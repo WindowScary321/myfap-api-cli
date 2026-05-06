@@ -53,6 +53,7 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
 |Option|Chú thích|
 |:-|:-|
 |--help|Hiển thị bảng Commands và Options|
+|--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
 |-c, --campus <cơ sở>|Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|

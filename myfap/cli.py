@@ -20,17 +20,24 @@ app.add_typer(other_app, name="other")
 # Trạng thái toàn cục (State) để lưu trữ các cờ flag
 state = {
     "campus": "APHL", # Campus Hoà Lạc
-    "semester": None
+    "semester": None,
+    "config": None
 }
+
+def get_auth(campus=None):
+    c = campus if campus else state["campus"]
+    return MyFapAuth(campus=c, session_file=state.get("config"))
 
 @app.callback()
 def main(
     campus: str = typer.Option("APHL", "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
+    config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh (thay vì mặc định ~/.myfap-api-cli/session.json)"),
 ):
     """
     Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh.
     """
     state["campus"] = campus
+    state["config"] = config
 
 @app.command()
 def login(
@@ -40,16 +47,23 @@ def login(
 ):
     """Đăng nhập vào hệ thống FEID"""
     target_campus = campus if campus else state["campus"]
-    auth = MyFapAuth(campus=target_campus)
+    auth = get_auth(target_campus)
 
     if refresh:
         import json
-        from .auth import SESSION_FILE
-        if not SESSION_FILE.exists():
-            typer.echo("Lỗi: Không tìm thấy session.json. Vui lòng chạy login bình thường.")
+        if not auth.session_file.exists():
+            typer.echo("Lỗi: Không tìm thấy file session. Vui lòng chạy login bình thường.")
             raise typer.Exit(1)
-        with open(SESSION_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(auth.session_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            typer.echo(f"Lỗi: File cấu hình '{auth.session_file}' không đúng định dạng JSON.")
+            raise typer.Exit(1)
+        
+        if not isinstance(data, dict):
+            typer.echo(f"Lỗi: File '{auth.session_file}' không chứa dữ liệu hợp lệ.")
+            raise typer.Exit(1)
         auth.refresh_token = data.get("refresh_token")
         auth.jwt_token = data.get("jwt_token")
         auth.authen_key = data.get("authen_key")
@@ -99,7 +113,7 @@ def campuses():
 @app.command()
 def semesters():
     """Xem danh sách kỳ học"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -119,7 +133,7 @@ def schedule(
     ics: bool = typer.Option(False, "--ics", help="Xuất lịch học ra định dạng iCalendar (.ics)")
 ):
     """Xem lịch học (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -167,7 +181,7 @@ def marks(
         typer.echo("Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)")
         raise typer.Exit(code=1)
         
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -219,7 +233,7 @@ def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)")
 ):
     """Xem lịch thi (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -258,7 +272,7 @@ def week_timetable(
     year: Optional[int] = typer.Option(None, "--year", "-y", help="Năm học (VD: 2026)")
 ):
     """Xem lịch học theo tuần (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -327,7 +341,7 @@ def attendance(
     class_name: Optional[str] = typer.Option(None, "--classname", "-cn", help="Tên lớp học (VD: SE1801)")
 ):
     """Xem thông tin điểm danh (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -374,7 +388,7 @@ def attendance(
 @app.command()
 def applications():
     """Xem danh sách đơn từ đã gửi cho trường (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -395,7 +409,7 @@ def applications():
 @app.command()
 def news():
     """Xem 10 thông báo gần nhất (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -417,7 +431,7 @@ def news():
 @info_app.command("student")
 def info_student():
     """Xem thông tin sinh viên (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
         raise typer.Exit(code=1)
@@ -434,7 +448,7 @@ def info_student():
 @info_app.command("campus")
 def info_campus():
     """Xem thông tin phòng dịch vụ sinh viên (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn.")
         raise typer.Exit(code=1)
@@ -453,7 +467,7 @@ def info_campus():
 @other_app.command("survey")
 def other_survey():
     """Kiểm tra các survey chưa thực hiện (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn.")
         raise typer.Exit(code=1)
@@ -470,7 +484,7 @@ def other_survey():
 @other_app.command("feedback")
 def other_feedback():
     """Kiểm tra Feedback (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         raise typer.Exit(code=1)
     other_client = MyFapOther(auth)
@@ -486,7 +500,7 @@ def other_feedback():
 @other_app.command("profile")
 def other_profile():
     """Kiểm tra Update Profile (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         raise typer.Exit(code=1)
     other_client = MyFapOther(auth)
@@ -502,7 +516,7 @@ def other_profile():
 @other_app.command("notification")
 def other_notification():
     """Xem thông báo qua MSSV (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         raise typer.Exit(code=1)
     other_client = MyFapOther(auth)
@@ -518,7 +532,7 @@ def other_notification():
 @other_app.command("fee")
 def other_fee():
     """Lấy danh sách học phí chưa thanh toán (xuất JSON)"""
-    auth = MyFapAuth(campus=state["campus"])
+    auth = get_auth()
     if not auth.load_session():
         raise typer.Exit(code=1)
     other_client = MyFapOther(auth)

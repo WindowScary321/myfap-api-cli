@@ -23,8 +23,9 @@ def create_checksum(identifier: str, campus: str) -> str:
     return base64.b64encode(sig).decode()
 
 class MyFapAuth:
-    def __init__(self, campus="APHL"):
+    def __init__(self, campus="APHL", session_file=None):
         self.campus = campus
+        self.session_file = Path(session_file) if session_file else SESSION_FILE
         self.code_verifier, self.code_challenge = pkce.generate_pkce_pair()
         self.jwt_token = None
         self.refresh_token = None
@@ -45,17 +46,25 @@ class MyFapAuth:
             "refresh_token": self.refresh_token,
             "campus": self.campus
         }
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(SESSION_FILE, "w", encoding="utf-8") as f:
+        self.session_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.session_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
 
     def load_session(self):
-        if not SESSION_FILE.exists():
+        if not self.session_file.exists():
             return False
         try:
-            with open(SESSION_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            with open(self.session_file, "r", encoding="utf-8") as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    print(f"[!] Lỗi: File cấu hình '{self.session_file}' không đúng định dạng JSON.")
+                    return False
             
+            if not isinstance(data, dict) or "authen_key" not in data:
+                print(f"[!] Lỗi: File '{self.session_file}' không chứa dữ liệu session hợp lệ của MyFAP.")
+                return False
+                
             self.authen_key = data.get("authen_key")
             self.mssv = data.get("mssv")
             self.email = data.get("email")
@@ -110,8 +119,16 @@ class MyFapAuth:
                         self.save_session()
                         print("[*] Làm mới phiên đăng nhập thành công!")
                         return True
-            print("[!] Refresh Token thất bại. Vui lòng đăng nhập lại.")
-            return False
+                    else:
+                        print(f"[!] Lỗi handshake sau khi refresh: {resp_hs}")
+                        return False
+                else:
+                    print(f"[!] Lỗi handshake sau khi refresh (FAP trả về {r_handshake.status_code}): {r_handshake.text}")
+                    return False
+            else:
+                print(f"[!] Lỗi từ FEID (Mã {r.status_code}): {r.text}")
+                print("[!] Refresh Token thất bại hoặc đã bị thu hồi. Vui lòng chạy lệnh 'myfap login -f' để đăng nhập lại.")
+                return False
         except Exception as e:
             print(f"[!] Lỗi khi Refresh Token: {e}")
             return False
