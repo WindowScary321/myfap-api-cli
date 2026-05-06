@@ -6,6 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "myfap"
 version = "0.1.0"
 description = "CLI Tool dựa trên MyFAP API dành cho Sinh Viên FPTU"
+readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name="Author", email="author@example.com" }
 ]
@@ -26,3 +28,6 @@ myfap = "myfap.cli:app"
 
 [tool.setuptools.packages.find]
 include = ["myfap*"]
+
+[project.urls]
+Homepage = "https://github.com/WindowScary321/myfap-api-cli"
