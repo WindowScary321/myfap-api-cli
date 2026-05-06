@@ -74,13 +74,15 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
     - ``+`` nghĩa là bạn sẽ ko cần thêm flag ``--semester`` hoặc ``-s`` nếu gọi api vào đúng thời gian trong kỳ. Để xem thông tin của kỳ trước, bạn phải thêm flag này.
 - Xem tất cả command ``*``
   ```
-  (.venv) PS D:\git\myfap-api-cli> myfap --help  
+  myfap --help  
   Usage: myfap [OPTIONS] COMMAND [ARGS]...
 
     CLI Tool dựa trên MyFAP dành cho Sinh Viên FPTU
 
   Options:
     -c, --campus TEXT  Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]
+    --config TEXT      Đường dẫn file session tùy chỉnh (thay vì mặc định
+                      ~/.myfap-api-cli/session.json)
     --help             Show this message and exit.
 
   Commands:
@@ -96,7 +98,6 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
     news            Xem 10 thông báo gần nhất (xuất JSON)
     info            Xem thông tin chung (sinh viên, campus)
     other           Các chức năng phụ trợ khác (survey, feedback, fee...)
-  ```
 - Xem danh sách kỳ ``*``
   ```
   myfap semesters
@@ -181,4 +182,8 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
 - Đăng nhập lại, bỏ qua file ``session.json``
   ```
   myfap login -f
+  ```
+- Trỏ vào file ``session.json`` vào vị trí tuỳ chỉnh
+  ```
+  myfap login --config "%appdata%\myfap-api-cli\session.json"
   ```
