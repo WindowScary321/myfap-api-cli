@@ -21,21 +21,10 @@ Chào mứng đến với dự án đầu tiên của kế hoạch lật đổ F
 
 Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip. Bạn có thể tải sauce về và chạy:
 
-- Tạo venv.
+- Cài đặt ứng dụng.
 
   ```
-  python -m venv .venv && .\.venv\Scripts\activate
-  ```
-
-- Cài đặt dependency.
-
-  ```
-  pip install .
-  ```
-
-- Cài đặt playwright (nếu bạn ko dùng chrome hoặc edge).
-  ```
-  playwright install
+  pip install myfap
   ```
 
 - Lấy danh sách cơ sở.
