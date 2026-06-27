@@ -23,11 +23,17 @@ def clean_json(data):
     return data
 
 
+def _create_session():
+    """Tạo requests.Session() chung với User-Agent mạo danh app mobile FPT"""
+    s = requests.Session()
+    s.headers.update({"User-Agent": "okhttp/4.9.2"})
+    return s
+
+
 class MyFapEssential:
     def __init__(self, auth=None):
         self.auth = auth
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "okhttp/4.9.2"})
+        self.session = auth.session if auth else _create_session()
 
     def get_campuses(self):
         """Lấy danh sách các cơ sở (không cần authenKey)"""
@@ -75,8 +81,7 @@ class MyFapEssential:
 class MyFapOther:
     def __init__(self, auth):
         self.auth = auth
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "okhttp/4.9.2"})
+        self.session = auth.session if auth else _create_session()
 
     def get_required_survey(self):
         """Lấy các survey chưa thực hiện"""
@@ -131,8 +136,7 @@ class MyFapOther:
 class MyFapClient:
     def __init__(self, auth):
         self.auth = auth
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "okhttp/4.9.2"})
+        self.session = auth.session if auth else _create_session()
 
     def get_schedule(self, semester: str):
         """Lấy lịch học theo kỳ"""

@@ -28,6 +28,26 @@ def get_auth(campus=None):
     c = campus if campus else state["campus"]
     return MyFapAuth(campus=c, session_file=state.get("config"))
 
+def require_auth():
+    """Load session hoặc thoát nếu chưa đăng nhập"""
+    auth = get_auth()
+    if not auth.load_session():
+        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
+        raise typer.Exit(code=1)
+    return auth
+
+def resolve_semester(auth, semester_flag):
+    """Xác định kỳ học: dùng flag nếu có, không thì lấy kỳ mới nhất"""
+    if semester_flag:
+        return semester_flag
+    essential = MyFapEssential(auth)
+    semesters_list = essential.get_semesters()
+    if not semesters_list:
+        raise Exception("Không tìm thấy kỳ học nào.")
+    sem = semesters_list[0]['semesterName']
+    typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
+    return sem
+
 @app.callback()
 def main(
     campus: str = typer.Option("APHL", "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
@@ -113,11 +133,7 @@ def campuses():
 @app.command()
 def semesters():
     """Xem danh sách kỳ học"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     other = MyFapEssential(auth)
     try:
         data = other.get_semesters()
@@ -133,24 +149,15 @@ def schedule(
     ics: bool = typer.Option(False, "--ics", help="Xuất lịch học ra định dạng iCalendar (.ics)")
 ):
     """Xem lịch học (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     client = MyFapClient(auth)
-    other = MyFapEssential(auth)
     
     # Xác định kỳ học
-    sem = semester
-    if not sem:
-        try:
-            semesters = other.get_semesters()
-            sem = semesters[0]['semesterName'] if semesters else "Fall2025"
-            typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
-        except Exception as e:
-            typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
-            raise typer.Exit(code=1)
+    try:
+        sem = resolve_semester(auth, semester)
+    except Exception as e:
+        typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
+        raise typer.Exit(code=1)
             
     # Lấy lịch học
     try:
@@ -181,13 +188,8 @@ def marks(
         typer.echo("Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)")
         raise typer.Exit(code=1)
         
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     client = MyFapClient(auth)
-    other = MyFapEssential(auth)
 
     # Nếu truyền --courseid thì bỏ qua semester và gọi GetMarkByCourse luôn
     if courseid:
@@ -206,15 +208,11 @@ def marks(
         return
     
     # Xác định kỳ học nếu không truyền courseid
-    sem = semester
-    if not sem:
-        try:
-            semesters = other.get_semesters()
-            sem = semesters[0]['semesterName'] if semesters else "Fall2025"
-            typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
-        except Exception as e:
-            typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
-            raise typer.Exit(code=1)
+    try:
+        sem = resolve_semester(auth, semester)
+    except Exception as e:
+        typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
+        raise typer.Exit(code=1)
             
     # Lấy bảng điểm cả kỳ
     try:
@@ -233,24 +231,15 @@ def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)")
 ):
     """Xem lịch thi (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     client = MyFapClient(auth)
-    other = MyFapEssential(auth)
     
     # Xác định kỳ học
-    sem = semester
-    if not sem:
-        try:
-            semesters = other.get_semesters()
-            sem = semesters[0]['semesterName'] if semesters else "Summer2026"
-            typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
-        except Exception as e:
-            typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
-            raise typer.Exit(code=1)
+    try:
+        sem = resolve_semester(auth, semester)
+    except Exception as e:
+        typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
+        raise typer.Exit(code=1)
             
     # Lấy lịch thi
     try:
@@ -272,13 +261,9 @@ def week_timetable(
     year: Optional[int] = typer.Option(None, "--year", "-y", help="Năm học (VD: 2026)")
 ):
     """Xem lịch học theo tuần (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     client = MyFapClient(auth)
-    other = MyFapEssential(auth)
+    essential = MyFapEssential(auth)
 
     from datetime import datetime
     now = datetime.now()
@@ -302,7 +287,7 @@ def week_timetable(
             date_str = now.strftime("%Y-%m-%d")
             
         try:
-            target_week = other.get_week(date_str)
+            target_week = essential.get_week(date_str)
             if date:
                 typer.echo(f"Ngày {date_str} tương ứng với: Tuần {target_week}")
             else:
@@ -312,15 +297,11 @@ def week_timetable(
             raise typer.Exit(code=1)
 
     # Xác định kỳ học
-    sem = semester
-    if not sem:
-        try:
-            semesters = other.get_semesters()
-            sem = semesters[0]['semesterName'] if semesters else "Summer2026"
-            typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
-        except Exception as e:
-            typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
-            raise typer.Exit(code=1)
+    try:
+        sem = resolve_semester(auth, semester)
+    except Exception as e:
+        typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
+        raise typer.Exit(code=1)
             
     # Lấy lịch học theo tuần
     try:
@@ -341,24 +322,15 @@ def attendance(
     class_name: Optional[str] = typer.Option(None, "--classname", "-cn", help="Tên lớp học (VD: SE1801)")
 ):
     """Xem thông tin điểm danh (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
-        
+    auth = require_auth()
     client = MyFapClient(auth)
-    other = MyFapEssential(auth)
 
     # Xác định kỳ học
-    sem = semester
-    if not sem:
-        try:
-            semesters = other.get_semesters()
-            sem = semesters[0]['semesterName'] if semesters else "Summer2026"
-            typer.echo(f"Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}")
-        except Exception as e:
-            typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
-            raise typer.Exit(code=1)
+    try:
+        sem = resolve_semester(auth, semester)
+    except Exception as e:
+        typer.echo(f"Không thể lấy danh sách kỳ học: {e}")
+        raise typer.Exit(code=1)
 
     # Nếu người dùng truyền thông tin môn học và lớp
     if subject_code or class_name:
@@ -388,10 +360,7 @@ def attendance(
 @app.command()
 def applications():
     """Xem danh sách đơn từ đã gửi cho trường (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
+    auth = require_auth()
         
     client = MyFapClient(auth)
     
@@ -409,10 +378,7 @@ def applications():
 @app.command()
 def news():
     """Xem 10 thông báo gần nhất (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
+    auth = require_auth()
         
     other = MyFapEssential(auth)
     
@@ -431,10 +397,7 @@ def news():
 @info_app.command("student")
 def info_student():
     """Xem thông tin sinh viên (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.")
-        raise typer.Exit(code=1)
+    auth = require_auth()
     client = MyFapClient(auth)
     try:
         data = client.get_student_info()
@@ -448,10 +411,7 @@ def info_student():
 @info_app.command("campus")
 def info_campus():
     """Xem thông tin phòng dịch vụ sinh viên (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn.")
-        raise typer.Exit(code=1)
+    auth = require_auth()
     client = MyFapClient(auth)
     try:
         data = client.get_campus_info()
@@ -467,10 +427,7 @@ def info_campus():
 @other_app.command("survey")
 def other_survey():
     """Kiểm tra các survey chưa thực hiện (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        typer.echo("Lỗi: Chưa đăng nhập hoặc session hết hạn.")
-        raise typer.Exit(code=1)
+    auth = require_auth()
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_required_survey()
@@ -484,9 +441,7 @@ def other_survey():
 @other_app.command("feedback")
 def other_feedback():
     """Kiểm tra Feedback (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        raise typer.Exit(code=1)
+    auth = require_auth()
     other_client = MyFapOther(auth)
     try:
         data = other_client.check_open_feedback()
@@ -500,9 +455,7 @@ def other_feedback():
 @other_app.command("profile")
 def other_profile():
     """Kiểm tra Update Profile (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        raise typer.Exit(code=1)
+    auth = require_auth()
     other_client = MyFapOther(auth)
     try:
         data = other_client.check_update_profile()
@@ -516,9 +469,7 @@ def other_profile():
 @other_app.command("notification")
 def other_notification():
     """Xem thông báo qua MSSV (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        raise typer.Exit(code=1)
+    auth = require_auth()
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_notification()
@@ -532,9 +483,7 @@ def other_notification():
 @other_app.command("fee")
 def other_fee():
     """Lấy danh sách học phí chưa thanh toán (xuất JSON)"""
-    auth = get_auth()
-    if not auth.load_session():
-        raise typer.Exit(code=1)
+    auth = require_auth()
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_fee()
