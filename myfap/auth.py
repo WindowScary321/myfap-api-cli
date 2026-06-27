@@ -227,7 +227,7 @@ class MyFapAuth:
         # Lấy MSSV và email từ Token
         parts = self.jwt_token.split('.')
         payload_str = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
-        payload = json.loads(base64.b64decode(payload_str))
+        payload = json.loads(base64.urlsafe_b64decode(payload_str))
         self.email = payload.get('email', '')
         try:
             proj_str = payload.get('projectCampuses', '[]')
