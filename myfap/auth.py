@@ -86,7 +86,7 @@ class MyFapAuth:
                     return self.refresh_session()
                 return True
             return self.refresh_session()
-        except:
+        except Exception:
             return self.refresh_session()
 
 
@@ -178,7 +178,7 @@ class MyFapAuth:
                             import urllib.parse as urlparse
                             parsed = urlparse.urlparse(location)
                             code = urlparse.parse_qs(parsed.query)['code'][0]
-                        except:
+                        except Exception:
                             code = location.split("code=")[1].split("&")[0]
 
             def handle_request(request):
@@ -189,7 +189,7 @@ class MyFapAuth:
                         import urllib.parse as urlparse
                         parsed = urlparse.urlparse(url)
                         code = urlparse.parse_qs(parsed.query)['code'][0]
-                    except:
+                    except Exception:
                         code = url.split("code=")[1].split("&")[0]
 
             page.on("response", handle_response)
@@ -205,7 +205,7 @@ class MyFapAuth:
             while not code and (time.time() - start_time) < 120:
                 try:
                     page.wait_for_timeout(500)
-                except:
+                except Exception:
                     break
             browser.close()
 
@@ -240,7 +240,7 @@ class MyFapAuth:
                     break
             if not found and projects: self.mssv = projects[0].get('RollNumber')
             print(f"[*] Xin chào sinh viên: {self.mssv}")
-        except:
+        except Exception:
             self.mssv = input("[?] Không tìm thấy MSSV tự động. Nhập MSSV thủ công: ")
 
         print("[*] Handshake với FAP API để lấy authenKey...")

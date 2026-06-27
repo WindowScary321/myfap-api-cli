@@ -2,8 +2,8 @@
 
 ## Giới thiệu
 
-Chào mứng đến với dự án đầu tiên của kế hoạch lật đổ FBTU. Cli này tương tác giống hoàn toàn với APP MYFAP trên điện thoại. Bạn có thể xem lịch học, lịch thi, điểm số (sự thất vọng của gia đình), thông tin cá nhân, v.v. 1 cách thuận tiện, không bị gò bó trong giao diện app. <br>
-- Lưu ý: repo này được thực hiện cùng với sự hỗ trợ của Ai (Gemini 3.1 Pro Preview)
+Đây là cli tương tác giống hoàn toàn với APP MYFAP trên điện thoại. Bạn có thể xem lịch học, lịch thi, điểm số (sự thất vọng của gia đình), thông tin cá nhân, v.v. 1 cách thuận tiện, không bị gò bó trong giao diện app. <br>
+- Lưu ý: repo này được thực hiện cùng với sự hỗ trợ của AI.
 
 ## Tính năng chính
 - Hỗ trợ đa nền tảng.

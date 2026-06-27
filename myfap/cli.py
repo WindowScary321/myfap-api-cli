@@ -101,9 +101,9 @@ def login(
 @app.command()
 def campuses():
     """Xem danh sách các cơ sở (Campus)"""
-    other = MyFapOther()
+    essential = MyFapEssential()
     try:
-        data = other.get_campuses()
+        data = essential.get_campuses()
         typer.echo("Danh sách các cơ sở (Campus):")
         for c in data:
             typer.echo(f"- {c.get('campusName')} (Mã: {c.get('campusCode')})")
