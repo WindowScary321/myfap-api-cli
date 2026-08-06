@@ -64,7 +64,8 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
 |-cn, --classname <mã lớp>|Chọn lớp học, chỉ có ở command ``attendance``|
 |--ics|Convert Sang **ICS**, dễ dàng import lịch học vào Google Calendar hoặc các dịch vụ tương tự, chỉ có ở command ``schedule``)|
 |-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, chỉ có ở command ``marks``)|
-|-r, --refresh|Refresh thủ công ``authen_key`` trong file ``session.json``, chỉ có ở command ``login``|
+|--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
+|--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|
 |-f, --force|Buộc đăng nhập lại, bỏ qua file ``session.json``, chỉ có ở command ``login``|
 
 ## Các ví dụ sử dụng
@@ -86,16 +87,19 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
     --help             Show this message and exit.
 
   Commands:
+    version         Hiển thị phiên bản MyFap API CLI
     login           Đăng nhập vào hệ thống FEID
+    logout          Đăng xuất (Xóa session)
+    refresh         Làm mới token (Refresh Token)
     campuses        Xem danh sách các cơ sở (Campus)
     semesters       Xem danh sách kỳ học
-    schedule        Xem lịch học (xuất JSON)
-    marks           Xem bảng điểm (xuất JSON)
-    exams           Xem lịch thi (xuất JSON)
-    week-timetable  Xem lịch học theo tuần (xuất JSON)
-    attendance      Xem thông tin điểm danh (xuất JSON)
-    applications    Xem danh sách đơn từ đã gửi cho trường (xuất JSON)
-    news            Xem 10 thông báo gần nhất (xuất JSON)
+    schedule        Xem lịch học
+    marks           Xem bảng điểm
+    exams           Xem lịch thi
+    week-timetable  Xem lịch học theo tuần
+    attendance      Xem thông tin điểm danh
+    applications    Xem danh sách đơn từ đã gửi cho trường
+    news            Xem 10 thông báo gần nhất
     info            Xem thông tin chung (sinh viên, campus)
     other           Các chức năng phụ trợ khác (survey, feedback, fee...)
 - Xem danh sách kỳ ``*``
@@ -169,15 +173,15 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
     --help  Show this message and exit.
 
   Commands:
-    survey        Kiểm tra các survey chưa thực hiện (xuất JSON)
-    feedback      Kiểm tra Feedback (xuất JSON)
-    profile       Kiểm tra Update Profile (xuất JSON)
-    notification  Xem thông báo qua MSSV (xuất JSON)
-    fee           Lấy danh sách học phí chưa thanh toán (xuất JSON)
+    survey        Kiểm tra các survey chưa thực hiện
+    feedback      Kiểm tra Feedback
+    profile       Kiểm tra Update Profile
+    notification  Xem thông báo qua MSSV
+    fee           Lấy danh sách học phí chưa thanh toán
   ```
 - Refresh thủ công ``authen_key`` trong trường hợp cli bị lỗi
   ```
-  myfap login -r
+  myfap refresh
   ```
 - Đăng nhập lại, bỏ qua file ``session.json``
   ```

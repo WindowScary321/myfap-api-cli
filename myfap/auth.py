@@ -49,6 +49,11 @@ class MyFapAuth:
         self.session_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.session_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
+        try:
+            import os
+            os.chmod(self.session_file, 0o600)
+        except Exception:
+            pass
 
     def load_session(self):
         if not self.session_file.exists():
@@ -98,7 +103,7 @@ class MyFapAuth:
                 "client_id": CLIENT_ID, 
                 "refresh_token": self.refresh_token, 
                 "grant_type": "refresh_token"
-            })
+            }, timeout=10)
             if r.status_code == 200:
                 resp = r.json()
                 self.jwt_token = resp.get('access_token', self.jwt_token)
@@ -110,7 +115,8 @@ class MyFapAuth:
                 r_handshake = self.session.post(
                     f"{FAP_HOST}/AuthenticationByFeId?campusCode={self.campus}&checksum={checksum}",
                     json={"token": self.jwt_token},
-                    headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"}
+                    headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
+                    timeout=10
                 )
                 if r_handshake.status_code == 200:
                     resp_hs = r_handshake.json()
@@ -202,11 +208,15 @@ class MyFapAuth:
                 pass
             
             start_time = time.time()
-            while not code and (time.time() - start_time) < 120:
-                try:
+            try:
+                while not code and (time.time() - start_time) < 120:
                     page.wait_for_timeout(500)
-                except Exception:
-                    break
+            except KeyboardInterrupt:
+                print("\n[!] Hủy đăng nhập bởi người dùng.")
+                browser.close()
+                raise Exception("Đăng nhập bị hủy.")
+            except Exception:
+                pass
             browser.close()
 
         if not code:
@@ -216,7 +226,7 @@ class MyFapAuth:
         r = self.session.post(f"{FEID_HOST}/connect/token", data={
             "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
             "code_verifier": self.code_verifier, "grant_type": "authorization_code"
-        })
+        }, timeout=10)
         
         if r.status_code != 200:
             raise Exception(f"Lỗi lấy JWT Token: {r.text}")
@@ -241,14 +251,15 @@ class MyFapAuth:
             if not found and projects: self.mssv = projects[0].get('RollNumber')
             print(f"[*] Xin chào sinh viên: {self.mssv}")
         except Exception:
-            self.mssv = input("[?] Không tìm thấy MSSV tự động. Nhập MSSV thủ công: ")
+            raise Exception("Không tìm thấy MSSV tự động trong Token. Đăng nhập thất bại.")
 
         print("[*] Handshake với FAP API để lấy authenKey...")
         checksum = create_checksum(MAGIC_ID, self.campus)
         r = self.session.post(
             f"{FAP_HOST}/AuthenticationByFeId?campusCode={self.campus}&checksum={checksum}",
             json={"token": self.jwt_token},
-            headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"}
+            headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
+            timeout=10
         )
         if r.status_code == 200:
             resp = r.json()
@@ -261,37 +272,3 @@ class MyFapAuth:
         else:
             raise Exception(f"API Error {r.status_code}: {r.text}")
 
-if __name__ == "__main__":
-    print("--- BẮT ĐẦU TEST AUTH VÀ GỌI API ---")
-    campus = "APHL"
-    auth = MyFapAuth(campus=campus)
-    
-    try:
-        authen_key, mssv = auth.login()
-        
-        print("\n--- TEST LẤY DANH SÁCH KỲ HỌC (GetSemester) ---")
-        checksum = create_checksum(MAGIC_ID, campus)
-        url_sem = f"{FAP_HOST}/GetSemester?campusCode={campus}&Authen={authen_key}&checksum={checksum}"
-        r_sem = requests.get(url_sem)
-        semester = "Fall2025"
-        if r_sem.status_code == 200:
-            semesters = r_sem.json().get('data', [])
-            semesters.sort(key=lambda x: x['termID'], reverse=True)
-            if semesters:
-                semester = semesters[0]['semesterName']
-                print(f"[*] Kỳ học hiện tại: {semester}")
-
-        print("\n--- TEST API GetActivityStudent ---")
-        checksum_api = create_checksum(mssv, campus)
-        url_act = f"{FAP_HOST}/GetActivityStudent?campusCode={campus}&rollNumber={mssv}&Authen={authen_key}&checksum={checksum_api}&Semester={semester}"
-        r_act = requests.get(url_act)
-        
-        if r_act.status_code == 200:
-            data = r_act.json()
-            print("[*] Gọi thành công! Dữ liệu mẫu (chỉ in vài dòng đầu):")
-            print(json.dumps(data, indent=2, ensure_ascii=False)[:600] + "\n...")
-        else:
-            print(f"[!] Lỗi gọi API: {r_act.text}")
-            
-    except Exception as e:
-        print(f"[!] Lỗi: {e}")

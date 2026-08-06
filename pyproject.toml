@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "myfap"
-version = "0.1.5"
+version = "0.1.6"
 description = "CLI Tool dựa trên MyFAP API dành cho Sinh Viên FPTU"
 readme = "README.md"
 license = { text = "MIT" }
@@ -21,7 +21,7 @@ dependencies = [
     "ics>=0.7.2",
     "pytz>=2023.3"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.scripts]
 myfap = "myfap.cli:app"
