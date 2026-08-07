@@ -1,13 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "myfap"
-version = "0.1.6"
+version = "0.1.7"
 description = "CLI Tool dựa trên MyFAP API dành cho Sinh Viên FPTU"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE*"]
 authors = [
     { name="WindowScary321", email="126940686+WindowScary321@users.noreply.github.com" }
 ]

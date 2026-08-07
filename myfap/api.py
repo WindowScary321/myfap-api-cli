@@ -134,6 +134,16 @@ class MyFapOther:
             return {"status": "Không có khoản nợ học phí nào cần thanh toán."}
         raise Exception(f"Lỗi lấy Fee: {r.text}")
 
+    def get_subjects(self):
+        """Lấy danh sách tất cả môn học"""
+        checksum = create_checksum(MAGIC_ID, self.auth.campus)
+        url = f"{FAP_HOST}/GetSubjets?campusCode={self.auth.campus}&Authen={self.auth.authen_key}&checksum={checksum}"
+        timeout = max(DEFAULT_TIMEOUT, 30.0)
+        r = self.session.get(url, timeout=timeout)
+        if r.status_code == 200:
+            return clean_json(check_api_error(r.json()))
+        raise Exception(f"Lỗi lấy danh sách môn học: {r.text}")
+
 class MyFapClient:
     def __init__(self, auth):
         self.auth = auth

@@ -537,3 +537,21 @@ def other_fee(
     except Exception as e:
         console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
+
+@other_app.command("subjects")
+def other_subjects(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy danh sách tất cả môn học"""
+    auth = require_auth()
+    other_client = MyFapOther(auth)
+    try:
+        with console.status("[bold green]Đang tải danh sách tất cả môn học..."):
+            data = other_client.get_subjects()
+        filename = f"Subjects.json"
+        save_output(data, filename, output, stdout)
+    except Exception as e:
+        console.print(f"[red]Lỗi: {e}[/red]")
+        raise typer.Exit(code=1)
+
