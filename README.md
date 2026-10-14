@@ -19,7 +19,7 @@
 
 ## Cách sử dụng
 
-Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip. Bạn có thể tải sauce về và chạy:
+Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. Để phát triển từ mã nguồn, xem mục dùng uv.
 
 - Cài đặt ứng dụng.
 
@@ -48,6 +48,41 @@ Do dự án đang trong quá trình phát triển nên chưa thể đem lên pip
   ```
   myfap schedule
   ```
+
+## Phát triển với uv
+
+Bạn cần cài [uv](https://docs.astral.sh/uv/getting-started/installation/) trước khi bắt đầu. Repo dùng Python 3.11 cho môi trường dev, được chọn trong `.python-version`; package vẫn hỗ trợ Python từ 3.9. Cả `.python-version` và `uv.lock` được commit để các máy dùng cùng cấu hình và phiên bản dependency.
+
+Clone repo và cài môi trường theo lockfile:
+
+```sh
+git clone https://github.com/WindowScary321/myfap-api-cli.git
+cd myfap-api-cli
+uv sync --locked
+```
+
+`uv sync` tạo `.venv` và cài package ở chế độ editable, nên thay đổi mã nguồn có hiệu lực khi chạy CLI. Bạn dùng `uv run` để chạy trong môi trường này, không cần activate thủ công hay chạy `uv init` trong repo đã có cấu hình.
+
+```sh
+uv run myfap --help
+uv run myfap version
+uv run python -m unittest discover -s tests -v
+uv build
+```
+
+### Trình duyệt cho đăng nhập
+
+Đăng nhập mở cửa sổ trình duyệt và ưu tiên Chrome đã cài trên máy, sau đó thử Edge. Nếu có Chrome hoặc Edge chạy được, bạn không cần cài thêm trình duyệt. Để dùng Firefox làm phương án dự phòng, cài trình duyệt của Playwright bằng lệnh sau:
+
+```sh
+uv run playwright install firefox
+```
+
+Bước cài Firefox là tùy chọn; việc build package không cần trình duyệt.
+
+### Cập nhật dependency
+
+Bạn dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cập nhật dependency trong `pyproject.toml` và `uv.lock`. Nếu sửa dependency trực tiếp trong `pyproject.toml`, chạy `uv lock` rồi `uv sync --locked`. Sau khi kiểm tra, commit cả thay đổi cấu hình và lockfile cùng nhau. Không commit thư mục `.venv`.
 
 ## Các Options
 |Option|Chú thích|

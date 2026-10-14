@@ -16,16 +16,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Set up Python
+      - name: Cài Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version-file: ".python-version"
 
-      - name: Install build tools
-        run: pip install build twine
+      - name: Cài uv
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.13.0"
+          enable-cache: true
+
+      - name: Đồng bộ dependencies
+        run: uv sync --locked
+
+      - name: Chạy regression test
+        run: uv run --locked python -m unittest discover -s tests -v
 
       - name: Build package
-        run: python -m build
+        run: uv build
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
