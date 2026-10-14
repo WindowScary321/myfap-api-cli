@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-Quản lý môi trường dev và dependencies bằng uv; sửa `myfap version` để đọc metadata của package `myfap`. Giữ setuptools, tên package, phiên bản 0.1.7 và phạm vi Python >=3.9.
+Quản lý môi trường dev và dependencies bằng uv; sửa `myfap version` để đọc metadata của package `myfap`. Giữ setuptools, tên package và phạm vi Python >=3.9. Bump phiên bản lên 0.1.8 cho thay đổi này.
 
 ## Thứ tự thực hiện
 
