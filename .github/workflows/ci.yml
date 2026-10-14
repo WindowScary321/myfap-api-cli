@@ -1,0 +1,44 @@
+name: Kiểm tra
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+jobs:
+  test-and-build:
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.11"]
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v5
+
+      - name: Cài uv
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.13.0"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Đồng bộ dependencies
+        run: uv sync --locked
+
+      - name: Chạy regression test
+        run: uv run --locked python -m unittest discover -s tests -v
+
+      - name: Kiểm tra CLI
+        run: uv run --locked myfap --help
+
+      - name: Build package
+        run: uv build

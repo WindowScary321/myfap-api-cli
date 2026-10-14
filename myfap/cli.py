@@ -93,7 +93,7 @@ def main(
 def version():
     """Hiển thị phiên bản MyFap API CLI"""
     try:
-        ver = metadata.version("myfap-api-cli")
+        ver = metadata.version("myfap")
     except metadata.PackageNotFoundError:
         ver = "unknown (not installed via pip)"
     console.print(f"MyFap API CLI version: [bold cyan]{ver}[/bold cyan]")
