@@ -6,6 +6,7 @@ import requests
 from .auth import FAP_HOST, MAGIC_ID, create_checksum, create_survey_checksum
 from .config import DEFAULT_TIMEOUT, resolve_timeout
 from .errors import (
+    AUTHENTICATED_READ_OPERATIONS,
     ApiAppCheckError,
     ApiError,
     ApiHTTPError,
@@ -28,12 +29,7 @@ def clean_json(data):
     return data
 
 
-READ_OPERATIONS = {
-    "GetAllActiveCampus", "GetSemester", "GetWeekByDate", "GetTop10News", "GetRequiredSurvey", "CheckOpenFeedBack",
-    "CheckUpdateProfile", "GetNotificationByRoll", "GeFeeByRoll", "GetSubjets", "GetActivityStudent",
-    "GetStudentMark", "GetMarkByCourse", "GetScheduleExam", "GetActivityStudentByWeek",
-    "GetStudentAttendances", "getCourseAttendance", "GetApplication", "GetStudentById", "GetCampusInfo",
-}
+READ_OPERATIONS = AUTHENTICATED_READ_OPERATIONS | {"GetAllActiveCampus", "GetWeekByDate", "GetRequiredSurvey"}
 
 
 def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_found=False,

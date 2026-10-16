@@ -35,11 +35,15 @@ class ApiAppCheckError(ApiError):
     pass
 
 
-V1_EXPIRY_OPERATIONS = frozenset({
+AUTHENTICATED_READ_OPERATIONS = frozenset({
+    "GetSemester", "GetTop10News", "CheckOpenFeedBack", "CheckUpdateProfile",
+    "GetNotificationByRoll", "GeFeeByRoll", "GetSubjets",
     "GetActivityStudent",
     "GetStudentMark",
+    "GetMarkByCourse", "GetScheduleExam",
     "GetStudentAttendances",
     "GetActivityStudentByWeek",
+    "getCourseAttendance", "GetApplication", "GetStudentById", "GetCampusInfo",
 })
 
 
@@ -66,11 +70,11 @@ def check_api_error(data, *, allow_survey_not_found=False, api_version="v1", ope
         raise ApiSessionExpiredError()
     if (
         api_version == "v1"
-        and operation in V1_EXPIRY_OPERATIONS
+        and operation in AUTHENTICATED_READ_OPERATIONS
         and code == "201"
         and data.get("message") == "Token invalid"
     ):
-        # The v1 contract uses HTTP 200 for this application-level expiry.
+        # Retry only known FAP reads with an explicit application-level expiry.
         raise ApiSessionExpiredError(200)
     if "data" not in data:
         raise ApiPayloadError("Response API phải có code và data.")

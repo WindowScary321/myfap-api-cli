@@ -8,9 +8,30 @@ from myfap import api
 from tests.test_api import response
 
 
+AUTHENTICATED_READ_CASES = (
+    (api.MyFapEssential, "get_semesters", (), "GetSemester"),
+    (api.MyFapEssential, "get_news", (), "GetTop10News"),
+    (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack"),
+    (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile"),
+    (api.MyFapOther, "get_notification", (), "GetNotificationByRoll"),
+    (api.MyFapOther, "get_fee", (), "GeFeeByRoll"),
+    (api.MyFapOther, "get_subjects", (), "GetSubjets"),
+    (api.MyFapClient, "get_schedule", ("Fall2026",), "GetActivityStudent"),
+    (api.MyFapClient, "get_marks", ("Fall2026",), "GetStudentMark"),
+    (api.MyFapClient, "get_mark_by_course", ("123",), "GetMarkByCourse"),
+    (api.MyFapClient, "get_exams", ("Fall2026",), "GetScheduleExam"),
+    (api.MyFapClient, "get_schedule_by_week", (42, "Fall2026", 2026), "GetActivityStudentByWeek"),
+    (api.MyFapClient, "get_attendances", ("Fall2026",), "GetStudentAttendances"),
+    (api.MyFapClient, "get_course_attendance", ("Fall2026", "TEST101", "DEMO01"), "getCourseAttendance"),
+    (api.MyFapClient, "get_applications", (), "GetApplication"),
+    (api.MyFapClient, "get_student_info", (), "GetStudentById"),
+    (api.MyFapClient, "get_campus_info", (), "GetCampusInfo"),
+)
+
+
 class ApiErrorPolicyTests(unittest.TestCase):
-    def test_known_v1_201_token_invalid_is_expiry_with_actual_http_status(self):
-        for operation in ("GetActivityStudent", "GetStudentMark", "GetStudentAttendances", "GetActivityStudentByWeek"):
+    def test_authenticated_v1_reads_recognize_201_token_invalid_with_actual_http_status(self):
+        for _, _, _, operation in AUTHENTICATED_READ_CASES:
             for code in (201, "201"):
                 with self.subTest(operation=operation, code=code):
                     with self.assertRaises(api.ApiSessionExpiredError) as caught:
@@ -18,7 +39,7 @@ class ApiErrorPolicyTests(unittest.TestCase):
                     self.assertEqual(caught.exception.status_code, 200)
 
     def test_other_v1_body_201_and_401_are_operation_errors_even_with_expiry_message(self):
-        for operation in ("GetTop10News", "GetNotificationByRoll", "GetSemester", "AuthenticationByFeId", "GetRequiredSurvey", "AddRate", "GetBalance", "UnknownOperation"):
+        for operation in ("GetAllActiveCampus", "GetWeekByDate", "AuthenticationByFeId", "GetRequiredSurvey", "AddRate", "GetBalance", "UnknownOperation"):
             for code in (201, "201", 401, "401"):
                 with self.subTest(operation=operation, code=code):
                     with self.assertRaises(api.ApiOperationError) as caught:
@@ -28,7 +49,7 @@ class ApiErrorPolicyTests(unittest.TestCase):
                     self.assertEqual(caught.exception.code, str(code))
 
     def test_v1_201_requires_exact_token_invalid_message(self):
-        for operation in ("GetActivityStudent", "GetStudentMark", "GetStudentAttendances", "GetActivityStudentByWeek"):
+        for _, _, _, operation in AUTHENTICATED_READ_CASES:
             for message in (None, "token invalid", "Token Invalid", "Session expired", "Token invalid "):
                 with self.subTest(operation=operation, message=message):
                     with self.assertRaises(api.ApiOperationError):
@@ -110,14 +131,8 @@ class AuthenticatedRequestTests(unittest.TestCase):
         self.assertEqual(calls[1].kwargs["params"]["Semester"], "Fall2026")
         self.auth.ensure_bound.assert_called_with(campus="TEST", api_version="v1", account_type="student")
 
-    def test_known_v1_201_reads_retry_once_with_rotated_key_and_fresh_checksum(self):
-        operations = (
-            ("get_schedule", ("Fall2026",)),
-            ("get_marks", ("Fall2026",)),
-            ("get_attendances", ("Fall2026",)),
-            ("get_schedule_by_week", (42, "Fall2026", 2026)),
-        )
-        for method, args in operations:
+    def test_all_authenticated_v1_reads_retry_once_with_rotated_key_and_fresh_checksum(self):
+        for cls, method, args, operation in AUTHENTICATED_READ_CASES:
             for code in (201, "201"):
                 with self.subTest(operation=method, code=code):
                     self.auth.authen_key = "FAKE_OLD_KEY"
@@ -134,9 +149,11 @@ class AuthenticatedRequestTests(unittest.TestCase):
 
                     self.auth.refresh_session.side_effect = refresh
                     with patch("myfap.api.create_checksum", side_effect=["FAKE_OLD_CHECKSUM", "FAKE_NEW_CHECKSUM"]):
-                        self.assertEqual(getattr(api.MyFapClient(self.auth), method)(*args), {"code": 200, "data": []})
+                        expected = [] if operation == "GetSemester" else {"code": 200, "data": []}
+                        self.assertEqual(getattr(cls(self.auth), method)(*args), expected)
                     self.auth.refresh_session.assert_called_once_with()
                     self.assertEqual(self.session.get.call_count, 2)
+                    self.assertTrue(all(call.args[0].endswith("/" + operation) for call in self.session.get.call_args_list))
                     first, retried = [call.kwargs["params"] for call in self.session.get.call_args_list]
                     self.assertEqual(first["Authen"], "FAKE_OLD_KEY")
                     self.assertEqual(retried["Authen"], "FAKE_NEW_KEY")

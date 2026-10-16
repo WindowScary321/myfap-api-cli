@@ -38,7 +38,7 @@ myfap refresh
 myfap --config ./local-state.json refresh
 ```
 
-Lệnh đọc tự refresh rồi retry tối đa một lần khi nhận HTTP 401, hoặc khi API v1 trả body `code: 201` cùng message chính xác `Token invalid` trên bốn operation: `GetActivityStudent`, `GetStudentMark`, `GetStudentAttendances`, `GetActivityStudentByWeek`. Đây là contract được đối chiếu tại caller trong APK. `201` thiếu/sai message, operation chưa có bằng chứng, news/notification và handshake vẫn là lỗi operation; không tự refresh/logout. Body `401` của v1, timeout, lỗi mạng, HTTP 403/5xx và App Check cũng không gây refresh. Request ghi không được tự retry.
+Lệnh đọc tự refresh rồi retry tối đa một lần khi nhận HTTP 401, hoặc khi API v1 trả body `code: 201` cùng message chính xác `Token invalid` trên 17 FAP read operation có `Authen`. Policy bao gồm kỳ học, news, feedback/profile, notification, học phí, subjects, lịch học/điểm/điểm danh, lịch thi, đơn từ và thông tin sinh viên/campus. Bốn operation cốt lõi đã được đối chiếu trực tiếp với caller APK; 13 operation còn lại được mở rộng theo yêu cầu QoL với cùng exact-message guard. `201` thiếu/sai message vẫn là lỗi operation; news/notification rỗng không refresh. Public bootstrap, tra tuần và survey không mang FAP `Authen` nên không tự refresh. Body `401` của v1, timeout, lỗi mạng, HTTP 403/5xx và App Check cũng không gây refresh. Request ghi không được tự retry.
 
 Refresh giữ lock từ lúc đọc session đến khi lưu xong để hai process không rotate cùng token. Nếu process khác đã refresh cùng tài khoản và binding, CLI dùng session mới; nếu identity hoặc binding đã đổi, command dừng và yêu cầu chạy lại.
 

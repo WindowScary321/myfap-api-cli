@@ -51,7 +51,7 @@ Phase 4 tiếp tục điều tra lỗi backend/contract của news, notification
 
 ## Sửa lỗi sau review PR #5
 
-- [x] Khôi phục expiry v1 theo operation: body `201` cùng exact message `Token invalid` trên bốn operation đã có caller APK; giữ news/notification, handshake và trường hợp chưa có bằng chứng là lỗi operation. Retry đọc vẫn tối đa một lần.
+- [x] Mở rộng expiry v1 cho 17 FAP read operation có `Authen`: body `201` cùng exact message `Token invalid` kích hoạt retry tối đa một lần. Public/survey, handshake, operation ghi và body 201 thiếu/sai message không refresh; news/notification rỗng vẫn là lỗi operation.
 - [x] Login mới không bị binding v2/donor đã lưu chặn; chỉ kế thừa campus. Lệnh đọc và tham số yêu cầu v2/donor rõ ràng vẫn bị chặn trong Phase 2.
 - [x] `myfap login` tự mở trình duyệt khi session cần xác thực lại hoặc binding không được hỗ trợ, thay vì yêu cầu gõ lại `--force`.
 - [x] Thêm leeway 30 giây khi xác minh `exp/iat/nbf` của ID token, tách biệt buffer refresh sớm access token. Giữ strict type/finite và mọi kiểm tra chữ ký/identity.
