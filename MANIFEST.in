@@ -1,2 +1,3 @@
 prune docs
 prune tasks
+prune tests

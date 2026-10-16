@@ -1,0 +1,16 @@
+{
+  "code": "200",
+  "data": [
+    {
+      "date": "10/15/2026 12:00:00 AM",
+      "slotTime": "(7:30-9:50)",
+      "subjectCode": "TEST101",
+      "isOnline": "True",
+      "roomNo": "Demo room",
+      "groupName": "Demo group",
+      "sessionNo": 1,
+      "lecturer": "Demo lecturer",
+      "meetURL": "https://example.invalid/meet"
+    }
+  ]
+}
