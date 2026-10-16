@@ -68,8 +68,7 @@ Thứ tự ưu tiên là `--timeout` → `MYFAP_TIMEOUT` → mặc định. Cả
 |---|---|---|
 | Dữ liệu FAP và survey | 10 giây | Giá trị đã chọn |
 | Danh sách môn `other subjects` | 30 giây | Giá trị đã chọn, tối thiểu 30 giây |
-| Kiểm tra session | 5 giây | Giá trị đã chọn |
-| Lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
+| Discovery/JWKS, lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
 
 Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; nay cả biến môi trường và option đều áp dụng cho HTTP ở bước xác thực. Theo cách xử lý của Requests, timeout giới hạn chờ kết nối và chờ dữ liệu giữa các lần đọc, không giới hạn tổng thời gian chạy command. Thời gian chờ đăng nhập trên trình duyệt vẫn là 120 giây.
 ### Xem lịch học của Kỳ bất kỳ 
