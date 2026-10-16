@@ -20,6 +20,7 @@ from .storage import SessionFormatError, SessionStore, SessionStoreError
 
 CONFIG_DIR = Path.home() / ".myfap-api-cli"
 SESSION_FILE = CONFIG_DIR / "session.json"
+ACCESS_TOKEN_REFRESH_BUFFER = 30.0
 
 
 class AuthError(ApiError):
@@ -148,19 +149,6 @@ class MyFapAuth:
                     self.store.write(self._snapshot())
                     return True
                 self.ensure_bound()
-                try:
-                    result = self.session.get(
-                        f"{FAP_HOST}/GetSemester",
-                        params={"campusCode": self.campus, "Authen": self.authen_key, "checksum": create_checksum(MAGIC_ID, self.campus)},
-                        timeout=self.timeout or 5,
-                        allow_redirects=False,
-                    )
-                except requests.RequestException:
-                    raise AuthError("Không kiểm tra được session do lỗi kết nối. Hãy thử lại sau.") from None
-                try:
-                    read_response(result, api_version=self.api_version, operation="GetSemester")
-                except ApiSessionExpiredError:
-                    return self._refresh_locked()
                 return True
         except SessionStoreError:
             print("[!] Không đọc hoặc khóa được JSON session an toàn. Hãy kiểm tra --config.", file=sys.stderr)
@@ -226,7 +214,7 @@ class MyFapAuth:
         value = self.access_token_expires_at
         return (
             isinstance(value, (int, float)) and not isinstance(value, bool)
-            and math.isfinite(value) and value <= time.time()
+            and math.isfinite(value) and value <= time.time() + ACCESS_TOKEN_REFRESH_BUFFER
         )
 
     def _refresh_locked(self):
@@ -386,7 +374,7 @@ class MyFapAuth:
 
     def logout(self):
         try:
-            with self.store.lock():
+            with self.store.lock(cleanup=True):
                 if self.store.read() is None:
                     return False
                 self.session_file.unlink()

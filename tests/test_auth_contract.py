@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 import requests
 from typer.testing import CliRunner
 
+from myfap import api as api_module
 from myfap import auth as auth_module
 from myfap.auth import MyFapAuth
 from myfap.cli import app
@@ -53,25 +54,40 @@ class AuthContractTests(unittest.TestCase):
         prepared = requests.Request("GET", url, params=call.kwargs["params"]).prepare()
         self.assertEqual(parse_qs(urlsplit(prepared.url).query), {key: [value] for key, value in expected.items()})
 
-    def test_session_probe_uses_raw_params(self):
+    def test_loading_bound_session_is_local_without_probe_or_refresh(self):
+        self.auth.session.get = Mock()
+        self.auth.session.post = Mock()
+        self.auth.refresh_session = Mock()
+        self.assertTrue(self.auth.load_session())
+        self.auth.session.get.assert_not_called()
+        self.auth.session.post.assert_not_called()
+        self.auth.refresh_session.assert_not_called()
+
+    def test_semesters_command_uses_raw_params(self):
         self.auth.session.get = Mock(return_value=response({"code": "200", "data": []}))
-        with patch.object(auth_module, "create_checksum", return_value="fake+/=="):
-            self.assertTrue(self.auth.load_session())
+        with patch.object(api_module, "create_checksum", return_value="fake+/=="), patch("myfap.cli.get_auth", return_value=self.auth):
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["semesters"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.auth.session.get.call_count, 1)
+        self.assertTrue(self.auth.session.get.call_args.args[0].endswith("/GetSemester"))
         self.assert_query(self.auth.session.get.call_args, {
             "campusCode": "TEST&campus", "Authen": "fake+key/=&value", "checksum": "fake+/==",
         })
         self.assertFalse(self.auth.session.get.call_args.kwargs["allow_redirects"])
 
-    def test_session_probe_does_not_follow_redirect(self):
+    def test_data_command_does_not_follow_redirect(self):
         self.auth.session.get = Mock(return_value=response({"code": "200", "data": []}, 302))
         self.auth.session.post = Mock()
-        with self.assertRaises(Exception) as caught:
-            self.auth.load_session()
-        self.assertIn("HTTP 302", str(caught.exception))
+        with patch("myfap.cli.get_auth", return_value=self.auth):
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["info", "student", "--stdout"])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("HTTP 302", result.stderr)
+        self.assertTrue(self.auth.session.get.call_args.args[0].endswith("/GetStudentById"))
         self.assertFalse(self.auth.session.get.call_args.kwargs["allow_redirects"])
         self.auth.session.post.assert_not_called()
 
-    def test_transient_probe_failures_never_refresh(self):
+    def test_transient_data_failures_never_refresh(self):
         malformed = response({})
         malformed._content = b"not json"
         for failure in (
@@ -82,19 +98,47 @@ class AuthContractTests(unittest.TestCase):
             with self.subTest(failure=type(failure).__name__):
                 self.auth.session.get = Mock(side_effect=failure) if isinstance(failure, Exception) else Mock(return_value=failure)
                 self.auth.refresh_session = Mock(return_value=True)
-                with self.assertRaises(Exception) as caught:
-                    self.auth.load_session()
-                self.assertNotIn("private-url", str(caught.exception))
+                with patch("myfap.cli.get_auth", return_value=self.auth):
+                    result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["info", "student", "--stdout"])
+                self.assertEqual(result.exit_code, 1, result.output)
+                self.assertEqual(result.stdout, "")
+                self.assertNotIn("private-url", result.stderr)
+                self.assertNotIn("Chưa đăng nhập", result.stderr)
+                self.assertTrue(self.auth.session.get.call_args.args[0].endswith("/GetStudentById"))
+                self.assertEqual(self.auth.session.get.call_count, 1)
                 self.auth.refresh_session.assert_not_called()
 
-    def test_cli_reports_probe_error_without_suggesting_expired_session(self):
+    def test_cli_reports_data_error_without_suggesting_expired_session(self):
         self.auth.session.get = Mock(return_value=response({}, 503))
         with patch("myfap.cli.get_auth", return_value=self.auth):
-            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["schedule", "--stdout"])
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["info", "student", "--stdout"])
         self.assertEqual(result.exit_code, 1)
         self.assertEqual(result.stdout, "")
         self.assertIn("HTTP 503", result.stderr)
         self.assertNotIn("Chưa đăng nhập", result.stderr)
+        self.assertTrue(self.auth.session.get.call_args.args[0].endswith("/GetStudentById"))
+
+    def test_news_and_notification_201_do_not_invalidate_saved_session(self):
+        before = self.auth.session_file.read_bytes()
+        self.auth.refresh_session = Mock()
+        cases = [(["news", "--stdout"], "GetTop10News"), (["other", "notification", "--stdout"], "GetNotificationByRoll")]
+        for args, operation in cases:
+            with self.subTest(operation=operation):
+                self.auth.session.get = Mock(return_value=response({"code": "201", "data": None}))
+                with patch("myfap.cli.get_auth", return_value=self.auth):
+                    result = CliRunner(**RUNNER_OPTIONS).invoke(app, args)
+                self.assertEqual(result.exit_code, 1, result.output)
+                self.assertEqual(result.stdout, "")
+                self.assertIn("201", result.stderr)
+                self.assertNotIn("hết hạn", result.stderr)
+                self.assertTrue(self.auth.session.get.call_args.args[0].endswith("/" + operation))
+                self.auth.refresh_session.assert_not_called()
+                self.assertEqual(self.auth.session_file.read_bytes(), before)
+        self.auth.session.get = Mock(return_value=response({"code": "200", "data": []}))
+        with patch("myfap.cli.get_auth", return_value=self.auth):
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["info", "student", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), {"code": "200", "data": []})
 
     def test_data_command_stdout_stays_json_after_actual_refresh(self):
         self.auth.session.get = Mock(side_effect=[
@@ -109,16 +153,22 @@ class AuthContractTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(json.loads(result.stdout), {"code": "200", "data": []})
         self.assertIn("thành công", result.stderr)
+        self.assertEqual(self.auth.session.get.call_count, 2)
+        self.assertTrue(all(call.args[0].endswith("/GetActivityStudent") for call in self.auth.session.get.call_args_list))
+        self.assertEqual([call.kwargs["params"]["Authen"] for call in self.auth.session.get.call_args_list], ["fake+key/=&value", "fake-new-key"])
         self.assertEqual(self.auth.session.post.call_count, 1)
         self.assertEqual(json.loads(self.auth.session_file.read_text(encoding="utf-8"))["refresh_token"], "fake-new-refresh")
 
-    def test_explicit_session_expiry_refreshes_once(self):
-        for status, body in ((401, {}),):
-            with self.subTest(status=status):
-                self.auth.session.get = Mock(return_value=response(body, status))
-                self.auth._refresh_locked = Mock(return_value=True)
-                self.assertTrue(self.auth.load_session())
-                self.auth._refresh_locked.assert_called_once_with()
+    def test_actual_data_request_retries_explicit_expiry_only_once(self):
+        self.auth.session.get = Mock(return_value=response({}, 401))
+        self.auth.refresh_session = Mock(return_value=True)
+        with patch("myfap.cli.get_auth", return_value=self.auth):
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["info", "student", "--stdout"])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertEqual(result.stdout, "")
+        self.auth.refresh_session.assert_called_once_with()
+        self.assertEqual(self.auth.session.get.call_count, 2)
+        self.assertTrue(all(call.args[0].endswith("/GetStudentById") for call in self.auth.session.get.call_args_list))
 
     def test_refresh_handshake_uses_params_and_logs_only_to_stderr(self):
         self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{"authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "sample@example.invalid", "typeAcc": "student"}]}))

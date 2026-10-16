@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from myfap.storage import SessionFormatError, SessionStore, SessionStoreError
+from myfap import storage as storage_module
 
 
 def _hold_lock(path, acquired, release):
@@ -23,6 +24,33 @@ def _update_counter(path, started):
     with store.lock():
         data = store.read()
         store.write({"counter": data["counter"] + 1})
+
+
+def _paused_waiter(path, opened, proceed, blocked, acquired):
+    original_open, original_lock = storage_module._open, SessionStore._try_lock
+    first_open = True
+
+    def pause_open(*args, **kwargs):
+        nonlocal first_open
+        fd = original_open(*args, **kwargs)
+        if first_open:
+            first_open = False
+            opened.set()
+            if not proceed.wait(15):
+                os.close(fd)
+                raise RuntimeError("fake-waiter-timeout")
+        return fd
+
+    def observe_lock(fd):
+        try:
+            original_lock(fd)
+        except OSError:
+            blocked.set()
+            raise
+
+    with patch.object(storage_module, "_open", side_effect=pause_open), patch.object(SessionStore, "_try_lock", side_effect=observe_lock):
+        with SessionStore(path).lock():
+            acquired.set()
 
 
 class SessionStoreTests(unittest.TestCase):
@@ -191,6 +219,60 @@ class SessionStoreTests(unittest.TestCase):
         self.assertIs(caught.exception, failure)
         with self.store.lock():
             pass
+
+    def test_cleanup_removes_idle_lock_after_critical_section(self):
+        with self.store.lock(cleanup=True):
+            self.assertTrue(self.store.lock_path.exists())
+        self.assertFalse(self.store.lock_path.exists())
+        with self.store.lock():
+            self.store.write({"after_cleanup": True})
+        self.assertEqual(self.store.read(), {"after_cleanup": True})
+
+    def test_cleanup_preserves_body_exception(self):
+        with self.assertRaisesRegex(RuntimeError, "fake-body-error"):
+            with self.store.lock(cleanup=True):
+                raise RuntimeError("fake-body-error")
+        self.assertFalse(self.store.lock_path.exists())
+
+    def test_cleanup_does_not_split_lock_with_open_waiter(self):
+        context = multiprocessing.get_context("spawn")
+        opened, proceed, blocked, acquired = (context.Event() for _ in range(4))
+        process = context.Process(target=_paused_waiter, args=(str(self.path), opened, proceed, blocked, acquired))
+        try:
+            with self.store.lock(cleanup=True):
+                process.start()
+                self.assertTrue(opened.wait(10), "Tiến trình chờ chưa mở file khóa")
+            if os.name == "nt":
+                self.assertTrue(self.store.lock_path.exists(), "Windows phải giữ khóa khi handle khác còn mở")
+            else:
+                self.assertFalse(self.store.lock_path.exists())
+            with self.store.lock():
+                proceed.set()
+                self.assertTrue(blocked.wait(10), "Tiến trình chờ phải đợi khóa đang được giữ")
+                self.assertFalse(acquired.is_set(), "Không được tạo hai khóa song song sau cleanup")
+            self.assertTrue(acquired.wait(10), "Tiến trình chờ chưa lấy được khóa hiện tại")
+            process.join(10)
+            self.assertEqual(process.exitcode, 0)
+            with self.store.lock(cleanup=True):
+                pass
+            self.assertFalse(self.store.lock_path.exists())
+        finally:
+            proceed.set()
+            if process.pid is not None:
+                process.join(10)
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
+
+    def test_logout_removes_session_and_idle_sidecar(self):
+        from myfap.auth import MyFapAuth
+
+        self.store.write({"fake": True})
+        with self.store.lock():
+            pass
+        self.assertTrue(MyFapAuth(session_file=self.path).logout())
+        self.assertFalse(self.path.exists())
+        self.assertFalse(self.store.lock_path.exists())
 
     @unittest.skipUnless(os.name == "nt", "Best-effort chmod chỉ áp dụng trên Windows")
     def test_windows_chmod_failure_does_not_hide_write_failure(self):

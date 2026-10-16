@@ -86,7 +86,7 @@ class TimeoutTests(unittest.TestCase):
         self.assertIn("--timeout", Text.from_ansi(result.stdout).plain)
         self.assertNotIn("Traceback", result.stderr)
 
-    def test_auth_preserves_defaults_and_honors_environment_for_probe_and_refresh(self):
+    def test_auth_preserves_defaults_and_honors_environment_for_data_and_refresh(self):
         for value in (None, "2.5"):
             with self.subTest(value=value), TemporaryDirectory() as temporary:
                 if value is not None:
@@ -99,7 +99,10 @@ class TimeoutTests(unittest.TestCase):
                 auth.save_session()
                 auth.session.get = Mock(return_value=response({"code": "200", "data": []}))
                 self.assertTrue(auth.load_session())
-                self.assertEqual(auth.session.get.call_args.kwargs["timeout"], 5 if value is None else 2.5)
+                auth.session.get.assert_not_called()
+                api.MyFapEssential(auth).get_semesters()
+                self.assertEqual(auth.session.get.call_count, 1)
+                self.assertEqual(auth.session.get.call_args.kwargs["timeout"], 10 if value is None else 2.5)
                 auth.session.post = Mock(return_value=response({"code": "200", "data": [{
                     "authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "test@example.invalid", "typeAcc": "student",
                 }]}))

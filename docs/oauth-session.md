@@ -25,7 +25,9 @@ Session gắn với campus, API version và loại tài khoản. Thay campus yê
 
 ## Dùng session cũ và refresh
 
-Session cũ thiếu API version được hiểu là v1. Nếu FAP credential còn hợp lệ, CLI tiếp tục dùng cho các lệnh đọc. Session chưa có subject OIDC đã xác minh cần đăng nhập lại bằng `myfap login --force` trước khi refresh; CLI không dùng payload access token làm bằng chứng identity.
+Session cũ thiếu API version được hiểu là v1. CLI đọc và kiểm tra binding cục bộ khi nạp session; việc xác thực trên server diễn ra ở request dữ liệu thực tế, không gọi `GetSemester` chỉ để dò session. Session chưa có subject OIDC đã xác minh cần đăng nhập lại bằng `myfap login --force` trước khi refresh; CLI không dùng payload access token làm bằng chứng identity.
+
+`GetSemester` chỉ được gọi khi chạy `semesters` hoặc khi lệnh cần tự chọn kỳ: `schedule`, `marks` không có `--courseid`, `exams`, `attendance`, `week-timetable`. Truyền `--semester` thì bỏ qua bước tra kỳ. Các lệnh như `info`, `news`, `applications`, `marks --courseid` và `other` gọi thẳng operation tương ứng.
 
 ```sh
 myfap refresh
@@ -36,12 +38,14 @@ Lệnh đọc chỉ tự refresh rồi retry tối đa một lần khi nhận HT
 
 Refresh giữ lock từ lúc đọc session đến khi lưu xong để hai process không rotate cùng token. Nếu process khác đã refresh cùng tài khoản và binding, CLI dùng session mới; nếu identity hoặc binding đã đổi, command dừng và yêu cầu chạy lại.
 
-Refresh token mới được ghi atomic trước khi xác minh ID token và handshake tiếp theo. Nếu bước sau lỗi, file giữ token đã rotate và đánh dấu FAP cần xác thực lại. Khi ID token đã hợp lệ nhưng handshake lỗi tạm thời, lệnh tiếp theo thử handshake lại; nếu access token đã hết hạn thì refresh trước. Nếu xác minh ID token thất bại, đăng nhập lại bằng `login --force`, hoặc thử `refresh` khi lỗi JWKS đã được xử lý. Trường `expires_in` vắng có nghĩa thời hạn chưa biết; refresh không trả refresh token mới thì giữ token trước đó. ID token được trả về luôn phải có `exp` hợp lệ.
+Refresh token mới được ghi atomic trước khi xác minh ID token và handshake tiếp theo. Nếu bước sau lỗi, file giữ token đã rotate và đánh dấu FAP cần xác thực lại. Khi ID token đã hợp lệ nhưng handshake lỗi tạm thời, lệnh tiếp theo thử handshake lại. Trước handshake hoặc phục hồi binding, access token đã hết hạn hoặc còn tối đa 30 giây sẽ được refresh sớm để bù lệch đồng hồ và thời gian request. Buffer này không kéo dài thời hạn token và không đổi việc xác minh claim của ID token. FAP session đang dùng được tiếp tục gọi operation thực tế; thời hạn FEID không được suy thành thời hạn FAP `authenKey`.
+
+Nếu xác minh ID token thất bại, đăng nhập lại bằng `login --force`, hoặc thử `refresh` khi lỗi JWKS đã được xử lý. Trường `expires_in` vắng có nghĩa thời hạn chưa biết; refresh không trả refresh token mới thì giữ token trước đó. ID token được trả về luôn phải có `exp` hợp lệ.
 
 ## Timeout và file trên máy
 
 `--timeout` ưu tiên hơn `MYFAP_TIMEOUT` và áp dụng cho discovery, JWKS, token exchange/refresh, handshake cùng API dữ liệu. Cấu hình này không đổi thời gian chờ trình duyệt 120 giây. Xem [mặc định theo operation](Example.md#điều-chỉnh-timeout-http).
 
-Session vẫn là JSON chứa credential trên máy, không được mã hóa. CLI dùng file tạm cùng thư mục, flush/fsync rồi thay thế atomic; trên Unix đặt quyền file `0600`. Trên Windows, quyền truy cập phụ thuộc ACL của thư mục tài khoản. File khóa `<tên-session>.lock` có thể còn sau logout; file này không chứa token và không nên xóa khi CLI đang chạy.
+Session vẫn là JSON chứa credential trên máy, không được mã hóa. CLI dùng file tạm cùng thư mục, flush/fsync rồi thay thế atomic; trên Unix đặt quyền file `0600`. Trên Windows, quyền truy cập phụ thuộc ACL của thư mục tài khoản. Logout xóa session và dọn file khóa `<tên-session>.lock` khi có thể xóa an toàn. Trên Windows, handle của process khác có thể ngăn xóa sidecar; khi đó file khóa được giữ để bảo toàn đồng bộ. File này không chứa token và không nên xóa thủ công khi CLI đang chạy.
 
 Giữ session, file xuất dữ liệu, HAR/SAZ và biến bí mật ngoài Git. `docs/` và `tasks/` chỉ thuộc repository, không nằm trong artifact PyPI. CI dùng dữ liệu giả; đăng nhập FEID và API thật được kiểm chứng thủ công với session tạm riêng.

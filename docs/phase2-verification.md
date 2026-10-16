@@ -12,7 +12,7 @@ Regression bao phủ callback trùng/sai state/cancel/timeout, chữ ký và cla
 
 [CI của commit triển khai `8a369d3`](https://github.com/WindowScary321/myfap-api-cli/actions/runs/38895605533) đã pass toàn bộ 11 job: scope, bốn source job, build, bốn artifact job và ready. Matrix gồm Ubuntu/Windows × Python 3.9/3.11. Kết quả commit tài liệu cuối được cập nhật vào PR khi hoàn tất.
 
-## Live với session tạm
+## Live với session tạm trước bổ sung QoL
 
 Người dùng tự đăng nhập trên cửa sổ FEID. CLI dùng `--config` trỏ đến file tạm ngoài repository, không đọc trực tiếp thư mục session cá nhân. Output được giữ trong RAM và chỉ xuất các trường đã cho phép: tên operation, HTTP/body code, kiểu dữ liệu, kết quả validation và exit code. Không lưu URL chứa query, token, MSSV/email, raw response, lịch học hoặc điểm.
 
@@ -39,3 +39,18 @@ Các luồng cần trace operation chạy qua Typer app với tham số CLI th�
 Đổi campus thất bại với HCM đã được kiểm chứng live và giữ nguyên APHL. Chưa xác nhận chuyển campus thành công vì tài khoản mẫu chỉ có APHL. Phục hồi sau handshake lỗi đã được kiểm bằng fault injection trên session thật; chưa quan sát server tự trả lỗi handshake. FEID trả `expires_in: 3600` khi refresh, nhưng FAP `authenKey` không có contract TTL; hết hạn FEID access token không đồng nghĩa FAP credential hết hạn. Vì vậy HTTP 401 tự refresh/retry mới chỉ có fixture, chưa có bằng chứng phiên thật tự hết hạn. Đổi API version hoàn tất khi có adapter v2 ở Phase 3.
 
 Session cũ chưa có subject OIDC đã xác minh cần `login --force` trước khi refresh. File session vẫn là JSON chứa credential; xem [quy tắc lưu session](oauth-session.md#timeout-và-file-trên-máy). PR này không tạo tag, publish PyPI hoặc triển khai auto release.
+
+## Kiểm chứng QoL trong PR #5
+
+Sau khi bỏ probe `GetSemester`, thêm buffer 30 giây trước khi dùng FEID access token để handshake và dọn lock khi logout, Windows/Python 3.9 và 3.11 cùng chạy 191 test: 188 pass, 3 skip mỗi môi trường. Test số request dùng auth/client thật với HTTP giả; test biên thời hạn cố định đồng hồ; test cleanup dùng process riêng để giữ handle chờ và phát hiện hai khóa song song. POSIX được kiểm trong CI Ubuntu.
+
+Đã đăng nhập mới bằng session tạm riêng và chạy Requests thật:
+
+| Command | Trace sau QoL |
+|---|---|
+| `info student --stdout` | Chỉ GetStudentById HTTP 200/body 200; JSON hợp lệ, exit 0 |
+| `semesters` | Chỉ một GetSemester HTTP 200/body 200; exit 0 |
+| `login` với session đã lưu | Không phát sinh HTTP; exit 0 |
+| `logout` | Exit 0; cả session tạm và `.lock` đều không còn |
+
+Buffer 30 giây được kiểm bằng đồng hồ cố định, không sửa token thật để giả thời hạn. Buffer chỉ refresh sớm trước handshake/phục hồi binding; không kéo dài token hoặc suy thời hạn FAP từ FEID. Trên Windows, logout có thể giữ lock nếu process khác còn mở handle; hành vi này tránh phá đồng bộ giữa các process. Kết quả CI commit QoL được cập nhật qua comment PR.

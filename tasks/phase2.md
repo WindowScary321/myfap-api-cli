@@ -40,3 +40,11 @@ Live đã xác nhận login mới, ID token validation, handshake, refresh, đ�
 Không đọc, liệt kê, sao chép hoặc kiểm tra trực tiếp thư mục session cá nhân. Live chỉ chạy CLI theo luồng thông thường; không lưu token, identity, lịch học, bảng điểm hoặc raw response vào Git. Không phát lại HAR/SAZ.
 
 Phase 4 tiếp tục điều tra lỗi backend/contract của news, notification và fee; sửa phân loại 201 không làm các endpoint đó trở thành thành công. Binding chuyển v2 và live đổi API version hoàn tất khi có adapter Phase 3. Auto release vẫn thuộc Phase 5.
+
+## QoL bổ sung trong PR #5
+
+- [x] Bỏ `GetSemester` probe khỏi nạp session; chỉ tra kỳ khi command cần tự chọn kỳ hoặc chạy `semesters`. Các request dữ liệu giữ refresh/retry một lần trên HTTP 401.
+- [x] Buffer 30 giây để refresh access token sớm trước handshake/phục hồi binding; không kéo dài thời hạn token hoặc thay xác minh ID token.
+- [x] Logout dọn session và lock idle. POSIX kiểm lại inode sau acquire để process chờ không dùng khóa đã unlink; Windows giữ lock nếu process khác còn mở handle.
+- [x] Regression command-level về số request, biên buffer và cleanup có process chờ; 191 test chạy trên Windows/Python 3.9/3.11, mỗi môi trường 188 pass và 3 skip.
+- [x] Live QoL: `info student` không có `GetSemester`, `semesters` chỉ một request, `login` dùng session local và logout xóa session/lock tạm. CI commit mới được cập nhật qua comment PR; xem [báo cáo kiểm chứng](../docs/phase2-verification.md).

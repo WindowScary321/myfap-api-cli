@@ -7,7 +7,6 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from myfap import auth as module
-from myfap.errors import ApiOperationError
 from myfap.oidc import OAuthError
 
 
@@ -56,7 +55,7 @@ class AuthLifecycleTests(unittest.TestCase):
         self.assertTrue(auth.load_session())
         self.assertEqual(auth.campus, "SAVED")
         self.assertEqual(auth.api_version, "v1")
-        self.assertEqual(auth.session.get.call_args.kwargs["params"]["campusCode"], "SAVED")
+        auth.session.get.assert_not_called()
 
     def test_saving_subject_alone_does_not_mark_oidc_verified(self):
         self.auth._fap_ready = None
@@ -64,15 +63,32 @@ class AuthLifecycleTests(unittest.TestCase):
         self.auth.save_session()
         self.assertFalse(self.load_file()["oidc_validated"])
 
-    def test_probe_201_does_not_refresh_or_modify_session(self):
+    def test_loading_bound_session_does_not_probe_refresh_or_modify_session(self):
         before = self.path.read_bytes()
         self.auth.session.get = Mock(return_value=response({"code": "201", "data": None, "message": None}))
         self.auth.refresh_session = Mock()
-        with self.assertRaises(ApiOperationError):
-            self.auth.load_session()
+        self.assertTrue(self.auth.load_session())
+        self.auth.session.get.assert_not_called()
         self.auth.refresh_session.assert_not_called()
         self.auth.session.post.assert_not_called()
         self.assertEqual(self.path.read_bytes(), before)
+
+    def test_access_token_refreshes_before_expiry_with_30_second_buffer(self):
+        with patch.object(module.time, "time", return_value=1000.0):
+            for expiry, expired in ((999, True), (1000, True), (1029.9, True), (1030, True), (1030.1, False), (1060, False)):
+                with self.subTest(expiry=expiry):
+                    self.auth.access_token_expires_at = expiry
+                    self.assertEqual(self.auth._access_token_expired(), expired)
+
+    def test_near_expiry_access_token_refreshes_before_recovery_handshake(self):
+        saved = self.load_file()
+        saved.update(authen_key=None, fap_needs_reauth=True, access_token_expires_at=1015)
+        self.path.write_text(json.dumps(saved), encoding="utf-8")
+        self.auth._refresh_locked = Mock(return_value=True)
+        with patch.object(module.time, "time", return_value=1000.0):
+            self.assertTrue(self.auth.load_session())
+        self.auth._refresh_locked.assert_called_once_with()
+        self.auth.session.post.assert_not_called()
 
     def test_binding_is_checked_before_any_data_request(self):
         with self.assertRaises(module.SessionBindingError):

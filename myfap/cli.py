@@ -127,7 +127,7 @@ def login(
 
     try:
         if not force and auth.load_session():
-            err_console.print("[green]Đã có session hợp lệ. Không cần đăng nhập lại.[/green]")
+            err_console.print("[green]Đã có session được lưu. Dùng 'myfap login --force' để đăng nhập lại.[/green]")
             return
         auth.login()
         err_console.print("[bold green]Đăng nhập và lưu session thành công![/bold green]")
