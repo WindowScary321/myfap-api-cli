@@ -10,7 +10,7 @@ Regression bao phủ callback trùng/sai state/cancel/timeout, chữ ký và cla
 
 `uv build` tạo wheel/sdist version `0.2.0`; Twine strict và artifact validator đều pass. Hai artifact được cài bằng pip vào hai venv sạch ngoài checkout, sau đó chạy `pip check`, `myfap version` và `myfap --help`. Artifact không chứa `docs/`, `tasks/`, fixture, capture hoặc file session.
 
-CI GitHub đang chạy matrix Ubuntu/Windows × Python 3.9/3.11. Kết quả của commit cuối được cập nhật vào PR khi hoàn tất.
+[CI của commit triển khai `8a369d3`](https://github.com/WindowScary321/myfap-api-cli/actions/runs/38895605533) đã pass toàn bộ 11 job: scope, bốn source job, build, bốn artifact job và ready. Matrix gồm Ubuntu/Windows × Python 3.9/3.11. Kết quả commit tài liệu cuối được cập nhật vào PR khi hoàn tất.
 
 ## Live với session tạm
 
