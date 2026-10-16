@@ -74,3 +74,5 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 |-f, --force|Buộc đăng nhập lại, bỏ qua file ``session.json``, chỉ có ở command ``login``|
 
 ## [Các ví dụ sử dụng](./docs/Example.md)
+
+Với `--stdout`, bạn nhận JSON hoặc ICS trên stdout; log và lỗi đi qua stderr. Khi thiếu `--semester`, CLI chọn kỳ theo `startDate` mới nhất. Với lịch tuần, `--date` quyết định năm nếu bạn không truyền `--year`.

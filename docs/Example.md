@@ -2,8 +2,9 @@
 
 ## Lưu ý
 - Do hầu hết các command đểu trả về json, ``*`` đánh dấu những command trả output ra màn hình.
-- Nếu ko thêm flag _thời gian_ hoặc _kỳ_, ``myfap`` sẽ tự động lấy thời gian mới nhất.
-- ``+`` nghĩa là bạn sẽ ko cần thêm flag ``--semester`` hoặc ``-s`` nếu gọi api vào đúng thời gian trong kỳ. Để xem thông tin của kỳ trước, bạn phải thêm flag này.
+- Khi thiếu `--semester`, CLI chọn kỳ có `startDate` mới nhất. Nếu ngày bị thiếu hoặc sai định dạng, bạn cần chỉ định kỳ bằng `--semester` hoặc `-s`.
+- Với `week-timetable`, năm được chọn theo `--year`, rồi năm trong `--date`, sau cùng là năm hiện tại. `--week` ưu tiên hơn việc tra số tuần từ ngày.
+- Dấu `+` đánh dấu command có thể tự chọn kỳ. Để xem kỳ trước, bạn cần truyền `--semester` hoặc `-s`.
 
 ### Xem tất cả command ``*``
   ```
@@ -58,7 +59,7 @@
   ```
 ### Xem lịch từng tuần bằng thời gian ngày ``+``
   ```
-  myfap week-timetable --date 2026-6-7
+  myfap week-timetable --date 2026-06-07
   ```
 ### Xem danh sách điểm danh của Kỳ bất kỳ
   ```
@@ -111,18 +112,30 @@
     feedback      Kiểm tra Feedback
     profile       Kiểm tra Update Profile
     notification  Xem thông báo qua MSSV
-    fee           Lấy danh sách học phí chưa thanh toán
+    fee           Lấy danh sách học phí và trạng thái thanh toán từng khoản
     subjects      Lấy danh sách tất cả môn học
   ```
 ### Refresh thủ công ``authen_key`` trong trường hợp cli bị lỗi
   ```
   myfap refresh
   ```
+
+### Xuất JSON hoặc ICS qua stdout
+
+Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. Log và lỗi đi qua stderr; lỗi trả exit code khác 0.
+
+```sh
+myfap schedule --stdout > schedule.json
+myfap schedule --ics --stdout > schedule.ics
+```
+
+`other fee` giữ mọi dòng server trả về, gồm `IsPaid`, số tiền và thông tin hóa đơn. HTTP 404 là lỗi API, không có nghĩa là tài khoản không nợ. `other survey` giữ nguyên body `code: "404"`, `message: "Data Not Found"`, `data: null` khi server trả HTTP 200; trạng thái này chưa xác nhận còn hay hết survey bắt buộc.
+
 ### Đăng nhập lại, bỏ qua file ``session.json``
   ```
   myfap login -f
   ```
-### Trỏ vào file ``session.json`` vào vị trí tuỳ chỉnh
+### Trỏ vào file ``session.json`` vào vị trí tùy chỉnh
   ```
-  myfap login --config "%appdata%\myfap-api-cli\session.json"
+  myfap --config "%appdata%\myfap-api-cli\session.json" login
   ```
