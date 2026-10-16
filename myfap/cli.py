@@ -10,6 +10,7 @@ from rich.table import Table
 from .auth import MyFapAuth
 from .api import MyFapClient, MyFapEssential, MyFapOther
 from .parsers import parse_marks_html, convert_schedule_to_ics
+from .config import resolve_timeout
 from importlib import metadata
 
 app = typer.Typer(
@@ -26,7 +27,8 @@ app.add_typer(other_app, name="other")
 
 state = {
     "campus": "APHL",
-    "config": None
+    "config": None,
+    "timeout": None
 }
 
 console = Console()
@@ -34,7 +36,7 @@ err_console = Console(stderr=True)
 
 def get_auth(campus=None):
     c = campus if campus else state["campus"]
-    return MyFapAuth(campus=c, session_file=state.get("config"))
+    return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"))
 
 def require_auth():
     auth = get_auth()
@@ -95,10 +97,15 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 def main(
     campus: str = typer.Option("APHL", "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
+    timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
 ):
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
     state["config"] = config
+    try:
+        state["timeout"] = resolve_timeout(timeout)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
 
 @app.command()
 def version():
@@ -182,7 +189,7 @@ def refresh():
 @app.command()
 def campuses():
     """Xem danh sách các cơ sở (Campus)"""
-    essential = MyFapEssential()
+    essential = MyFapEssential(timeout=state.get("timeout"))
     try:
         with err_console.status("[bold green]Đang lấy dữ liệu..."):
             data = essential.get_campuses()

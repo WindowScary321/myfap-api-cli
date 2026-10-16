@@ -59,6 +59,7 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 |:-|:-|
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
+|--timeout <giây>|Timeout HTTP, đặt trước command; ưu tiên hơn biến `MYFAP_TIMEOUT`|
 |-c, --campus <cơ sở>|Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|
@@ -76,3 +77,5 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 ## [Các ví dụ sử dụng](./docs/Example.md)
 
 Với `--stdout`, bạn nhận JSON hoặc ICS trên stdout; log và lỗi đi qua stderr. Khi thiếu `--semester`, CLI chọn kỳ theo `startDate` mới nhất. Với lịch tuần, `--date` quyết định năm nếu bạn không truyền `--year`.
+
+Bạn có thể dùng `myfap --timeout 20 schedule --stdout` hoặc đặt biến môi trường `MYFAP_TIMEOUT=20`. Chỉ nhận số giây hữu hạn lớn hơn 0; `--timeout` luôn ưu tiên hơn biến môi trường. Cấu hình áp dụng cho request dữ liệu, kiểm tra session, lấy token và handshake FEID/FAP. Xem [chi tiết timeout](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/Example.md#điều-chỉnh-timeout-http) để biết các mặc định và ngoại lệ.

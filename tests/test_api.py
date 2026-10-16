@@ -49,16 +49,17 @@ class ApiContractTests(unittest.TestCase):
             (api.MyFapClient, "get_campus_info", (), "GetCampusInfo", student, []),
         ]
         with patch("myfap.api.create_checksum", return_value="FAKE+/CHECKSUM="):
-            for cls, name, args, route, params, payload in cases:
-                with self.subTest(operation=name):
-                    self.session.get.return_value = response({"code": "200", "data": payload})
-                    getattr(cls(self.auth), name)(*args)
-                    call = self.session.get.call_args
-                    self.assertEqual(call.args, (f"{api.FAP_HOST}/{route}",))
-                    self.assertEqual(call.kwargs.get("params", {}), params)
-                    prepared = requests.Request("GET", call.args[0], params=call.kwargs.get("params")).prepare()
-                    self.assertEqual(parse_qs(urlsplit(prepared.url).query), {k: [str(v)] for k, v in params.items()})
-                    self.assertEqual(call.kwargs["timeout"], max(api.DEFAULT_TIMEOUT, 30.0) if name == "get_subjects" else api.DEFAULT_TIMEOUT)
+            for timeout in (api.DEFAULT_TIMEOUT, 2.5, 45):
+                for cls, name, args, route, params, payload in cases:
+                    with self.subTest(operation=name):
+                        self.session.get.return_value = response({"code": "200", "data": payload})
+                        getattr(cls(self.auth, timeout=timeout), name)(*args)
+                        call = self.session.get.call_args
+                        self.assertEqual(call.args, (f"{api.FAP_HOST}/{route}",))
+                        self.assertEqual(call.kwargs.get("params", {}), params)
+                        prepared = requests.Request("GET", call.args[0], params=call.kwargs.get("params")).prepare()
+                        self.assertEqual(parse_qs(urlsplit(prepared.url).query), {k: [str(v)] for k, v in params.items()})
+                        self.assertEqual(call.kwargs["timeout"], max(timeout, 30.0) if name == "get_subjects" else timeout)
 
     def test_checksum_identifiers_follow_v1_operations(self):
         cases = [(api.MyFapEssential, "get_semesters", (), api.MAGIC_ID), (api.MyFapOther, "get_subjects", (), api.MAGIC_ID), (api.MyFapEssential, "get_news", (2,), "2"), (api.MyFapClient, "get_schedule", ("Fall2026",), self.auth.mssv)]

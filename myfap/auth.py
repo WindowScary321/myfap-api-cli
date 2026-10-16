@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 from playwright.sync_api import sync_playwright
+from .config import resolve_timeout
 
 # Import biến từ file ngoài
 from .auth_var import FEID_HOST, FAP_HOST, CLIENT_ID, REDIRECT_URI, SECRET_KEY, MAGIC_ID, SURVEY_SECRET_KEY
@@ -32,8 +33,9 @@ def create_survey_checksum(username: str) -> str:
     return _create_checksum(username.strip().lower(), "", SURVEY_SECRET_KEY)
 
 class MyFapAuth:
-    def __init__(self, campus="APHL", session_file=None):
+    def __init__(self, campus="APHL", session_file=None, timeout=None):
         self.campus = campus
+        self.timeout = resolve_timeout(timeout)
         self.session_file = Path(session_file) if session_file else SESSION_FILE
         self.code_verifier, self.code_challenge = pkce.generate_pkce_pair()
         self.jwt_token = None
@@ -100,7 +102,7 @@ class MyFapAuth:
             r = self.session.get(
                 f"{FAP_HOST}/GetSemester",
                 params={"campusCode": self.campus, "Authen": self.authen_key, "checksum": checksum},
-                timeout=5,
+                timeout=self.timeout or 5,
             )
         except requests.RequestException:
             raise ApiError("Không kiểm tra được session do lỗi kết nối. Hãy thử lại sau.") from None
@@ -125,7 +127,7 @@ class MyFapAuth:
                 "client_id": CLIENT_ID, 
                 "refresh_token": self.refresh_token, 
                 "grant_type": "refresh_token"
-            }, timeout=10)
+            }, timeout=self.timeout or 10)
             if r.status_code == 200:
                 resp = r.json()
                 self.jwt_token = resp.get('access_token', self.jwt_token)
@@ -139,7 +141,7 @@ class MyFapAuth:
                     params={"campusCode": self.campus, "checksum": checksum},
                     json={"token": self.jwt_token},
                     headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-                    timeout=10
+                    timeout=self.timeout or 10
                 )
                 resp_hs = read_response(r_handshake)
                 if 'data' in resp_hs and len(resp_hs['data']) > 0:
@@ -251,7 +253,7 @@ class MyFapAuth:
             r = self.session.post(f"{FEID_HOST}/connect/token", data={
                 "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
                 "code_verifier": self.code_verifier, "grant_type": "authorization_code"
-            }, timeout=10)
+            }, timeout=self.timeout or 10)
         except requests.RequestException:
             raise ApiError("Không kết nối được FEID. Hãy thử đăng nhập lại sau.") from None
         
@@ -288,7 +290,7 @@ class MyFapAuth:
                 params={"campusCode": self.campus, "checksum": checksum},
                 json={"token": self.jwt_token},
                 headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-                timeout=10
+                timeout=self.timeout or 10
             )
         except requests.RequestException:
             raise ApiError("Không kết nối được FAP để hoàn tất đăng nhập. Hãy thử lại sau.") from None
