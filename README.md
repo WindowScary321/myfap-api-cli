@@ -19,26 +19,25 @@
 
 ## Cách sử dụng
 
-Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. Để phát triển từ mã nguồn, xem [tài liệu phát triển](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/development.md).
-
-- Cài đặt ứng dụng.
+- Cài đặt cli
 
   ```
   pip install myfap
   ```
 
-- Lấy danh sách cơ sở.
+- Lấy danh sách cơ sở
 
   ```
   myfap campuses
   ```
 
-- Login vào feid (chỉ cần làm 1 lần, mặc định chọn cơ sở Hola).
+- Login vào feid (chỉ cần làm 1 lần, mặc định chọn Hola)
   ```
   myfap login
   ```
   Sau khi hoàn thành login, phiên đăng nhập sẽ dc lưu ở ``~/.myfap-api-cli/session.json`` <br>
-- Login cho cơ sở Xavalo.
+
+- Login cho cơ sở Xavalo 
   ```
   myfap login -c HCM
   ```
@@ -49,10 +48,14 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
   myfap schedule
   ```
 
-## Tài liệu phát triển
+## Thông tin thêm
+- [Các ví dụ sử dụng](./docs/Example.md)
+- [Tạo môi trường dev bằng uv](./docs/development.md)
+- [CI và kiểm tra artifact](./docs/development.md#ci-và-kiểm-tra-artifact)
 
-- [Phát triển với uv](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/development.md#phát-triển-với-uv): tạo môi trường dev, chạy CLI và cập nhật dependency.
-- [CI và kiểm tra artifact](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/development.md#ci-và-kiểm-tra-artifact): phạm vi kiểm tra, build wheel/sdist và smoke test bằng pip.
+## Lưu ý
+Khi thiếu `--semester`, cli chọn kỳ theo `startDate` gần đây. Với lịch tuần, `--date` quyết định năm nếu bạn không truyền `--year` <br>
+
 
 ## Các Options
 |Option|Chú thích|
@@ -73,9 +76,14 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 |--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
 |--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|
 |-f, --force|Buộc đăng nhập lại, bỏ qua file ``session.json``, chỉ có ở command ``login``|
+|--timeout <giây>|Tăng hoặc giảm thời gian chờ dữ liệu gửi về từ server, có thể dùng biến môi trường ``MYFAP_TIMEOUT``|
 
-## [Các ví dụ sử dụng](./docs/Example.md)
-
-Với `--stdout`, bạn nhận JSON hoặc ICS trên stdout; log và lỗi đi qua stderr. Khi thiếu `--semester`, CLI chọn kỳ theo `startDate` mới nhất. Với lịch tuần, `--date` quyết định năm nếu bạn không truyền `--year`.
-
-Bạn có thể dùng `myfap --timeout 20 schedule --stdout` hoặc đặt biến môi trường `MYFAP_TIMEOUT=20`. Chỉ nhận số giây hữu hạn lớn hơn 0; `--timeout` luôn ưu tiên hơn biến môi trường. Cấu hình áp dụng cho request dữ liệu, kiểm tra session, lấy token và handshake FEID/FAP. Xem [chi tiết timeout](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/Example.md#điều-chỉnh-timeout-http) để biết các mặc định và ngoại lệ.
+## Ghi công
+- Api đã dc reverse engineered từ [myFAP android](https://play.google.com/store/apps/details?id=com.fuct): phiên bản *2.0.6*, versionCode: *31*
+- [JADX](https://github.com/skylot/jadx): decompile và unpack apk android
+- [Hermes decomp](https://github.com/SymbioticSec/hermes-decomp): decompile index.android.bundle về js có thể đọc dc
+- [Burp Suite Community Edition](https://portswigger.net/burp): bắt gói tin và phân tích động ứng dụng myFAP
+- [Playwright](https://playwright.dev/): chịu trắch nhiệm chính trong quy trình login
+- [Typer](https://typer.tiangolo.com/) & [Rich](https://rich.readthedocs.io/): nền tảng giao diện cli của repo này
+- [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/): bóc tách và xử lý dữ liệu html
+- [ics.py](https://icspy.readthedocs.io/): tạo và chuẩn hóa định dạng iCalendar giúp dễ dàng import vào các ứng dụng lịch

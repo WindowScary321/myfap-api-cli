@@ -1,7 +1,5 @@
 # Phát triển và kiểm tra
 
-[Quay lại README](../README.md)
-
 ## Phát triển với uv
 
 Cài [uv](https://docs.astral.sh/uv/getting-started/installation/) trước khi bắt đầu. Repo dùng Python 3.11 cho môi trường dev, theo `.python-version`; package vẫn hỗ trợ Python từ 3.9. File `uv.lock` lưu phiên bản dependency. Cả hai file được commit để các máy dùng cùng cấu hình.
