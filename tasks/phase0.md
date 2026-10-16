@@ -15,14 +15,15 @@ Gia cố CI trước các phase sửa v1, OAuth/session và v2. Version package 
 - [x] Chuyển CI thành source matrix → build Ubuntu một lần → artifact matrix → gate cuối; hỗ trợ reusable workflow outputs.
 - [x] Pin action theo commit SHA, giữ quyền `contents: read` và tắt persist Git credential.
 - [x] Thêm unit test với archive giả, version/hash sai, đường dẫn nhạy cảm, symlink, smoke isolation và UTF-8.
-- [ ] Xác nhận toàn bộ matrix GitHub Actions trên commit cuối của PR.
-- [ ] Cập nhật PR body và comment kết quả cuối; giữ working tree sạch.
+- [x] Xác nhận source và artifact trên cả bốn môi trường GitHub Actions; tiếp tục kiểm tra lại khi PR có commit mới.
+- [x] Ghi các mốc commit/kiểm tra bằng comment và tổng hợp bằng chứng trong PR.
 
 ## Kiểm chứng
 
-- Unit suite local: 18 test pass, gồm regression version hiện có.
+- Unit suite local: 19 test pass, gồm regression version hiện có. Thử đảo điều kiện kiểm manifest khiến test hash thất bại; khôi phục code và suite pass lại.
 - `uv build`, `twine check --strict`, artifact validation và actionlint pass.
-- Pip smoke thật trên Windows/Python 3.9 và 3.11 đang được kiểm tra; Ubuntu do GitHub Actions xác nhận.
+- Pip smoke thật trên Windows/Python 3.9 và 3.11 pass cho wheel lẫn sdist; bốn tổ hợp OS/Python trên GitHub Actions đều pass.
+- [Run CI 38852306858](https://github.com/WindowScary321/myfap-api-cli/actions/runs/38852306858) của commit `393ced9`: 10/10 job thành công. Kết quả commit mới nhất được cập nhật trong PR.
 
 ## Giới hạn
 
