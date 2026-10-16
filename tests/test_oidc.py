@@ -3,7 +3,7 @@ import hashlib
 import json
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import jwt
@@ -192,12 +192,50 @@ class OIDCTests(unittest.TestCase):
         self.assertEqual(claims["sub"], "fake-subject")
         self.session.get.assert_any_call(ISSUER + "/.well-known/jwks", timeout=2.5, allow_redirects=False)
 
+    def test_id_token_accepts_clock_skew_within_30_seconds_on_login_and_refresh(self):
+        now = 1700000000.25
+        cases = (("exp", 0), ("exp", -0.5), ("exp", -29.999),
+                 ("iat", 0.5), ("iat", 29.999), ("iat", 30),
+                 ("nbf", 0.5), ("nbf", 29.999), ("nbf", 30))
+        for refresh in (False, True):
+            for field, offset in cases:
+                with self.subTest(refresh=refresh, field=field, offset=offset), patch("myfap.oidc.time.time", return_value=now):
+                    session = Mock(get=Mock(side_effect=[response(metadata()), response({"keys": [self.jwk]})]))
+                    client = OIDCClient(session, issuer=ISSUER, client_id=CLIENT_ID, redirect_uri=REDIRECT_URI)
+                    changes = {"exp": now + 300, "iat": now - 10}
+                    changes[field] = now + offset
+                    claims = client.validate_tokens(self.token_response(changes), "fake-nonce", expected_subject="fake-subject", refresh=refresh)
+                    self.assertEqual(claims[field], now + offset)
+
+    def test_id_token_rejects_time_claims_beyond_clock_skew_on_login_and_refresh(self):
+        now = 1700000000.25
+        cases = (("exp", -30), ("exp", -30.001), ("iat", 30.001), ("nbf", 30.001))
+        for refresh in (False, True):
+            for field, offset in cases:
+                with self.subTest(refresh=refresh, field=field, offset=offset), patch("myfap.oidc.time.time", return_value=now):
+                    session = Mock(get=Mock(side_effect=[response(metadata()), response({"keys": [self.jwk]})]))
+                    client = OIDCClient(session, issuer=ISSUER, client_id=CLIENT_ID, redirect_uri=REDIRECT_URI)
+                    with self.assertRaises(OAuthError):
+                        changes = {"exp": now + 300, "iat": now - 10}
+                        changes[field] = now + offset
+                        client.validate_tokens(self.token_response(changes), "fake-nonce", expected_subject="fake-subject", refresh=refresh)
+
+    def test_id_token_clock_skew_never_accepts_invalid_time_claim_types(self):
+        for refresh in (False, True):
+            for field in ("exp", "iat", "nbf"):
+                for value in (None, True, False, "1700000000", float("nan"), float("inf"), float("-inf"), [], {}):
+                    with self.subTest(refresh=refresh, field=field, value=value):
+                        session = Mock(get=Mock(side_effect=[response(metadata()), response({"keys": [self.jwk]})]))
+                        client = OIDCClient(session, issuer=ISSUER, client_id=CLIENT_ID, redirect_uri=REDIRECT_URI)
+                        with self.assertRaises(OAuthError):
+                            client.validate_tokens(self.token_response({field: value}), "fake-nonce", expected_subject="fake-subject", refresh=refresh)
+
     def test_id_token_rejects_bad_claims(self):
         cases = [
             {"iss": ISSUER + "/evil"}, {"aud": "other-client"}, {"aud": [CLIENT_ID, "other-client"]},
             {"aud": [CLIENT_ID], "azp": "other-client"}, {"aud": [CLIENT_ID, "other-client"], "azp": "other-client"},
             {"nonce": "other-nonce"}, {"nonce": None}, {"sub": ""}, {"sub": 123},
-            {"exp": time.time() - 10}, {"exp": "9999999999"}, {"exp": float("inf")}, {"exp": float("nan")}, {"exp": True},
+            {"exp": time.time() - 300}, {"exp": "9999999999"}, {"exp": float("inf")}, {"exp": float("nan")}, {"exp": True},
             {"iat": time.time() + 300}, {"iat": "1"}, {"nbf": time.time() + 300},
             {"at_hash": "wrong-access-hash"},
         ]

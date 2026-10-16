@@ -7,7 +7,7 @@ from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 
-from .auth import MyFapAuth
+from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
 from .parsers import parse_marks_html, convert_schedule_to_ics
 from .config import resolve_timeout
@@ -126,9 +126,14 @@ def login(
     auth = get_auth(target_campus)
 
     try:
-        if not force and auth.load_session():
-            err_console.print("[green]Đã có session được lưu. Dùng 'myfap login --force' để đăng nhập lại.[/green]")
-            return
+        if not force:
+            try:
+                loaded = auth.load_session()
+            except SessionBindingError:
+                loaded = False
+            if loaded:
+                err_console.print("[green]Đã có session được lưu. Dùng 'myfap login --force' để đăng nhập lại.[/green]")
+                return
         auth.login()
         err_console.print("[bold green]Đăng nhập và lưu session thành công![/bold green]")
     except Exception as e:
@@ -355,15 +360,14 @@ def attendance(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem thông tin điểm danh"""
+    if bool(subject_code) != bool(class_name):
+        err_console.print("[red]Lỗi: Cần cả --subjectcode (-sc) và --classname (-cn) để xem chi tiết điểm danh.[/red]")
+        raise typer.Exit(code=1)
     auth = require_auth()
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
 
     if subject_code or class_name:
-        if not (subject_code and class_name):
-            err_console.print("[red]Lỗi: Bạn phải cung cấp CẢ -sc, --subjectcode VÀ -cn, --classname để xem chi tiết điểm danh từng buổi.[/red]")
-            raise typer.Exit(code=1)
-            
         try:
             with err_console.status(f"[bold green]Đang tải điểm danh môn {subject_code}..."):
                 data = client.get_course_attendance(sem, subject_code, class_name)

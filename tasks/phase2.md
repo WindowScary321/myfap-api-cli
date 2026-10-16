@@ -48,3 +48,15 @@ Phase 4 tiếp tục điều tra lỗi backend/contract của news, notification
 - [x] Logout dọn session và lock idle. POSIX kiểm lại inode sau acquire để process chờ không dùng khóa đã unlink; Windows giữ lock nếu process khác còn mở handle.
 - [x] Regression command-level về số request, biên buffer và cleanup có process chờ; 191 test chạy trên Windows/Python 3.9/3.11, mỗi môi trường 188 pass và 3 skip.
 - [x] Live QoL: `info student` không có `GetSemester`, `semesters` chỉ một request, `login` dùng session local và logout xóa session/lock tạm. CI commit mới được cập nhật qua comment PR; xem [báo cáo kiểm chứng](../docs/phase2-verification.md).
+
+## Sửa lỗi sau review PR #5
+
+- [x] Khôi phục expiry v1 theo operation: body `201` cùng exact message `Token invalid` trên bốn operation đã có caller APK; giữ news/notification, handshake và trường hợp chưa có bằng chứng là lỗi operation. Retry đọc vẫn tối đa một lần.
+- [x] Login mới không bị binding v2/donor đã lưu chặn; chỉ kế thừa campus. Lệnh đọc và tham số yêu cầu v2/donor rõ ràng vẫn bị chặn trong Phase 2.
+- [x] `myfap login` tự mở trình duyệt khi session cần xác thực lại hoặc binding không được hỗ trợ, thay vì yêu cầu gõ lại `--force`.
+- [x] Thêm leeway 30 giây khi xác minh `exp/iat/nbf` của ID token, tách biệt buffer refresh sớm access token. Giữ strict type/finite và mọi kiểm tra chữ ký/identity.
+- [x] Logout dọn JSON hỏng mà không parse nội dung, giữ lock và guard đường dẫn.
+- [x] Attendance kiểm tra cặp `--subjectcode/--classname` trước khi nạp session hoặc gọi HTTP.
+- [x] Gỡ dependency `pkce` không còn caller và đồng bộ lockfile.
+
+Các lỗi có regression RED trước sửa và GREEN sau sửa. Tổng hợp kết luận, nguồn APK và kết quả kiểm chứng tại [báo cáo review](../docs/phase2-review-fixes.md); CI của commit cuối được cập nhật trong comment PR.

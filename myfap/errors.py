@@ -35,6 +35,14 @@ class ApiAppCheckError(ApiError):
     pass
 
 
+V1_EXPIRY_OPERATIONS = frozenset({
+    "GetActivityStudent",
+    "GetStudentMark",
+    "GetStudentAttendances",
+    "GetActivityStudentByWeek",
+})
+
+
 def _check_app_check(data):
     if isinstance(data, dict) and (
         data.get("code") == "APP_CHECK_FAILED" or data.get("errorMessage") == "APP_CHECK_FAILED"
@@ -56,6 +64,14 @@ def check_api_error(data, *, allow_survey_not_found=False, api_version="v1", ope
         raise ApiPayloadError("Mã trạng thái trong response API không hợp lệ.")
     if api_version == "v2" and code == "401":
         raise ApiSessionExpiredError()
+    if (
+        api_version == "v1"
+        and operation in V1_EXPIRY_OPERATIONS
+        and code == "201"
+        and data.get("message") == "Token invalid"
+    ):
+        # The v1 contract uses HTTP 200 for this application-level expiry.
+        raise ApiSessionExpiredError(200)
     if "data" not in data:
         raise ApiPayloadError("Response API phải có code và data.")
     if code == "200":

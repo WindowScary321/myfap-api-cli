@@ -336,11 +336,10 @@ class MyFapAuth:
                     existing = self.store.read()
                 except SessionFormatError:
                     existing = None
-                if existing is not None:
-                    try:
-                        self._restore(existing)
-                    except AuthError:
-                        pass
+                stored_campus = existing.get("campus") if existing is not None else None
+                self.campus = self._requested[0] or (stored_campus if _text(stored_campus) else "APHL")
+                self.api_version = self._requested[1] or "v1"
+                self.account_type = self._requested[2] or "student"
             self._check_supported()
             oidc = self._oidc()
             attempt = oidc.begin_login()
@@ -375,9 +374,6 @@ class MyFapAuth:
     def logout(self):
         try:
             with self.store.lock(cleanup=True):
-                if self.store.read() is None:
-                    return False
-                self.session_file.unlink()
-                return True
+                return self.store.delete()
         except (OSError, SessionStoreError):
             raise AuthError("Không xóa được session an toàn.") from None

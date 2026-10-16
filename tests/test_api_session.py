@@ -9,15 +9,40 @@ from tests.test_api import response
 
 
 class ApiErrorPolicyTests(unittest.TestCase):
-    def test_v1_body_201_and_401_are_operation_errors(self):
-        for operation in ("GetTop10News", "GetNotificationByRoll", "GetSemester", "UnknownOperation"):
+    def test_known_v1_201_token_invalid_is_expiry_with_actual_http_status(self):
+        for operation in ("GetActivityStudent", "GetStudentMark", "GetStudentAttendances", "GetActivityStudentByWeek"):
+            for code in (201, "201"):
+                with self.subTest(operation=operation, code=code):
+                    with self.assertRaises(api.ApiSessionExpiredError) as caught:
+                        api.read_response(response({"code": code, "message": "Token invalid", "data": None}), api_version="v1", operation=operation)
+                    self.assertEqual(caught.exception.status_code, 200)
+
+    def test_other_v1_body_201_and_401_are_operation_errors_even_with_expiry_message(self):
+        for operation in ("GetTop10News", "GetNotificationByRoll", "GetSemester", "AuthenticationByFeId", "GetRequiredSurvey", "AddRate", "GetBalance", "UnknownOperation"):
             for code in (201, "201", 401, "401"):
                 with self.subTest(operation=operation, code=code):
                     with self.assertRaises(api.ApiOperationError) as caught:
-                        api.read_response(response({"code": code, "data": None}), api_version="v1", operation=operation)
+                        api.read_response(response({"code": code, "message": "Token invalid", "data": None}), api_version="v1", operation=operation)
                     self.assertEqual(caught.exception.api_version, "v1")
                     self.assertEqual(caught.exception.operation, operation)
                     self.assertEqual(caught.exception.code, str(code))
+
+    def test_v1_201_requires_exact_token_invalid_message(self):
+        for operation in ("GetActivityStudent", "GetStudentMark", "GetStudentAttendances", "GetActivityStudentByWeek"):
+            for message in (None, "token invalid", "Token Invalid", "Session expired", "Token invalid "):
+                with self.subTest(operation=operation, message=message):
+                    with self.assertRaises(api.ApiOperationError):
+                        api.read_response(response({"code": 201, "message": message, "data": None}), api_version="v1", operation=operation)
+            with self.subTest(operation=operation, message="missing"):
+                with self.assertRaises(api.ApiOperationError):
+                    api.read_response(response({"code": 201, "data": None}), api_version="v1", operation=operation)
+            with self.subTest(operation=operation, code=401):
+                with self.assertRaises(api.ApiOperationError):
+                    api.read_response(response({"code": 401, "message": "Token invalid", "data": None}), api_version="v1", operation=operation)
+
+    def test_v1_201_contract_does_not_require_data_field(self):
+        with self.assertRaises(api.ApiSessionExpiredError):
+            api.read_response(response({"code": "201", "message": "Token invalid"}), api_version="v1", operation="GetStudentMark")
 
     def test_http_401_is_explicit_expiry_and_keeps_status(self):
         for version in ("v1", "v2"):
@@ -85,6 +110,59 @@ class AuthenticatedRequestTests(unittest.TestCase):
         self.assertEqual(calls[1].kwargs["params"]["Semester"], "Fall2026")
         self.auth.ensure_bound.assert_called_with(campus="TEST", api_version="v1", account_type="student")
 
+    def test_known_v1_201_reads_retry_once_with_rotated_key_and_fresh_checksum(self):
+        operations = (
+            ("get_schedule", ("Fall2026",)),
+            ("get_marks", ("Fall2026",)),
+            ("get_attendances", ("Fall2026",)),
+            ("get_schedule_by_week", (42, "Fall2026", 2026)),
+        )
+        for method, args in operations:
+            for code in (201, "201"):
+                with self.subTest(operation=method, code=code):
+                    self.auth.authen_key = "FAKE_OLD_KEY"
+                    self.auth.refresh_session.reset_mock()
+                    self.session.get.reset_mock()
+                    self.session.get.side_effect = [
+                        response({"code": code, "message": "Token invalid", "data": None}),
+                        response({"code": 200, "data": []}),
+                    ]
+
+                    def refresh():
+                        self.auth.authen_key = "FAKE_NEW_KEY"
+                        return True
+
+                    self.auth.refresh_session.side_effect = refresh
+                    with patch("myfap.api.create_checksum", side_effect=["FAKE_OLD_CHECKSUM", "FAKE_NEW_CHECKSUM"]):
+                        self.assertEqual(getattr(api.MyFapClient(self.auth), method)(*args), {"code": 200, "data": []})
+                    self.auth.refresh_session.assert_called_once_with()
+                    self.assertEqual(self.session.get.call_count, 2)
+                    first, retried = [call.kwargs["params"] for call in self.session.get.call_args_list]
+                    self.assertEqual(first["Authen"], "FAKE_OLD_KEY")
+                    self.assertEqual(retried["Authen"], "FAKE_NEW_KEY")
+                    self.assertEqual(retried["checksum"], "FAKE_NEW_CHECKSUM")
+                    self.assertEqual({key: value for key, value in first.items() if key not in ("Authen", "checksum")},
+                                     {key: value for key, value in retried.items() if key not in ("Authen", "checksum")})
+
+    def test_second_v1_201_failure_does_not_refresh_again(self):
+        self.session.get.side_effect = [
+            response({"code": 201, "message": "Token invalid", "data": None}),
+            response({"code": "201", "message": "Token invalid", "data": None}),
+        ]
+        with self.assertRaises(api.ApiSessionExpiredError) as caught:
+            api.MyFapClient(self.auth).get_marks("Fall2026")
+        self.assertEqual(caught.exception.status_code, 200)
+        self.auth.refresh_session.assert_called_once_with()
+        self.assertEqual(self.session.get.call_count, 2)
+
+    def test_known_v1_201_failed_refresh_does_not_retry(self):
+        self.auth.refresh_session.return_value = False
+        self.session.get.return_value = response({"code": 201, "message": "Token invalid", "data": None})
+        with self.assertRaises(api.ApiSessionExpiredError):
+            api.MyFapClient(self.auth).get_marks("Fall2026")
+        self.auth.refresh_session.assert_called_once_with()
+        self.assertEqual(self.session.get.call_count, 1)
+
     def test_second_expiry_raises_without_another_refresh(self):
         self.session.get.return_value = response(status=401)
         with self.assertRaises(api.ApiSessionExpiredError):
@@ -100,7 +178,10 @@ class AuthenticatedRequestTests(unittest.TestCase):
         self.assertEqual(self.session.get.call_count, 1)
 
     def test_non_expiry_failures_never_refresh(self):
-        cases = [response(status=403), response(status=500), response({"code": "APP_CHECK_FAILED"}, 401), requests.Timeout("PRIVATE_SENTINEL")]
+        cases = [
+            response({"code": 201, "message": "Token invalid", "data": None}, status)
+            for status in (403, 404, 500, 503)
+        ] + [response({"code": "APP_CHECK_FAILED", "message": "Token invalid"}, 401), requests.Timeout("PRIVATE_SENTINEL")]
         for failed in cases:
             with self.subTest(failure=type(failed).__name__):
                 self.session.get.side_effect = [failed]

@@ -241,6 +241,7 @@ class AuthLifecycleTests(unittest.TestCase):
     def test_login_recovers_invalid_json_or_schema_only_after_success(self):
         for content in (
             '{"PRIVATE_SENTINEL":', '[]', '{}',
+            '{"campus":42}', '{"campus":""}',
             '{"campus":"SAVED","authen_key":[]}',
             '{"campus":"SAVED","oidc_subject":42}',
         ):
@@ -251,8 +252,74 @@ class AuthLifecycleTests(unittest.TestCase):
                 self._prepare_login(auth, before)
                 self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
                 auth._authorize.assert_called_once()
-                self.assertEqual(auth.campus, "APHL")
+                self.assertEqual(auth.campus, "SAVED" if '"campus":"SAVED"' in content else "APHL")
                 self.assertEqual(self.load_file()["oidc_subject"], "new-fake-subject")
+
+    def test_fresh_login_inherits_campus_but_resets_unsupported_stored_binding(self):
+        for changes in ({"api_version": "v2"}, {"account_type": "donor"}, {"api_version": "v2", "account_type": "donor"}):
+            with self.subTest(changes=changes):
+                saved = {**self.auth._snapshot(), **changes, "campus": "SAVED"}
+                self.path.write_text(json.dumps(saved), encoding="utf-8")
+                before = self.path.read_bytes()
+                auth = module.MyFapAuth(session_file=self.path)
+                self._prepare_login(auth, before)
+                self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
+                auth._authorize.assert_called_once()
+                self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("SAVED", "v1", "student"))
+                stored = self.load_file()
+                self.assertEqual((stored["campus"], stored["api_version"], stored["account_type"]), ("SAVED", "v1", "student"))
+
+    def test_fresh_login_honors_explicit_parameters_without_fallback(self):
+        self.path.write_text(json.dumps({"campus": "SAVED", "api_version": "v2", "account_type": "donor"}), encoding="utf-8")
+        before = self.path.read_bytes()
+        auth = module.MyFapAuth(campus="EXPLICIT", api_version="v1", account_type="student", session_file=self.path)
+        self._prepare_login(auth, before)
+        self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
+        self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("EXPLICIT", "v1", "student"))
+        for requested in ({"api_version": "v2"}, {"account_type": "donor"}):
+            with self.subTest(requested=requested):
+                before = self.path.read_bytes()
+                auth = module.MyFapAuth(session_file=self.path, **requested)
+                auth._authorize = Mock()
+                with self.assertRaises(module.SessionBindingError):
+                    auth.login()
+                auth._authorize.assert_not_called()
+                self.assertEqual(self.path.read_bytes(), before)
+
+    def test_fresh_login_failure_preserves_unsupported_stored_session(self):
+        self.path.write_text(json.dumps({"campus": "SAVED", "api_version": "v2", "account_type": "donor"}), encoding="utf-8")
+        before = self.path.read_bytes()
+        auth = module.MyFapAuth(session_file=self.path)
+        auth._authorize = Mock(side_effect=module.AuthError("Đã hủy đăng nhập."))
+        self.oidc.begin_login.return_value = {"nonce": "fake-nonce"}
+        with self.assertRaises(module.AuthError):
+            auth.login()
+        auth._authorize.assert_called_once()
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_fresh_login_handshake_failure_keeps_unsupported_stored_session(self):
+        self.path.write_text(json.dumps({"campus": "SAVED", "api_version": "v2", "account_type": "donor"}), encoding="utf-8")
+        before = self.path.read_bytes()
+        auth = module.MyFapAuth(session_file=self.path)
+        self._prepare_login(auth, before)
+        auth.session.post.return_value = response({}, 503)
+        with self.assertRaises(module.ApiError):
+            auth.login()
+        auth._authorize.assert_called_once()
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_normal_load_still_refuses_unsupported_stored_binding(self):
+        for changes in ({"api_version": "v2"}, {"account_type": "donor"}):
+            with self.subTest(changes=changes):
+                self.path.write_text(json.dumps({**self.auth._snapshot(), **changes}), encoding="utf-8")
+                before = self.path.read_bytes()
+                auth = module.MyFapAuth(session_file=self.path)
+                auth.session.get, auth.session.post = Mock(), Mock()
+                with self.assertRaises(module.SessionBindingError):
+                    auth.load_session()
+                auth.session.get.assert_not_called()
+                auth.session.post.assert_not_called()
+                self.assertEqual(self.path.read_bytes(), before)
 
     def test_failed_login_preserves_invalid_session_bytes(self):
         for content in ('{"PRIVATE_SENTINEL":', '{"campus":"SAVED","authen_key":[]}'):

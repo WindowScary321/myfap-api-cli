@@ -132,6 +132,19 @@ class SessionStore:
         except (OSError, TypeError, ValueError):
             raise SessionStoreError("Không thể ghi file session an toàn.") from None
 
+    def delete(self) -> bool:
+        """Remove a regular session file; the caller holds the session lock."""
+
+        if _validate_path(self.path) is None:
+            return False
+        try:
+            self.path.unlink()
+        except FileNotFoundError:
+            return False
+        except OSError:
+            raise SessionStoreError("Không thể xóa file session an toàn.") from None
+        return True
+
     @contextmanager
     def lock(self, *, cleanup: bool = False) -> Iterator[None]:
         """Hold an exclusive one-byte lock on a stable sidecar file."""

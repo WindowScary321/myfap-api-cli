@@ -10,6 +10,9 @@ import jwt
 import requests
 
 
+ID_TOKEN_CLOCK_SKEW = 30.0
+
+
 class OAuthError(Exception):
     def __init__(self, message, code="oauth", status_code=None):
         super().__init__(message)
@@ -202,7 +205,7 @@ class OIDCClient:
                     value = claims[field]
                     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                         raise ValueError
-                    if (field == "exp" and value <= now) or (field != "exp" and value > now):
+                    if (field == "exp" and value <= now - ID_TOKEN_CLOCK_SKEW) or (field != "exp" and value > now + ID_TOKEN_CLOCK_SKEW):
                         raise ValueError
             if not isinstance(claims["sub"], str) or not claims["sub"] or (expected_subject is not None and claims["sub"] != expected_subject):
                 raise ValueError

@@ -9,6 +9,7 @@ from ics import Calendar
 from typer.testing import CliRunner
 
 from myfap.cli import app
+from myfap.auth import SessionBindingError
 
 
 RUNNER_OPTIONS = {"mix_stderr": False} if "mix_stderr" in inspect.signature(CliRunner).parameters else {}
@@ -86,6 +87,38 @@ class DataCommandTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertIn("myfap login", result.stderr)
         self.client.get_schedule.assert_not_called()
+
+    def test_login_opens_browser_when_saved_session_requires_login(self):
+        for error in (
+            SessionBindingError("Session cần đăng nhập lại."),
+            SessionBindingError("Adapter API v2 chưa được triển khai."),
+        ):
+            with self.subTest(error=str(error)):
+                self.auth.load_session.side_effect = error
+                self.auth.login = Mock()
+                result = self.runner.invoke(app, ["login"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.auth.login.assert_called_once_with()
+
+    def test_login_does_not_mask_unrelated_network_failures(self):
+        self.auth.load_session.side_effect = RuntimeError("Không kết nối được FAP.")
+        self.auth.login = Mock()
+        result = self.runner.invoke(app, ["login"])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.auth.login.assert_not_called()
+
+    def test_incomplete_attendance_options_fail_before_auth_or_http(self):
+        for args in (["--subjectcode", "TEST101"], ["--classname", "DEMO01"]):
+            with self.subTest(options=args):
+                self.auth_factory.reset_mock()
+                self.essential.get_semesters.reset_mock()
+                result = self.runner.invoke(app, ["attendance", *args, "--stdout"])
+                self.assertEqual(result.exit_code, 1, result.output)
+                self.assertEqual(result.stdout, "")
+                self.assertIn("--subjectcode", result.stderr)
+                self.assertIn("--classname", result.stderr)
+                self.auth_factory.assert_not_called()
+                self.essential.get_semesters.assert_not_called()
 
     def test_explicit_semester_skips_semester_lookup(self):
         self.client.get_schedule.return_value = self.payload

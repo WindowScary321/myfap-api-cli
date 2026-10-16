@@ -170,6 +170,27 @@ class AuthContractTests(unittest.TestCase):
         self.assertEqual(self.auth.session.get.call_count, 2)
         self.assertTrue(all(call.args[0].endswith("/GetStudentById") for call in self.auth.session.get.call_args_list))
 
+    def test_schedule_201_token_invalid_refreshes_and_keeps_stdout_json(self):
+        self.auth.session.get = Mock(side_effect=[
+            response({"code": "201", "message": "Token invalid", "data": None}),
+            response({"code": "200", "data": []}),
+        ])
+        self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{
+            "authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "sample@example.invalid", "typeAcc": "student",
+        }]}))
+        with patch("myfap.cli.get_auth", return_value=self.auth), patch.object(self.auth, "_oidc") as factory:
+            factory.return_value.request_token.return_value = {"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}
+            factory.return_value.validate_tokens.return_value = None
+            result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["schedule", "--semester", "Fall2026", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), {"code": "200", "data": []})
+        self.assertIn("thành công", result.stderr)
+        factory.return_value.request_token.assert_called_once()
+        self.assertEqual(self.auth.session.get.call_count, 2)
+        self.assertEqual([call.kwargs["params"]["Authen"] for call in self.auth.session.get.call_args_list], ["fake+key/=&value", "fake-new-key"])
+        self.assertEqual(self.auth.session.post.call_count, 1)
+        self.assertEqual(json.loads(self.auth.session_file.read_text(encoding="utf-8"))["refresh_token"], "fake-new-refresh")
+
     def test_refresh_handshake_uses_params_and_logs_only_to_stderr(self):
         self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{"authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "sample@example.invalid", "typeAcc": "student"}]}))
         out, err = io.StringIO(), io.StringIO()

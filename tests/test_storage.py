@@ -274,6 +274,60 @@ class SessionStoreTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
         self.assertFalse(self.store.lock_path.exists())
 
+    def test_logout_removes_corrupt_regular_file_without_parsing(self):
+        from myfap.auth import MyFapAuth
+
+        self.path.parent.mkdir()
+        for payload in (b'{"PRIVATE_SENTINEL":', b'[]', b'null', b'\xff\xfe'):
+            with self.subTest(payload=payload):
+                self.path.write_bytes(payload)
+                auth = MyFapAuth(session_file=self.path)
+                with patch.object(auth.store, "read", side_effect=AssertionError("Không đọc JSON khi logout")):
+                    self.assertTrue(auth.logout())
+                self.assertFalse(self.path.exists())
+                self.assertFalse(self.store.lock_path.exists())
+
+    def test_logout_missing_file_is_idempotent_and_cleans_idle_lock(self):
+        from myfap.auth import MyFapAuth
+
+        auth = MyFapAuth(session_file=self.path)
+        self.assertFalse(auth.logout())
+        self.assertFalse(auth.logout())
+        self.assertFalse(self.store.lock_path.exists())
+
+    def test_logout_rejects_symlink_and_preserves_target(self):
+        from myfap.auth import AuthError, MyFapAuth
+
+        self.path.parent.mkdir()
+        target = self.path.parent / "target.json"
+        target.write_text("PRIVATE_SENTINEL", encoding="utf-8")
+        self._symlink(self.path, target)
+        with self.assertRaises(AuthError):
+            MyFapAuth(session_file=self.path).logout()
+        self.assertEqual(target.read_text(encoding="utf-8"), "PRIVATE_SENTINEL")
+
+    def test_logout_rejects_non_regular_file_and_reparse_point(self):
+        from myfap.auth import AuthError, MyFapAuth
+
+        self.path.mkdir(parents=True)
+        with self.assertRaises(AuthError):
+            MyFapAuth(session_file=self.path).logout()
+        self.assertTrue(self.path.is_dir())
+        metadata = SimpleNamespace(st_mode=stat.S_IFREG, st_file_attributes=0x400)
+        with patch("myfap.storage.Path.lstat", return_value=metadata):
+            with self.assertRaises(AuthError):
+                MyFapAuth(session_file=self.path).logout()
+
+    def test_delete_revalidates_path_after_lock_is_acquired(self):
+        self.store.write({"fake": "original"})
+        before = self.path.read_bytes()
+        metadata = SimpleNamespace(st_mode=stat.S_IFREG, st_file_attributes=0x400)
+        with self.store.lock():
+            with patch("myfap.storage.Path.lstat", return_value=metadata):
+                with self.assertRaises(SessionStoreError):
+                    self.store.delete()
+        self.assertEqual(self.path.read_bytes(), before)
+
     @unittest.skipUnless(os.name == "nt", "Best-effort chmod chỉ áp dụng trên Windows")
     def test_windows_chmod_failure_does_not_hide_write_failure(self):
         with patch("myfap.storage.os.chmod", side_effect=OSError("fake-acl-error")):
