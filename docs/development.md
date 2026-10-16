@@ -2,20 +2,15 @@
 
 ## Phát triển với uv
 
-Cài [uv](https://docs.astral.sh/uv/getting-started/installation/) trước khi bắt đầu. Repo dùng Python 3.11 cho môi trường dev, theo `.python-version`; package vẫn hỗ trợ Python từ 3.9. File `uv.lock` lưu phiên bản dependency. Cả hai file được commit để các máy dùng cùng cấu hình.
+Cài [uv](https://docs.astral.sh/uv/getting-started/installation/). Repo dùng Python 3.11 cho môi trường dev
 
-Clone repo và tạo môi trường theo lockfile:
-
+Clone this shit
 ```sh
 git clone https://github.com/WindowScary321/myfap-api-cli.git
 cd myfap-api-cli
 uv sync --locked
 ```
-
-`uv sync` tạo `.venv` và cài package ở chế độ editable. Khi sửa mã nguồn, bạn có thể chạy lại CLI để dùng thay đổi đó ngay. Dùng `uv run` để chạy lệnh trong môi trường này mà không cần activate thủ công. Repo đã có cấu hình nên không cần chạy `uv init`.
-
-Chạy các lệnh sau từ thư mục gốc của repo:
-
+Test các chức năng cơ bản
 ```sh
 uv run myfap --help
 uv run myfap version
@@ -23,31 +18,27 @@ uv run python -m unittest discover -s tests -v
 uv build
 ```
 
-### Trình duyệt cho đăng nhập
+### Cài đặt trình browser cần thiết cho Playwright
 
-CLI mở cửa sổ trình duyệt để đăng nhập, ưu tiên Chrome đã cài trên máy rồi đến Edge. Nếu dùng được một trong hai, bạn không cần cài thêm trình duyệt. Để có Firefox làm phương án dự phòng, chạy:
+CLI mở cửa sổ trình duyệt để đăng nhập, ưu tiên Chrome rồi đến Edge. Nếu không dùng dc cả 2, hãy cài firefox của Playwright:
 
 ```sh
 uv run playwright install firefox
 ```
 
-Chỉ cần bước này khi muốn dùng Firefox; build package không cần trình duyệt.
-
 ### Cập nhật dependency
 
-Dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cập nhật cả `pyproject.toml` và `uv.lock`. Nếu sửa dependency trực tiếp trong `pyproject.toml`, chạy `uv lock` rồi `uv sync --locked` để đồng bộ lại môi trường.
-
-Sau khi kiểm tra, commit thay đổi cấu hình cùng lockfile. Giữ `.venv` ở máy local, không commit thư mục này.
+Dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cập nhật dependency. Nếu sửa trực tiếp trong `pyproject.toml`, chạy `uv lock` rồi `uv sync --locked` để đồng bộ lại môi trường
 
 ## CI và kiểm tra artifact
 
-Job `scope` chỉ so sánh tên path thay đổi. Với PR hoặc push `main` chỉ sửa `docs/` hoặc `tasks/`, CI bỏ qua source/build/smoke, không tạo artifact và job `ready` trả kết quả thành công. Nếu có thay đổi ở code hoặc file khác, CI chạy đầy đủ. `README.md` và `LICENSE` ở root vẫn thuộc phạm vi kiểm tra vì cần cho metadata package.
+- **Cảnh báo: AI SLOP, đọc như đấm vào mồm**
 
-Khi chạy đầy đủ, CI kiểm tra source trên Ubuntu và Windows, mỗi hệ điều hành dùng Python 3.9 và 3.11. Job build tạo một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine rồi tạo `SHA256SUMS`. Sau đó, cả bốn môi trường cài wheel và sdist bằng pip vào hai venv tạm riêng ngoài checkout, chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài trình duyệt Playwright.
+Với PR hoặc push `main` chỉ sửa `docs/` hoặc `tasks/`, CI bỏ qua luôn. Nếu có thay đổi ở code hoặc file khác, CI vẫn chạy. `README.md` và `LICENSE` ở root vẫn thuộc phạm vi kiểm tra vì cần cho metadata package
+
+Khi chạy đầy đủ, CI kiểm tra source trên Ubuntu và Windows, mỗi hệ điều hành dùng Python 3.9 và 3.11. Job build tạo một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine rồi tạo `SHA256SUMS`. Sau đó, cả bốn môi trường cài wheel và sdist bằng pip vào hai venv, chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài trình duyệt Playwright (nặng vl, mấy ô muốn đợi à)
 
 ### Kiểm tra trên máy local
-
-Cài nhóm công cụ CI và chạy các lệnh sau bằng Python 3.11 từ thư mục gốc của repo:
 
 ```sh
 uv sync --locked --group ci
@@ -58,22 +49,32 @@ uv run --locked --group ci python scripts/check_artifacts.py --dist-dir dist
 uv run --locked --group ci python scripts/smoke_install.py --artifact-dir dist --expected-version 0.2.0
 ```
 
-Thư mục artifact phải chỉ chứa wheel/sdist của version hiện tại và manifest. Nếu còn file build cũ, chuyển chúng ra ngoài trước khi chạy kiểm tra. Các lệnh local kiểm tra môi trường Python đang dùng; matrix trên GitHub Actions kiểm tra đủ hai hệ điều hành và hai phiên bản Python.
+Thư mục artifact phải chỉ chứa wheel/sdist của version hiện tại và manifest. Nếu còn file build cũ, copy ra ngoài trước khi chạy
 
-Smoke test dùng pip để resolve dependency từ metadata package, không áp dụng `uv.lock`. Marker `greenlet` cho Windows/Python 3.9 nằm trong dependency runtime để cả pip và uv cùng nhận ràng buộc.
+Smoke test dùng pip để resolve dependency từ metadata package, không áp dụng `uv.lock`. Marker `greenlet` cho Windows/Python 3.9 nằm trong dependency runtime để cả pip và uv cùng nhận ràng buộc
 
 ### Phạm vi package và kết quả CI
 
-`docs/` và `tasks/` chỉ lưu trong repository. CI không checkout hoặc đọc nội dung hai thư mục này để test/build. `MANIFEST.in` loại chúng khỏi sdist cả khi build local từ checkout đầy đủ; artifact validator báo lỗi nếu chúng xuất hiện trong wheel hoặc sdist.
+**Quy tắc đóng gói:** Thư mục `docs/` và `tasks/` chỉ lưu ở repo, được `MANIFEST.in` loại khỏi sdist (kể cả khi build local). CI không đọc hai thư mục này khi build/test; artifact validator sẽ báo lỗi nếu chúng xuất hiện trong wheel hoặc sdist
 
-Reusable workflow hỗ trợ `workflow_call` với input `ref` và luôn chạy đầy đủ các bước kiểm tra. Job `ready` báo lỗi nếu `scope` hoặc source/build/smoke thất bại. Chỉ khi tất cả bước bắt buộc thành công, workflow mới trả `artifact_name`, `package_version` và `manifest_sha256`. Artifact gồm wheel, sdist và `SHA256SUMS` của cùng run, được giữ 14 ngày để dùng trong bước phát hành sau này.
+**Reusable workflow (`workflow_call`):** Nhận input `ref`. Job `ready` sẽ fail nếu bước `scope`, source, build hoặc smoke test thất bại. Khi toàn bộ kiểm tra thành công, workflow xuất ra `artifact_name`, `package_version` và `manifest_sha256`
 
-Artifact validator chặn đường dẫn session, credential, capture và file ngoài allowlist. Validator không đọc nội dung dữ liệu nhạy cảm; vẫn cần review secret/PII có thể nằm trong mã Python hợp lệ. Workflow CI chỉ có quyền đọc repository, không có quyền publish.
+Artifact gồm wheel, sdist và `SHA256SUMS` cùng run, lưu retention 14 ngày phục vụ release
+
+Validator chặn file theo allowlist, ngăn rò rỉ session, credential và file capture. *Lưu ý:* Validator chỉ đối soát đường dẫn, không quét nội dung file để tìm secret/PII
+Workflow chạy với quyền read-only, không có quyền publish
 
 ### Regression cho API v1 và dữ liệu
 
-Suite unittest kiểm tra query và encoding, chọn kỳ theo ngày, survey/học phí, phân loại lỗi, stdout JSON/ICS và parser HTML. Fixture trong `tests/fixtures/` là dữ liệu tổng hợp; credential dùng chuỗi giả và domain `example.invalid`. Test không đăng nhập, không đọc HAR/SAZ và không gọi API thật.
+**Độ bao phủ:** Unit test kiểm tra query/encoding, chọn kỳ theo ngày, survey/học phí, phân loại lỗi, parser HTML và xuất stdout định dạng JSON/ICS
 
-Test và fixture chỉ phục vụ repository, không đóng gói trong wheel/sdist. Bạn chạy regression từ checkout bằng các lệnh ở trên.
+**Dữ liệu test & Bảo mật:**
+Toàn bộ fixture trong `tests/fixtures/` là dữ liệu giả lập (mock credential, domain `example.invalid`)
 
-ICS dùng timezone Việt Nam từ `pytz`, nên không cần timezone database của hệ điều hành trên Windows. Trạng thái và giới hạn kiểm chứng Phase 1 nằm trong [tasks/phase1.md](../tasks/phase1.md).
+Test chạy offline/độc lập: không đăng nhập, không parse HAR/SAZ và không gọi API thật
+
+Bộ test và fixture chỉ nằm trong repo, không đóng gói vào wheel/sdist
+
+**Môi trường & Timezone:** File ICS sử dụng timezone Việt Nam từ `pytz`, không phụ thuộc vào timezone database của hệ điều hành trên Windows
+
+Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](../tasks/phase1.md)
