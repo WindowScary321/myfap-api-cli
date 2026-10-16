@@ -41,6 +41,9 @@ class AuthContractTests(unittest.TestCase):
         self.auth.email = "sample@example.invalid"
         self.auth.jwt_token = "fake-access"
         self.auth.refresh_token = "fake-refresh"
+        self.auth.subject = "fake-subject"
+        self.auth.login_nonce = "fake-nonce"
+        self.auth._oidc_validated = True
         self.auth.save_session()
 
     def assert_query(self, call, expected):
@@ -57,6 +60,16 @@ class AuthContractTests(unittest.TestCase):
         self.assert_query(self.auth.session.get.call_args, {
             "campusCode": "TEST&campus", "Authen": "fake+key/=&value", "checksum": "fake+/==",
         })
+        self.assertFalse(self.auth.session.get.call_args.kwargs["allow_redirects"])
+
+    def test_session_probe_does_not_follow_redirect(self):
+        self.auth.session.get = Mock(return_value=response({"code": "200", "data": []}, 302))
+        self.auth.session.post = Mock()
+        with self.assertRaises(Exception) as caught:
+            self.auth.load_session()
+        self.assertIn("HTTP 302", str(caught.exception))
+        self.assertFalse(self.auth.session.get.call_args.kwargs["allow_redirects"])
+        self.auth.session.post.assert_not_called()
 
     def test_transient_probe_failures_never_refresh(self):
         malformed = response({})
@@ -85,77 +98,77 @@ class AuthContractTests(unittest.TestCase):
 
     def test_data_command_stdout_stays_json_after_actual_refresh(self):
         self.auth.session.get = Mock(side_effect=[
-            response({"code": "201", "data": None}),
+            response({}, 401),
             response({"code": "200", "data": []}),
         ])
-        self.auth.session.post = Mock(side_effect=[
-            response({"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}),
-            response({"code": "200", "data": [{"authenKey": "fake-new-key"}]}),
-        ])
-        with patch("myfap.cli.get_auth", return_value=self.auth):
+        self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{"authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "sample@example.invalid", "typeAcc": "student"}]}))
+        with patch("myfap.cli.get_auth", return_value=self.auth), patch.object(self.auth, "_oidc") as factory:
+            factory.return_value.request_token.return_value = {"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}
+            factory.return_value.validate_tokens.return_value = None
             result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["schedule", "--semester", "Fall2026", "--stdout"])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(json.loads(result.stdout), {"code": "200", "data": []})
         self.assertIn("thành công", result.stderr)
-        self.assertEqual(self.auth.session.post.call_count, 2)
+        self.assertEqual(self.auth.session.post.call_count, 1)
         self.assertEqual(json.loads(self.auth.session_file.read_text(encoding="utf-8"))["refresh_token"], "fake-new-refresh")
 
     def test_explicit_session_expiry_refreshes_once(self):
-        for status, body in ((200, {"code": "201", "data": None}), (401, {})):
+        for status, body in ((401, {}),):
             with self.subTest(status=status):
                 self.auth.session.get = Mock(return_value=response(body, status))
-                self.auth.refresh_session = Mock(return_value=True)
+                self.auth._refresh_locked = Mock(return_value=True)
                 self.assertTrue(self.auth.load_session())
-                self.auth.refresh_session.assert_called_once_with()
+                self.auth._refresh_locked.assert_called_once_with()
 
     def test_refresh_handshake_uses_params_and_logs_only_to_stderr(self):
-        self.auth.session.post = Mock(side_effect=[
-            response({"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}),
-            response({"code": "200", "data": [{"authenKey": "fake-new-key"}]}),
-        ])
+        self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{"authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "sample@example.invalid", "typeAcc": "student"}]}))
         out, err = io.StringIO(), io.StringIO()
-        with patch.object(auth_module, "create_checksum", return_value="fake+/=="), redirect_stdout(out), redirect_stderr(err):
+        with patch.object(auth_module, "create_checksum", return_value="fake+/=="), patch.object(self.auth, "_oidc") as factory, redirect_stdout(out), redirect_stderr(err):
+            factory.return_value.request_token.return_value = {"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}
+            factory.return_value.validate_tokens.return_value = None
             self.assertTrue(self.auth.refresh_session())
         self.assertEqual(out.getvalue(), "")
         self.assertIn("thành công", err.getvalue())
-        call = self.auth.session.post.call_args_list[1]
+        call = self.auth.session.post.call_args_list[0]
         self.assert_query(call, {"campusCode": "TEST&campus", "checksum": "fake+/=="})
         self.assertEqual(call.kwargs["json"], {"token": "fake-new-access"})
 
     def test_login_handshake_uses_params(self):
         self.auth.timeout = 2.5
-        payload = base64.urlsafe_b64encode(json.dumps({
-            "email": "sample@example.invalid",
-            "projectCampuses": json.dumps([{"CampusCode": self.auth.campus, "RollNumber": "TEST000"}]),
-        }).encode()).decode().rstrip("=")
-        token = f"fake.{payload}.fake"
-        self.auth.session.post = Mock(side_effect=[
-            response({"access_token": token}),
-            response({"code": "200", "data": [{"authenKey": "fake-login-key"}]}),
-        ])
+        self.auth.session.post = Mock(return_value=response({"code": "200", "data": [{
+            "authenKey": "fake-login-key", "rollnumber": "TEST000",
+            "email": "sample@example.invalid", "typeAcc": "student",
+        }]}))
+        client = auth_module.OIDCClient(self.auth.session, timeout=2.5, issuer=auth_module.FEID_HOST,
+                                       client_id=auth_module.CLIENT_ID, redirect_uri=auth_module.REDIRECT_URI)
+        client._metadata = {"authorization_endpoint": auth_module.FEID_HOST + "/connect/authorize"}
+        client.request_token = Mock(return_value={"access_token": "opaque-fake-access", "refresh_token": "fake-new-refresh"})
+        client.validate_tokens = Mock(return_value={"sub": "fake-subject"})
         playwright = Mock()
         page = playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
         handlers = {}
         page.on.side_effect = lambda event, callback: handlers.update({event: callback})
-        page.goto.side_effect = lambda url: handlers["request"](SimpleNamespace(url="io.identityserver.demo:/oauthredirect?code=fake-code"))
+        def navigate(url):
+            state = parse_qs(urlsplit(url).query)["state"][0]
+            callback = auth_module.REDIRECT_URI + "?code=fake-code&state=" + state
+            handlers["request"](SimpleNamespace(url=callback))
+            handlers["request"](SimpleNamespace(url=callback))
+        page.goto.side_effect = navigate
         manager = Mock()
         manager.__enter__ = Mock(return_value=playwright)
         manager.__exit__ = Mock(return_value=False)
-        with patch.object(auth_module, "sync_playwright", return_value=manager), patch.object(auth_module, "create_checksum", return_value="fake+/=="), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        with patch.object(auth_module, "sync_playwright", return_value=manager), patch.object(auth_module, "OIDCClient", return_value=client), patch.object(auth_module, "create_checksum", return_value="fake+/=="), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(self.auth.login(), ("fake-login-key", "TEST000"))
-        self.assert_query(self.auth.session.post.call_args_list[1], {"campusCode": "TEST&campus", "checksum": "fake+/=="})
-        self.assertEqual([call.kwargs["timeout"] for call in self.auth.session.post.call_args_list], [2.5, 2.5])
-        for side_effect in (
-            requests.Timeout("PRIVATE_SIGNATURE_SENTINEL"),
-            [response({"access_token": token}), requests.Timeout("PRIVATE_SIGNATURE_SENTINEL")],
-        ):
-            self.auth.session.post = Mock(side_effect=side_effect)
-            with patch.object(auth_module, "sync_playwright", return_value=manager), patch("myfap.cli.get_auth", return_value=self.auth):
+        self.assert_query(self.auth.session.post.call_args, {"campusCode": "TEST&campus", "checksum": "fake+/=="})
+        self.assertEqual(self.auth.session.post.call_args.kwargs["timeout"], 2.5)
+        client.validate_tokens.assert_called_once()
+        for failure in (requests.Timeout("PRIVATE_SIGNATURE_SENTINEL"), ValueError("PRIVATE_SIGNATURE_SENTINEL")):
+            self.auth.session.post = Mock(side_effect=failure)
+            with patch.object(auth_module, "sync_playwright", return_value=manager), patch.object(auth_module, "OIDCClient", return_value=client), patch("myfap.cli.get_auth", return_value=self.auth):
                 result = CliRunner(**RUNNER_OPTIONS).invoke(app, ["login", "--force"])
             self.assertEqual(result.exit_code, 1)
             self.assertEqual(result.stdout, "")
             self.assertNotIn("PRIVATE_SIGNATURE_SENTINEL", result.stderr)
-            self.assertIn("kết nối", result.stderr)
 
     def test_invalid_session_diagnostic_is_stderr_only(self):
         self.auth.session_file.write_text("not json", encoding="utf-8")

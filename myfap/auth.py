@@ -1,28 +1,40 @@
-import time
-import json
 import base64
 import hashlib
 import hmac
+import math
 import sys
-import requests
-import pkce
-from pathlib import Path
+import time
 from datetime import datetime
-import pytz
-from playwright.sync_api import sync_playwright
-from .config import resolve_timeout
+from pathlib import Path
 
-# Import biến từ file ngoài
+import pytz
+import requests
+from playwright.sync_api import sync_playwright
+
 from .auth_var import FEID_HOST, FAP_HOST, CLIENT_ID, REDIRECT_URI, SECRET_KEY, MAGIC_ID, SURVEY_SECRET_KEY
+from .config import resolve_timeout
+from .errors import ApiError, ApiSessionExpiredError, read_response
+from .oidc import OIDCClient, OAuthError
+from .storage import SessionFormatError, SessionStore, SessionStoreError
+
+
 CONFIG_DIR = Path.home() / ".myfap-api-cli"
 SESSION_FILE = CONFIG_DIR / "session.json"
 
+
+class AuthError(ApiError):
+    pass
+
+
+class SessionBindingError(AuthError):
+    pass
+
+
 def _create_checksum(identifier: str, campus: str, key: str) -> str:
-    tz = pytz.timezone('Asia/Ho_Chi_Minh')
-    time_str = datetime.now(tz).strftime("%d/%m/%Y %H") + ":00"
+    time_str = datetime.now(pytz.timezone("Asia/Ho_Chi_Minh")).strftime("%d/%m/%Y %H") + ":00"
     raw = f"{identifier}MYFAP{campus}{time_str}"
-    sig = hmac.new(key.encode(), raw.encode(), hashlib.sha1).digest()
-    return base64.b64encode(sig).decode()
+    signature = hmac.new(key.encode(), raw.encode(), hashlib.sha1).digest()
+    return base64.b64encode(signature).decode()
 
 
 def create_checksum(identifier: str, campus: str) -> str:
@@ -32,273 +44,352 @@ def create_checksum(identifier: str, campus: str) -> str:
 def create_survey_checksum(username: str) -> str:
     return _create_checksum(username.strip().lower(), "", SURVEY_SECRET_KEY)
 
+
+def _text(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
 class MyFapAuth:
-    def __init__(self, campus="APHL", session_file=None, timeout=None):
-        self.campus = campus
+    def __init__(self, campus=None, session_file=None, timeout=None, api_version=None, account_type=None):
+        if campus is not None and not _text(campus):
+            raise AuthError("Mã campus không hợp lệ. Hãy kiểm tra --campus.")
+        if api_version not in (None, "v1", "v2"):
+            raise AuthError("API version không hợp lệ.")
+        if account_type is not None and not _text(account_type):
+            raise AuthError("Loại tài khoản không hợp lệ.")
+        self._requested = (campus, api_version, account_type)
+        self.campus = campus or "APHL"
+        self.api_version = api_version or "v1"
+        self.account_type = account_type or "student"
         self.timeout = resolve_timeout(timeout)
         self.session_file = Path(session_file) if session_file else SESSION_FILE
-        self.code_verifier, self.code_challenge = pkce.generate_pkce_pair()
-        self.jwt_token = None
-        self.refresh_token = None
-        self.authen_key = None
-        self.mssv = None
-        self.email = None
-        
-        # Thiết lập session với User-Agent mạo danh app mobile FPT
+        self.store = SessionStore(self.session_file)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "okhttp/4.9.2"})
+        self.authen_key = self.mssv = self.email = None
+        self.jwt_token = self.refresh_token = None
+        self.subject = self.login_nonce = self.access_token_expires_at = None
+        self._binding = None
+        self._fap_ready = None
+        self._oidc_validated = False
+
+    def _oidc(self):
+        return OIDCClient(self.session, timeout=self.timeout, issuer=FEID_HOST, client_id=CLIENT_ID, redirect_uri=REDIRECT_URI)
+
+    def _snapshot(self):
+        binding = self._binding or (self.campus, self.api_version, self.account_type)
+        return {
+            "authen_key": self.authen_key, "mssv": self.mssv, "email": self.email,
+            "jwt_token": self.jwt_token, "refresh_token": self.refresh_token,
+            "campus": binding[0], "api_version": binding[1], "account_type": binding[2],
+            "oidc_subject": self.subject, "oidc_nonce": self.login_nonce,
+            "oidc_validated": self._oidc_validated,
+            "access_token_expires_at": self.access_token_expires_at,
+            "fap_needs_reauth": not (bool(self.authen_key) if self._fap_ready is None else self._fap_ready),
+        }
+
+    def _restore(self, data):
+        if not isinstance(data, dict):
+            raise AuthError("Session không hợp lệ. Hãy đăng nhập lại.")
+        campus, version, account = data.get("campus"), data.get("api_version", "v1"), data.get("account_type", "student")
+        if not _text(campus) or version not in ("v1", "v2") or not _text(account):
+            raise AuthError("Session thiếu binding hợp lệ. Hãy chạy 'myfap login -f'.")
+        for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):
+            value = data.get(field)
+            if value is not None and not _text(value):
+                raise AuthError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
+        subject, nonce = data.get("oidc_subject"), data.get("oidc_nonce")
+        if any(value is not None and not _text(value) for value in (subject, nonce)):
+            raise AuthError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
+        self._binding = (campus, version, account)
+        self.campus, self.api_version, self.account_type = tuple(requested if requested is not None else stored for requested, stored in zip(self._requested, self._binding))
+        for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):
+            setattr(self, field, data.get(field))
+        self.subject, self.login_nonce = subject, nonce
+        self._oidc_validated = data.get("oidc_validated") is True and _text(self.subject)
+        self._fap_ready = bool(self.authen_key) and data.get("fap_needs_reauth", False) is False
+        self.access_token_expires_at = data.get("access_token_expires_at")
 
     def save_session(self):
-        data = {
-            "authen_key": self.authen_key,
-            "mssv": self.mssv,
-            "email": self.email,
-            "jwt_token": self.jwt_token,
-            "refresh_token": self.refresh_token,
-            "campus": self.campus
-        }
-        self.session_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.session_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-        try:
-            import os
-            os.chmod(self.session_file, 0o600)
-        except Exception:
-            pass
+        if self._binding is None:
+            self._binding = (self.campus, self.api_version, self.account_type)
+        with self.store.lock():
+            self.store.write(self._snapshot())
+
+    def ensure_bound(self, *, campus=None, api_version=None, account_type=None):
+        target = (campus or self.campus, api_version or self.api_version, account_type or self.account_type)
+        ready = bool(self.authen_key) if self._fap_ready is None else self._fap_ready
+        if not ready or not self.authen_key or self._binding != target:
+            raise SessionBindingError("Session FAP chưa khớp campus/version/loại tài khoản. Hãy đăng nhập hoặc handshake lại.")
+
+    def _check_supported(self):
+        if self.api_version != "v1":
+            raise SessionBindingError("Adapter API v2 chưa được triển khai. Hãy dùng v1.")
+        if self.account_type != "student":
+            raise SessionBindingError("Luồng FEID hiện chỉ hỗ trợ tài khoản student.")
 
     def load_session(self):
-        from .api import ApiError, ApiHTTPError, ApiSessionExpiredError, read_response
-
-        if not self.session_file.exists():
-            return False
         try:
-            with open(self.session_file, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    print(f"[!] Lỗi: File cấu hình '{self.session_file}' không đúng định dạng JSON.", file=sys.stderr)
+            with self.store.lock():
+                data = self.store.read()
+                if data is None:
                     return False
-            
-            if not isinstance(data, dict) or "authen_key" not in data:
-                print(f"[!] Lỗi: File '{self.session_file}' không chứa dữ liệu session hợp lệ của MyFAP.", file=sys.stderr)
-                return False
-                
-            self.authen_key = data.get("authen_key")
-            self.mssv = data.get("mssv")
-            self.email = data.get("email")
-            self.jwt_token = data.get("jwt_token")
-            self.refresh_token = data.get("refresh_token")
-            # Campus có thể ghi đè bằng flag CLI
-            # self.campus = data.get("campus", self.campus) 
-            
-            if not self.authen_key: return False
-
-        except (OSError, ValueError):
-            print("[!] Không đọc được file session. Hãy kiểm tra --config hoặc đăng nhập lại.", file=sys.stderr)
-            return False
-
-        checksum = create_checksum(MAGIC_ID, self.campus)
-        try:
-            r = self.session.get(
-                f"{FAP_HOST}/GetSemester",
-                params={"campusCode": self.campus, "Authen": self.authen_key, "checksum": checksum},
-                timeout=self.timeout or 5,
-            )
-        except requests.RequestException:
-            raise ApiError("Không kiểm tra được session do lỗi kết nối. Hãy thử lại sau.") from None
-        try:
-            read_response(r)
-        except ApiSessionExpiredError:
-            return self.refresh_session()
-        except ApiHTTPError as error:
-            if error.status_code == 401:
-                return self.refresh_session()
-            raise
-        return True
-
-
-    def refresh_session(self):
-        from .api import ApiError, read_response
-
-        if not self.refresh_token: return False
-        try:
-            print("[*] Phiên đăng nhập hết hạn. Đang làm mới (Refresh Token)...", file=sys.stderr)
-            r = self.session.post(f"{FEID_HOST}/connect/token", data={
-                "client_id": CLIENT_ID, 
-                "refresh_token": self.refresh_token, 
-                "grant_type": "refresh_token"
-            }, timeout=self.timeout or 10)
-            if r.status_code == 200:
-                resp = r.json()
-                self.jwt_token = resp.get('access_token', self.jwt_token)
-                if 'refresh_token' in resp:
-                    self.refresh_token = resp['refresh_token']
-                
-                # Handshake lại để lấy authen_key mới
-                checksum = create_checksum(MAGIC_ID, self.campus)
-                r_handshake = self.session.post(
-                    f"{FAP_HOST}/AuthenticationByFeId",
-                    params={"campusCode": self.campus, "checksum": checksum},
-                    json={"token": self.jwt_token},
-                    headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-                    timeout=self.timeout or 10
-                )
-                resp_hs = read_response(r_handshake)
-                if 'data' in resp_hs and len(resp_hs['data']) > 0:
-                    self.authen_key = resp_hs['data'][0]['authenKey']
-                    self.save_session()
-                    print("[*] Làm mới phiên đăng nhập thành công!", file=sys.stderr)
-                    return True
-                else:
-                    print("[!] Handshake sau refresh không trả về session FAP. Hãy đăng nhập lại.", file=sys.stderr)
-                    return False
-            else:
-                print(f"[!] FEID trả về HTTP {r.status_code}.", file=sys.stderr)
-                print("[!] Refresh Token thất bại hoặc đã bị thu hồi. Vui lòng chạy lệnh 'myfap login -f' để đăng nhập lại.", file=sys.stderr)
-                return False
-        except ApiError as error:
-            print(f"[!] Không làm mới được session FAP: {error}", file=sys.stderr)
-            return False
-        except Exception:
-            print("[!] Không làm mới được session. Hãy thử lại hoặc chạy 'myfap login -f'.", file=sys.stderr)
-            return False
-
-    def login(self):
-        from .api import ApiError, read_response
-
-        print("[*] Đang khởi chạy Playwright...", file=sys.stderr)
-        auth_url = (f"{FEID_HOST}/connect/authorize?client_id={CLIENT_ID}"
-                    f"&redirect_uri={REDIRECT_URI}&response_type=code"
-                    f"&scope=openid%20profile%20offline_access%20identity-service"
-                    f"&code_challenge={self.code_challenge}&code_challenge_method=S256")
-        code = None
-        
-        with sync_playwright() as p:
-            # Ưu tiên mở bằng Chrome có sẵn trên máy, fallback sang Edge
-            # Thêm cờ để bypass tính năng nhận diện bot của Google (Couldn't sign you in)
-            custom_args = ['--disable-blink-features=AutomationControlled']
-            try:
-                browser = p.chromium.launch(
-                    channel="chrome", 
-                    headless=False,
-                    args=custom_args,
-                    ignore_default_args=["--enable-automation"]
-                )
-            except Exception:
-                try:
-                    browser = p.chromium.launch(
-                        channel="msedge", 
-                        headless=False,
-                        args=custom_args,
-                        ignore_default_args=["--enable-automation"]
-                    )
-                except Exception:
-                    # Nếu cả Chrome và Edge đều không có, dùng trình duyệt tải kèm playwright
-                    browser = p.firefox.launch(headless=False)
-
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
-            )
-            page = context.new_page()
-
-            def handle_response(response):
-                nonlocal code
-                if 300 <= response.status < 400:
-                    location = response.headers.get("location", "")
-                    if location and "io.identityserver.demo" in location and "code=" in location:
-                        try:
-                            import urllib.parse as urlparse
-                            parsed = urlparse.urlparse(location)
-                            code = urlparse.parse_qs(parsed.query)['code'][0]
-                        except Exception:
-                            code = location.split("code=")[1].split("&")[0]
-
-            def handle_request(request):
-                nonlocal code
-                url = request.url
-                if "io.identityserver.demo" in url and "code=" in url:
+                self._restore(data)
+                self._check_supported()
+                if self._binding != (self.campus, self.api_version, self.account_type) or not self._fap_ready:
+                    if not self.jwt_token or not self._oidc_validated:
+                        raise SessionBindingError("Session cần đăng nhập lại để xác minh binding. Hãy chạy 'myfap login -f'.")
+                    if self._access_token_expired():
+                        return self._refresh_locked()
                     try:
-                        import urllib.parse as urlparse
-                        parsed = urlparse.urlparse(url)
-                        code = urlparse.parse_qs(parsed.query)['code'][0]
-                    except Exception:
-                        code = url.split("code=")[1].split("&")[0]
+                        self._handshake()
+                    except ApiSessionExpiredError:
+                        return self._refresh_locked()
+                    self.store.write(self._snapshot())
+                    return True
+                self.ensure_bound()
+                try:
+                    result = self.session.get(
+                        f"{FAP_HOST}/GetSemester",
+                        params={"campusCode": self.campus, "Authen": self.authen_key, "checksum": create_checksum(MAGIC_ID, self.campus)},
+                        timeout=self.timeout or 5,
+                        allow_redirects=False,
+                    )
+                except requests.RequestException:
+                    raise AuthError("Không kiểm tra được session do lỗi kết nối. Hãy thử lại sau.") from None
+                try:
+                    read_response(result, api_version=self.api_version, operation="GetSemester")
+                except ApiSessionExpiredError:
+                    return self._refresh_locked()
+                return True
+        except SessionStoreError:
+            print("[!] Không đọc hoặc khóa được JSON session an toàn. Hãy kiểm tra --config.", file=sys.stderr)
+            return False
 
-            page.on("response", handle_response)
-            page.on("request", handle_request)
-
-            print(">>> VUI LÒNG ĐĂNG NHẬP TRÊN CỬA SỔ TRÌNH DUYỆT <<<", file=sys.stderr)
-            try:
-                page.goto(auth_url)
-            except Exception:
-                pass
-            
-            start_time = time.time()
-            try:
-                while not code and (time.time() - start_time) < 120:
-                    page.wait_for_timeout(500)
-            except KeyboardInterrupt:
-                print("\n[!] Hủy đăng nhập bởi người dùng.", file=sys.stderr)
-                browser.close()
-                raise Exception("Đăng nhập bị hủy.")
-            except Exception:
-                pass
-            browser.close()
-
-        if not code:
-            raise Exception("Lỗi: Không lấy được Code từ FEID (timeout hoặc trình duyệt bị đóng).")
-
-        print("[*] Lấy token từ Code...", file=sys.stderr)
+    def _handshake(self):
+        self._check_supported()
+        if not self.jwt_token:
+            raise AuthError("Không có FEID access token. Hãy đăng nhập lại.")
         try:
-            r = self.session.post(f"{FEID_HOST}/connect/token", data={
-                "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
-                "code_verifier": self.code_verifier, "grant_type": "authorization_code"
-            }, timeout=self.timeout or 10)
-        except requests.RequestException:
-            raise ApiError("Không kết nối được FEID. Hãy thử đăng nhập lại sau.") from None
-        
-        if r.status_code != 200:
-            raise Exception(f"Không lấy được token FEID (HTTP {r.status_code}). Hãy đăng nhập lại.")
-
-        self.jwt_token = r.json()['access_token']
-        self.refresh_token = r.json().get('refresh_token')
-        
-        # Lấy MSSV và email từ Token
-        parts = self.jwt_token.split('.')
-        payload_str = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(payload_str))
-        self.email = payload.get('email', '')
-        try:
-            proj_str = payload.get('projectCampuses', '[]')
-            projects = json.loads(proj_str)
-            found = False
-            for p in projects:
-                if p.get('CampusCode') == self.campus:
-                    self.mssv = p.get('RollNumber')
-                    found = True
-                    break
-            if not found and projects: self.mssv = projects[0].get('RollNumber')
-            print(f"[*] Xin chào sinh viên: {self.mssv}", file=sys.stderr)
-        except Exception:
-            raise Exception("Không tìm thấy MSSV tự động trong Token. Đăng nhập thất bại.")
-
-        print("[*] Handshake với FAP API để lấy authenKey...", file=sys.stderr)
-        checksum = create_checksum(MAGIC_ID, self.campus)
-        try:
-            r = self.session.post(
+            result = self.session.post(
                 f"{FAP_HOST}/AuthenticationByFeId",
-                params={"campusCode": self.campus, "checksum": checksum},
+                params={"campusCode": self.campus, "checksum": create_checksum(MAGIC_ID, self.campus)},
                 json={"token": self.jwt_token},
                 headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-                timeout=self.timeout or 10
+                timeout=self.timeout or 10, allow_redirects=False,
             )
         except requests.RequestException:
-            raise ApiError("Không kết nối được FAP để hoàn tất đăng nhập. Hãy thử lại sau.") from None
-        resp = read_response(r)
-        if 'data' in resp and len(resp['data']) > 0:
-            self.authen_key = resp['data'][0]['authenKey']
-            print("[*] Handshake thành công!", file=sys.stderr)
-            return self.authen_key, self.mssv
-        else:
-            raise Exception("Handshake không trả về session FAP. Hãy đăng nhập lại.")
+            raise AuthError("Không kết nối được FAP để handshake. Hãy thử lại sau.") from None
+        payload = read_response(result, api_version=self.api_version, operation="AuthenticationByFeId")
+        rows = payload["data"]
+        if not isinstance(rows, list):
+            raise AuthError("Handshake FAP không trả danh sách identity hợp lệ.")
+        matches = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            campus = row.get("campusCode", row.get("CampusCode"))
+            if campus is not None and campus != self.campus:
+                continue
+            if row.get("typeAcc") == self.account_type:
+                matches.append(row)
+        if len(matches) != 1 or (len(rows) != 1 and not _text(matches[0].get("campusCode", matches[0].get("CampusCode")))):
+            raise AuthError("Handshake FAP không xác định duy nhất identity đúng campus/loại tài khoản.")
+        row = matches[0]
+        key, roll, email = row.get("authenKey"), row.get("rollnumber", row.get("rollNumber")), row.get("email")
+        if not all(_text(value) for value in (key, roll, email)):
+            raise AuthError("Handshake FAP thiếu credential hoặc identity hợp lệ.")
+        if self._binding == (self.campus, self.api_version, self.account_type) and self.mssv and (self.mssv != roll or self.email != email):
+            raise AuthError("Identity FAP thay đổi ngoài luồng đăng nhập. Hãy đăng nhập lại.")
+        self.authen_key, self.mssv, self.email = key, roll, email
+        self._binding = (self.campus, self.api_version, self.account_type)
+        self._fap_ready = True
 
+    def _set_tokens(self, tokens):
+        self.jwt_token = tokens["access_token"]
+        self.refresh_token = tokens.get("refresh_token", self.refresh_token)
+        self.access_token_expires_at = None
+        self.authen_key = None
+        self._fap_ready = False
+        self._oidc_validated = False
+
+    def _set_expiry(self, tokens):
+        value = tokens.get("expires_in")
+        if value is None:
+            self.access_token_expires_at = None
+            return
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise AuthError("FEID trả về expires_in không hợp lệ.")
+        self.access_token_expires_at = time.time() + value
+
+    def _access_token_expired(self):
+        value = self.access_token_expires_at
+        return (
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value <= time.time()
+        )
+
+    def _refresh_locked(self):
+        self._check_supported()
+        if not self.refresh_token:
+            return False
+        if not _text(self.subject):
+            raise AuthError("Session cũ chưa có subject đã xác minh. Hãy chạy 'myfap login -f'.")
+        oidc = self._oidc()
+        try:
+            print("[*] Đang làm mới session FEID...", file=sys.stderr)
+            tokens = oidc.request_token({"client_id": CLIENT_ID, "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
+            self._set_tokens(tokens)
+            self.store.write(self._snapshot())
+            claims = oidc.validate_tokens(tokens, self.login_nonce, expected_subject=self.subject, refresh=True)
+            if claims is not None:
+                self.subject = claims["sub"]
+            self._set_expiry(tokens)
+            self._oidc_validated = True
+            self.store.write(self._snapshot())
+            self._handshake()
+            self.store.write(self._snapshot())
+            print("[*] Làm mới session thành công!", file=sys.stderr)
+            return True
+        except (OAuthError, ApiError, SessionStoreError):
+            print("[!] Không làm mới được session; token đã rotate vẫn được giữ nếu lưu thành công. Hãy thử lại hoặc đăng nhập lại.", file=sys.stderr)
+            return False
+
+    def refresh_session(self):
+        failed_key = self.authen_key
+        try:
+            with self.store.lock():
+                data = self.store.read()
+                if self._binding is not None:
+                    if data is None:
+                        raise SessionBindingError("Session đã bị xóa bởi tiến trình khác. Hãy chạy lại command.")
+                    stored_binding = (data.get("campus"), data.get("api_version", "v1"), data.get("account_type", "student"))
+                    if (
+                        stored_binding != self._binding or data.get("oidc_subject") != self.subject
+                        or data.get("mssv") != self.mssv or data.get("email") != self.email
+                    ):
+                        raise SessionBindingError("Session đã đổi identity hoặc binding ở tiến trình khác. Hãy chạy lại command.")
+                if data is not None:
+                    self._restore(data)
+                self._check_supported()
+                if failed_key and self.authen_key and failed_key != self.authen_key and self._fap_ready:
+                    self.ensure_bound()
+                    return True
+                return self._refresh_locked()
+        except SessionStoreError:
+            print("[!] Không khóa hoặc lưu được JSON session. Hãy thử lại sau.", file=sys.stderr)
+            return False
+
+    def _authorize(self, oidc, attempt):
+        code, failure = None, None
+        with sync_playwright() as playwright:
+            browser = None
+            try:
+                for channel in ("chrome", "msedge", None):
+                    try:
+                        browser = playwright.chromium.launch(channel=channel, headless=False, args=["--disable-blink-features=AutomationControlled"], ignore_default_args=["--enable-automation"]) if channel else playwright.firefox.launch(headless=False)
+                        break
+                    except Exception:
+                        continue
+                if browser is None:
+                    raise AuthError("Không mở được browser. Hãy cài Chrome/Edge hoặc Firefox của Playwright.")
+                page = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36").new_page()
+
+                def callback(url):
+                    nonlocal code, failure
+                    if code is not None or failure is not None:
+                        return
+                    try:
+                        code = oidc.parse_callback(url, attempt)
+                    except OAuthError as error:
+                        failure = error
+
+                def redirected(response):
+                    if 300 <= response.status < 400:
+                        location = response.headers.get("location")
+                        if location:
+                            callback(location)
+
+                page.on("request", lambda request: callback(request.url))
+                page.on("response", redirected)
+                print("[*] Hãy hoàn tất đăng nhập trên browser.", file=sys.stderr)
+                deadline = time.monotonic() + 120
+                try:
+                    page.goto(attempt["url"])
+                except Exception:
+                    pass
+                while code is None and failure is None and time.monotonic() < deadline:
+                    try:
+                        page.wait_for_timeout(250)
+                    except Exception:
+                        raise AuthError("Browser đăng nhập đã đóng. Hãy chạy lại login.") from None
+            except KeyboardInterrupt:
+                raise AuthError("Đã hủy đăng nhập.") from None
+            except AuthError:
+                raise
+            except Exception:
+                raise AuthError("Không hoàn tất được browser đăng nhập. Hãy thử lại.") from None
+            finally:
+                if browser is not None:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+        if failure is not None:
+            raise failure
+        if code is None:
+            raise AuthError("Đăng nhập hết thời gian chờ. Hãy chạy lại login.")
+        return code
+
+    def login(self):
+        try:
+            with self.store.lock():
+                try:
+                    existing = self.store.read()
+                except SessionFormatError:
+                    existing = None
+                if existing is not None:
+                    try:
+                        self._restore(existing)
+                    except AuthError:
+                        pass
+            self._check_supported()
+            oidc = self._oidc()
+            attempt = oidc.begin_login()
+            code = self._authorize(oidc, attempt)
+            with self.store.lock():
+                tokens = oidc.request_token({
+                    "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
+                    "code_verifier": attempt["code_verifier"], "grant_type": "authorization_code",
+                })
+                claims = oidc.validate_tokens(tokens, attempt["nonce"])
+                self.refresh_token = None
+                self._set_tokens(tokens)
+                self.subject, self.login_nonce = claims["sub"], attempt["nonce"]
+                self._set_expiry(tokens)
+                self._oidc_validated = True
+                self._binding = None
+                self.mssv = self.email = None
+                self._handshake()
+                self.store.write(self._snapshot())
+                return self.authen_key, self.mssv
+        except OAuthError as error:
+            raise AuthError(str(error)) from None
+        except SessionStoreError:
+            raise AuthError("Không lưu được session an toàn. Hãy thử đăng nhập lại.") from None
+        except AuthError:
+            raise
+        except ApiError:
+            raise
+        except Exception:
+            raise AuthError("Không hoàn tất được đăng nhập an toàn. Hãy thử lại.") from None
+
+    def logout(self):
+        try:
+            with self.store.lock():
+                if self.store.read() is None:
+                    return False
+                self.session_file.unlink()
+                return True
+        except (OSError, SessionStoreError):
+            raise AuthError("Không xóa được session an toàn.") from None

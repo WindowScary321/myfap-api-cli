@@ -38,7 +38,7 @@ class TimeoutTests(unittest.TestCase):
         for args in (["campuses"], ["info", "student", "--stdout"], ["other", "survey", "--stdout"]):
             with self.subTest(command=args), TemporaryDirectory() as temporary:
                 session_file = Path(temporary) / "session.json"
-                session_file.write_text(json.dumps({"authen_key": "fake-key", "mssv": "TEST000", "email": "test@example.invalid"}), encoding="utf-8")
+                session_file.write_text(json.dumps({"authen_key": "fake-key", "mssv": "TEST000", "email": "test@example.invalid", "campus": "APHL"}), encoding="utf-8")
                 with patch("requests.Session.get", return_value=response({"code": "200", "data": []})) as request:
                     result = self.runner.invoke(app, ["--timeout", "2.5", "--config", str(session_file), *args])
                 self.assertEqual(result.exit_code, 0, result.output)
@@ -93,17 +93,25 @@ class TimeoutTests(unittest.TestCase):
                     os.environ["MYFAP_TIMEOUT"] = value
                 auth = MyFapAuth(session_file=Path(temporary) / "session.json")
                 auth.authen_key, auth.refresh_token = "fake-key", "fake-refresh"
+                auth.mssv, auth.email = "TEST000", "test@example.invalid"
+                auth.subject, auth.login_nonce = "test-subject", "test-nonce"
+                auth._oidc_validated = True
                 auth.save_session()
                 auth.session.get = Mock(return_value=response({"code": "200", "data": []}))
                 self.assertTrue(auth.load_session())
                 self.assertEqual(auth.session.get.call_args.kwargs["timeout"], 5 if value is None else 2.5)
-                auth.session.post = Mock(side_effect=[
-                    response({"access_token": "fake-access"}),
-                    response({"code": "200", "data": [{"authenKey": "fake-new-key"}]}),
-                ])
-                with redirect_stderr(io.StringIO()):
+                auth.session.post = Mock(return_value=response({"code": "200", "data": [{
+                    "authenKey": "fake-new-key", "rollnumber": "TEST000", "email": "test@example.invalid", "typeAcc": "student",
+                }]}))
+                with patch("myfap.auth.OIDCClient.request_token", return_value={"access_token": "fake-access"}) as token_request, \
+                     patch("myfap.auth.OIDCClient.validate_tokens", return_value={"sub": "test-subject"}), \
+                     redirect_stderr(io.StringIO()):
+                    self.assertEqual(auth._oidc().timeout, 10 if value is None else 2.5)
                     self.assertTrue(auth.refresh_session())
-                self.assertEqual([call.kwargs["timeout"] for call in auth.session.post.call_args_list], [10, 10] if value is None else [2.5, 2.5])
+                token_request.assert_called_once()
+                self.assertEqual(token_request.call_args.args[0]["grant_type"], "refresh_token")
+                self.assertEqual(auth.session.post.call_count, 1)
+                self.assertEqual(auth.session.post.call_args.kwargs["timeout"], 10 if value is None else 2.5)
 
     def test_programmatic_auth_and_public_client_honor_override(self):
         with patch.dict(os.environ, {"MYFAP_TIMEOUT": "invalid"}):

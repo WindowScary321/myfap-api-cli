@@ -17,7 +17,7 @@ RUNNER_OPTIONS = {"mix_stderr": False} if "mix_stderr" in inspect.signature(CliR
 class DataCommandTests(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner(**RUNNER_OPTIONS)
-        self.auth = SimpleNamespace(load_session=Mock(return_value=True))
+        self.auth = SimpleNamespace(campus="APHL", load_session=Mock(return_value=True))
         self.auth_patch = patch("myfap.cli.get_auth", return_value=self.auth)
         self.auth_factory = self.auth_patch.start()
         self.addCleanup(self.auth_patch.stop)

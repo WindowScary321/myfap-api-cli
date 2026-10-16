@@ -26,7 +26,7 @@ other_app = typer.Typer(help="Các chức năng phụ trợ khác (survey, feedb
 app.add_typer(other_app, name="other")
 
 state = {
-    "campus": "APHL",
+    "campus": None,
     "config": None,
     "timeout": None
 }
@@ -95,7 +95,7 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 
 @app.callback()
 def main(
-    campus: str = typer.Option("APHL", "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
+    campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; mặc định dùng session hoặc APHL khi login mới"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
     timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
 ):
@@ -125,18 +125,11 @@ def login(
     target_campus = campus if campus else state["campus"]
     auth = get_auth(target_campus)
 
-    if target_campus == "APHL":
-        err_console.print(f"[*] Không nhận được tùy chọn cơ sở, mặc định sử dụng: {target_campus} (Hòa Lạc).")
-        err_console.print(f"    (Mẹo: Bạn có thể dùng 'myfap login -c HCM' để đổi cơ sở)")
-    else:
-        err_console.print(f"[*] Đang tiến hành đăng nhập với cơ sở: {target_campus}")
-        
     try:
         if not force and auth.load_session():
-            err_console.print(f"[green]Đã có session hợp lệ (User: {auth.mssv}). Không cần đăng nhập lại.[/green]")
+            err_console.print("[green]Đã có session hợp lệ. Không cần đăng nhập lại.[/green]")
             return
         auth.login()
-        auth.save_session()
         err_console.print("[bold green]Đăng nhập và lưu session thành công![/bold green]")
     except Exception as e:
         err_console.print(f"[bold red]Lỗi đăng nhập: {e}[/bold red]", style="red")
@@ -146,40 +139,26 @@ def login(
 def logout():
     """Đăng xuất (Xóa session)"""
     auth = get_auth()
-    if auth.session_file.exists():
-        auth.session_file.unlink()
-        err_console.print("[green]Đã xóa session thành công (Đăng xuất).[/green]")
-    else:
-        err_console.print("[yellow]Bạn chưa đăng nhập (không tìm thấy file session).[/yellow]")
+    try:
+        if auth.logout():
+            err_console.print("[green]Đã xóa session thành công (Đăng xuất).[/green]")
+        else:
+            err_console.print("[yellow]Bạn chưa đăng nhập (không tìm thấy file session).[/yellow]")
+    except Exception as error:
+        err_console.print(f"[red]Lỗi đăng xuất: {error}[/red]")
+        raise typer.Exit(1)
 
 @app.command()
 def refresh():
     """Làm mới token (Refresh Token)"""
     auth = get_auth()
-    if not auth.session_file.exists():
-        err_console.print("[red]Lỗi: Không tìm thấy file session. Vui lòng chạy 'myfap login'.[/red]")
-        raise typer.Exit(1)
-    
     try:
-        with open(auth.session_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        auth.refresh_token = data.get("refresh_token")
-        auth.jwt_token = data.get("jwt_token")
-        auth.authen_key = data.get("authen_key")
-        auth.mssv = data.get("mssv")
-        auth.email = data.get("email")
-    except Exception as e:
-        err_console.print(f"[red]Lỗi đọc file session: {e}[/red]")
+        with err_console.status("[bold green]Đang làm mới session..."):
+            success = auth.refresh_session()
+    except Exception as error:
+        err_console.print(f"[red]Lỗi refresh: {error}[/red]")
         raise typer.Exit(1)
-    
-    if not auth.refresh_token:
-        err_console.print("[red]Lỗi: Session cũ không chứa refresh_token. Vui lòng chạy lệnh 'myfap login'.[/red]")
-        raise typer.Exit(1)
-        
-    err_console.print("[*] Đang tiến hành Refresh Token thủ công...")
-    with err_console.status("[bold green]Đang làm mới token..."):
-        success = auth.refresh_session()
-    
+
     if success:
         err_console.print("[bold green]Refresh token và lưu session thành công![/bold green]")
     else:
@@ -215,7 +194,7 @@ def semesters():
         with err_console.status("[bold green]Đang lấy dữ liệu..."):
             data = other.get_semesters()
         
-        table = Table(title=f"Danh sách kỳ học (Cơ sở {state['campus']})")
+        table = Table(title=f"Danh sách kỳ học (Cơ sở {auth.campus})")
         table.add_column("Tên kỳ học", style="cyan")
         
         for s in data:
