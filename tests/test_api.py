@@ -150,14 +150,14 @@ class ResponseValidationTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_BODY_SENTINEL", str(error.exception))
 
     def test_body_errors_and_app_check_are_distinct(self):
-        for code, expected in ((201, api.ApiSessionExpiredError), ("APP_CHECK_FAILED", api.ApiAppCheckError), ("404", api.ApiError), (500, api.ApiError)):
+        for code, expected in ((201, api.ApiOperationError), (401, api.ApiOperationError), ("APP_CHECK_FAILED", api.ApiAppCheckError), ("404", api.ApiError), (500, api.ApiError)):
             with self.subTest(code=code):
                 with self.assertRaises(expected) as error:
                     api.read_response(response({"code": code, "message": "PRIVATE_BODY_SENTINEL", "data": None}))
                 self.assertNotIn("PRIVATE_BODY_SENTINEL", str(error.exception))
 
     def test_http_errors_preserve_status_and_do_not_leak_response(self):
-        for status in (401, 403, 404, 500, 503):
+        for status in (403, 404, 500, 503):
             with self.subTest(status=status):
                 failed = response(status=status)
                 with self.assertRaises(api.ApiHTTPError) as error:

@@ -68,8 +68,7 @@ Thứ tự ưu tiên là `--timeout` → `MYFAP_TIMEOUT` → mặc định. Cả
 |---|---|---|
 | Dữ liệu FAP và survey | 10 giây | Giá trị đã chọn |
 | Danh sách môn `other subjects` | 30 giây | Giá trị đã chọn, tối thiểu 30 giây |
-| Kiểm tra session | 5 giây | Giá trị đã chọn |
-| Lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
+| Discovery/JWKS, lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
 
 Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; nay cả biến môi trường và option đều áp dụng cho HTTP ở bước xác thực. Theo cách xử lý của Requests, timeout giới hạn chờ kết nối và chờ dữ liệu giữa các lần đọc, không giới hạn tổng thời gian chạy command. Thời gian chờ đăng nhập trên trình duyệt vẫn là 120 giây.
 ### Xem lịch học của Kỳ bất kỳ 
@@ -162,10 +161,12 @@ myfap schedule --ics --stdout > schedule.ics
 
 `other fee` giữ mọi dòng server trả về, gồm `IsPaid`, số tiền và thông tin hóa đơn. HTTP 404 là lỗi API, không có nghĩa là tài khoản không nợ. `other survey` giữ nguyên body `code: "404"`, `message: "Data Not Found"`, `data: null` khi server trả HTTP 200; trạng thái này chưa xác nhận còn hay hết survey bắt buộc.
 
-### Đăng nhập lại, bỏ qua file ``session.json``
+### Đăng nhập lại bằng trình duyệt
   ```
   myfap login -f
   ```
+
+Session chỉ được thay sau khi đăng nhập và handshake thành công. Xem [quy tắc session và refresh](oauth-session.md) trước khi dùng lại session từ phiên bản cũ.
 ### Trỏ vào file ``session.json`` vào vị trí tùy chỉnh
   ```
   myfap --config "%appdata%\myfap-api-cli\session.json" login

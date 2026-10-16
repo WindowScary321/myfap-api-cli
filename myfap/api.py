@@ -5,66 +5,17 @@ import requests
 
 from .auth import FAP_HOST, MAGIC_ID, create_checksum, create_survey_checksum
 from .config import DEFAULT_TIMEOUT, resolve_timeout
-
-
-class ApiError(Exception):
-    """Lỗi API an toàn để hiển thị, không chứa response hoặc credential."""
-
-
-class ApiHTTPError(ApiError):
-    def __init__(self, status_code):
-        self.status_code = status_code
-        super().__init__(f"API trả về HTTP {status_code}.")
-
-
-class ApiPayloadError(ApiError):
-    pass
-
-
-class ApiSessionExpiredError(ApiError):
-    pass
-
-
-class ApiAppCheckError(ApiError):
-    pass
-
-
-def _check_app_check(data):
-    if isinstance(data, dict) and (data.get("code") == "APP_CHECK_FAILED" or data.get("errorMessage") == "APP_CHECK_FAILED"):
-        raise ApiAppCheckError("API từ chối App Check (APP_CHECK_FAILED).")
-
-
-def check_api_error(data, *, allow_survey_not_found=False):
-    _check_app_check(data)
-    if not isinstance(data, dict) or "code" not in data or "data" not in data:
-        raise ApiPayloadError("Response API phải có code và data.")
-    code = data["code"]
-    if isinstance(code, bool) or not isinstance(code, (str, int)):
-        raise ApiPayloadError("Mã trạng thái trong response API không hợp lệ.")
-    code = str(code)
-    if not code.isascii() or not code.isdecimal():
-        raise ApiPayloadError("Mã trạng thái trong response API không hợp lệ.")
-    if code in ("201", "401"):
-        raise ApiSessionExpiredError("Phiên FAP hết hạn hoặc không hợp lệ. Hãy đăng nhập lại.")
-    if code == "200":
-        return data
-    if allow_survey_not_found and code == "404" and data["data"] is None and data.get("message") == "Data Not Found":
-        return data
-    raise ApiError(f"FAP API báo lỗi (mã {code}).")
-
-
-def read_response(response, *, allow_survey_not_found=False):
-    if response.status_code != 200:
-        try:
-            _check_app_check(response.json())
-        except ValueError:
-            pass
-        raise ApiHTTPError(response.status_code)
-    try:
-        payload = response.json()
-    except ValueError:
-        raise ApiPayloadError("Response API không phải JSON hợp lệ.") from None
-    return check_api_error(payload, allow_survey_not_found=allow_survey_not_found)
+from .errors import (
+    AUTHENTICATED_READ_OPERATIONS,
+    ApiAppCheckError,
+    ApiError,
+    ApiHTTPError,
+    ApiOperationError,
+    ApiPayloadError,
+    ApiSessionExpiredError,
+    check_api_error,
+    read_response,
+)
 
 
 def clean_json(data):
@@ -78,20 +29,59 @@ def clean_json(data):
     return data
 
 
-def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_found=False):
-    try:
-        response = session.get(url, params=params, timeout=timeout)
-    except requests.RequestException:
-        raise ApiError("Không kết nối được API. Hãy thử lại sau.") from None
-    return clean_json(read_response(response, allow_survey_not_found=allow_survey_not_found))
+READ_OPERATIONS = AUTHENTICATED_READ_OPERATIONS | {"GetAllActiveCampus", "GetWeekByDate", "GetRequiredSurvey"}
+
+
+def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_found=False,
+         auth=None, operation=None, params_factory=None):
+    current_params = params
+    retried = False
+    while True:
+        if auth is not None:
+            _ensure_v1(auth)
+            _ensure_bound(auth, campus=current_params.get("campusCode"))
+        try:
+            response = session.get(url, params=current_params, timeout=timeout, allow_redirects=False)
+        except requests.RequestException:
+            raise ApiError("Không kết nối được API. Hãy thử lại sau.") from None
+        try:
+            return clean_json(read_response(response, allow_survey_not_found=allow_survey_not_found, api_version=getattr(auth, "api_version", "v1"), operation=operation))
+        except ApiSessionExpiredError:
+            if retried or operation not in READ_OPERATIONS or auth is None or "Authen" not in params or params_factory is None:
+                raise
+            refresh = getattr(auth, "refresh_session", None)
+            if not callable(refresh) or not refresh():
+                raise
+            retried = True
+            current_params = params_factory()
 
 
 def _auth_params(auth, identifier, *, campus=None, student=False):
     campus = campus or auth.campus
+    _ensure_bound(auth, campus=campus)
     params = {"campusCode": campus, "Authen": auth.authen_key, "checksum": create_checksum(identifier, campus)}
     if student:
         params["rollNumber"] = auth.mssv
     return params
+
+
+def _ensure_v1(auth):
+    if auth is not None and getattr(auth, "api_version", "v1") != "v1":
+        raise ApiError("Session API v2 chưa được hỗ trợ trong adapter v1.")
+
+
+def _ensure_bound(auth, *, campus=None):
+    hook = getattr(auth, "ensure_bound", None)
+    if callable(hook):
+        hook(campus=campus or auth.campus, api_version=getattr(auth, "api_version", "v1"), account_type=getattr(auth, "account_type", None))
+
+
+def _authenticated_get(session, auth, operation, identifier, *, timeout, campus=None, student=False, params=None):
+    def build_params():
+        return {**_auth_params(auth, identifier, campus=campus, student=student), **(params or {})}
+
+    return _get(session, f"{FAP_HOST}/{operation}", build_params(), timeout=timeout,
+                auth=auth, operation=operation, params_factory=build_params)
 
 
 def _semester_start(semester):
@@ -115,12 +105,14 @@ def _create_session():
 class MyFapEssential:
     def __init__(self, auth=None, timeout=None):
         self.auth = auth
+        _ensure_v1(auth)
+        _ensure_bound(auth)
         self.timeout = resolve_timeout(timeout if timeout is not None else getattr(auth, "timeout", None), DEFAULT_TIMEOUT)
         self.session = auth.session if auth else _create_session()
 
     def get_campuses(self):
         """Lấy danh sách cơ sở, không cần authenKey."""
-        data = _get(self.session, f"{FAP_HOST}/GetAllActiveCampus", {}, timeout=self.timeout)["data"]
+        data = _get(self.session, f"{FAP_HOST}/GetAllActiveCampus", {}, timeout=self.timeout, auth=self.auth, operation="GetAllActiveCampus")["data"]
         if not isinstance(data, list):
             raise ApiPayloadError("Danh sách cơ sở trong response API không hợp lệ.")
         return data
@@ -129,15 +121,16 @@ class MyFapEssential:
         """Lấy kỳ học theo startDate mới nhất; giữ thứ tự server khi trùng ngày."""
         if not self.auth:
             raise ApiError("Cần session xác thực để lấy danh sách kỳ học.")
-        params = _auth_params(self.auth, MAGIC_ID, campus=campus)
-        semesters = _get(self.session, f"{FAP_HOST}/GetSemester", params, timeout=self.timeout)["data"]
+        semesters = _authenticated_get(self.session, self.auth, "GetSemester", MAGIC_ID,
+                                       campus=campus, timeout=self.timeout)["data"]
         if not isinstance(semesters, list):
             raise ApiPayloadError("Danh sách kỳ học trong response API không hợp lệ.")
         return sorted(semesters, key=_semester_start, reverse=True)
 
     def get_week(self, date_str: str):
         """Lấy số tuần tương ứng với ngày YYYY-MM-DD."""
-        value = _get(self.session, f"{FAP_HOST}/GetWeekByDate", {"date": date_str}, timeout=self.timeout)["data"]
+        value = _get(self.session, f"{FAP_HOST}/GetWeekByDate", {"date": date_str}, timeout=self.timeout,
+                     auth=self.auth, operation="GetWeekByDate")["data"]
         if isinstance(value, bool) or not isinstance(value, (str, int)):
             raise ApiPayloadError("Số tuần trong response API không hợp lệ.")
         try:
@@ -149,14 +142,15 @@ class MyFapEssential:
         """Lấy 10 thông báo gần nhất."""
         if not self.auth:
             raise ApiError("Không tìm thấy session xác thực.")
-        params = _auth_params(self.auth, str(news_type))
-        params["type"] = news_type
-        return _get(self.session, f"{FAP_HOST}/GetTop10News", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetTop10News", str(news_type),
+                                  params={"type": news_type}, timeout=self.timeout)
 
 
 class MyFapOther:
     def __init__(self, auth, timeout=None):
         self.auth = auth
+        _ensure_v1(auth)
+        _ensure_bound(auth)
         self.timeout = resolve_timeout(timeout if timeout is not None else getattr(auth, "timeout", None), DEFAULT_TIMEOUT)
         self.session = auth.session if auth else _create_session()
 
@@ -167,93 +161,89 @@ class MyFapOther:
         if not username:
             raise ApiError("Không tìm thấy email trong session. Hãy chạy 'myfap login' lại.")
         params = {"username": username, "checksum": create_survey_checksum(username)}
-        return _get(self.session, "https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey", params, allow_survey_not_found=True, timeout=self.timeout)
+        return _get(self.session, "https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey", params, allow_survey_not_found=True, timeout=self.timeout,
+                    auth=self.auth, operation="GetRequiredSurvey")
 
     def check_open_feedback(self):
         """Kiểm tra feedback."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/CheckOpenFeedBack", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "CheckOpenFeedBack", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def check_update_profile(self):
         """Kiểm tra cập nhật hồ sơ."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/CheckUpdateProfile", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "CheckUpdateProfile", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def get_notification(self):
         """Lấy thông báo theo MSSV."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/GetNotificationByRoll", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetNotificationByRoll", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def get_fee(self):
         """Lấy danh sách học phí và giữ trạng thái thanh toán của từng khoản."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/GeFeeByRoll", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GeFeeByRoll", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def get_subjects(self):
         """Lấy danh sách môn học."""
-        params = _auth_params(self.auth, MAGIC_ID)
-        return _get(self.session, f"{FAP_HOST}/GetSubjets", params, timeout=max(self.timeout, 30.0))
+        return _authenticated_get(self.session, self.auth, "GetSubjets", MAGIC_ID,
+                                  timeout=max(self.timeout, 30.0))
 
 
 class MyFapClient:
     def __init__(self, auth, timeout=None):
         self.auth = auth
+        _ensure_v1(auth)
+        _ensure_bound(auth)
         self.timeout = resolve_timeout(timeout if timeout is not None else getattr(auth, "timeout", None), DEFAULT_TIMEOUT)
         self.session = auth.session if auth else _create_session()
 
     def get_schedule(self, semester: str):
         """Lấy lịch học theo kỳ."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params["Semester"] = semester
-        return _get(self.session, f"{FAP_HOST}/GetActivityStudent", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetActivityStudent", self.auth.mssv,
+                                  student=True, params={"Semester": semester}, timeout=self.timeout)
 
     def get_marks(self, semester: str):
         """Lấy bảng điểm theo kỳ."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params["Semester"] = semester
-        return _get(self.session, f"{FAP_HOST}/GetStudentMark", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetStudentMark", self.auth.mssv,
+                                  student=True, params={"Semester": semester}, timeout=self.timeout)
 
     def get_mark_by_course(self, course_id: str):
         """Lấy điểm chi tiết của môn học, gồm dữ liệu HTML."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params["CourseId"] = course_id
-        return _get(self.session, f"{FAP_HOST}/GetMarkByCourse", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetMarkByCourse", self.auth.mssv,
+                                  student=True, params={"CourseId": course_id}, timeout=self.timeout)
 
     def get_exams(self, semester: str):
         """Lấy lịch thi theo kỳ."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params["Semester"] = semester
-        return _get(self.session, f"{FAP_HOST}/GetScheduleExam", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetScheduleExam", self.auth.mssv,
+                                  student=True, params={"Semester": semester}, timeout=self.timeout)
 
     def get_schedule_by_week(self, week: int, semester: str, year: int):
         """Lấy lịch học theo tuần."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params.update({"week": week, "Semester": semester, "year": year})
-        return _get(self.session, f"{FAP_HOST}/GetActivityStudentByWeek", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetActivityStudentByWeek", self.auth.mssv,
+                                  student=True, params={"week": week, "Semester": semester, "year": year}, timeout=self.timeout)
 
     def get_attendances(self, semester: str):
         """Lấy trạng thái điểm danh tổng quát theo kỳ."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params["Semester"] = semester
-        return _get(self.session, f"{FAP_HOST}/GetStudentAttendances", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetStudentAttendances", self.auth.mssv,
+                                  student=True, params={"Semester": semester}, timeout=self.timeout)
 
     def get_course_attendance(self, semester: str, subject_code: str, class_name: str):
         """Lấy chi tiết điểm danh một môn học."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        params.update({"Semester": semester, "SubjectCode": subject_code, "ClassName": class_name})
-        return _get(self.session, f"{FAP_HOST}/getCourseAttendance", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "getCourseAttendance", self.auth.mssv,
+                                  student=True, params={"Semester": semester, "SubjectCode": subject_code, "ClassName": class_name}, timeout=self.timeout)
 
     def get_applications(self):
         """Lấy danh sách đơn đã gửi."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/GetApplication", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetApplication", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def get_student_info(self):
         """Lấy thông tin sinh viên."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/GetStudentById", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetStudentById", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
 
     def get_campus_info(self):
         """Lấy thông tin phòng dịch vụ sinh viên."""
-        params = _auth_params(self.auth, self.auth.mssv, student=True)
-        return _get(self.session, f"{FAP_HOST}/GetCampusInfo", params, timeout=self.timeout)
+        return _authenticated_get(self.session, self.auth, "GetCampusInfo", self.auth.mssv,
+                                  student=True, timeout=self.timeout)
