@@ -14,7 +14,7 @@ Branch `feat/phase2-oauth-session` bắt đầu từ `main` sau PR #3. Giữ ver
 
 - `errors.py`: lỗi an toàn, không chứa credential, response hoặc URL có query; phân loại theo context của operation.
 - `oidc.py`: discovery, login attempt, callback, token request và validation tách biệt để persist rotation trước bước có thể lỗi.
-- `session_store.py`: đọc JSON, ghi atomic và khóa file; chỉ auth orchestration điều phối transaction.
+- `storage.py`: đọc JSON, ghi atomic và khóa file; chỉ auth orchestration điều phối transaction.
 - `auth.py`: vòng đời OAuth/FAP session, binding, identity handshake và rotation; CLI không tự mở file session để refresh.
 - `api.py`: kiểm binding và retry đọc có giới hạn; payload/output hiện có được giữ nguyên.
 
@@ -22,14 +22,18 @@ Các module mới phục vụ trust boundary và tránh circular import; không 
 
 ## Checklist
 
-- [ ] Regression cho hai body 201 và ma trận HTTP/body 401, App Check, timeout/5xx, read/write retry.
-- [ ] Callback/OIDC có test âm về chữ ký, issuer, audience/azp, nonce, expiry và at_hash; refresh có thể thiếu ID token nhưng nếu có phải cùng subject.
-- [ ] Session cũ thiếu version được hiểu là v1; đổi binding bị chặn trước HTTP dữ liệu, handshake lỗi không ghi nhầm binding.
-- [ ] Atomic write và lock được kiểm bằng file tạm/process riêng trên Windows và Unix; không đọc session thật trong test offline.
-- [ ] Test rotation chứng minh token mới được persist trước handshake và được giữ lại khi validation/handshake lỗi.
+- [x] Regression cho hai body 201 và ma trận HTTP/body 401, App Check, timeout/5xx, read/write retry.
+- [x] Callback/OIDC có test âm về chữ ký, issuer, audience/azp, nonce, expiry và at_hash; refresh có thể thiếu ID token nhưng nếu có phải cùng subject.
+- [x] Session cũ thiếu version được hiểu là v1; đổi binding bị chặn trước HTTP dữ liệu, handshake lỗi không ghi nhầm binding.
+- [x] Atomic write và lock được kiểm bằng file tạm/process riêng; không đọc session thật trong test offline. Windows đã chạy local, Unix chờ CI.
+- [x] Test rotation chứng minh token mới được persist trước handshake và được giữ lại khi validation/handshake lỗi.
 - [ ] Matrix Ubuntu/Windows × Python 3.9/3.11, wheel/sdist, Twine và smoke cài bằng pip pass.
-- [ ] Live gate ghi rõ phần đã kiểm chứng và phần cần thao tác đăng nhập; chỉ lưu metadata đã che dữ liệu.
-- [ ] Review độc lập, kiểm tra tiếng Việt và scan credential/PII trước commit/push; comment từng mốc vào draft PR.
+- [x] Live gate ghi rõ phần đã kiểm chứng và phần còn thiếu trong [báo cáo](../docs/phase2-verification.md); chỉ lưu metadata đã che dữ liệu.
+- [x] Review độc lập, kiểm tra tiếng Việt và scan credential/PII trước commit/push; comment từng mốc vào draft PR.
+
+Đã chạy 179 test trên Windows với Python 3.9.25 và 3.11: mỗi môi trường có 176 pass, 3 skip theo điều kiện hệ điều hành/quyền symlink. Build local qua Twine strict, artifact validator và smoke cài wheel/sdist bằng pip. CI GitHub đang chạy đủ matrix.
+
+Live đã xác nhận login mới, ID token validation, handshake, refresh, đọc JSON sau refresh và logout session tạm. News/notification vẫn trả body 201 và không gây refresh. Đổi campus và phục hồi sau handshake lỗi được kiểm bằng fixture, chưa xác nhận live; đổi version chờ Phase 3. PR vẫn giữ draft.
 
 ## Giới hạn
 

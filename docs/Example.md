@@ -162,10 +162,12 @@ myfap schedule --ics --stdout > schedule.ics
 
 `other fee` giữ mọi dòng server trả về, gồm `IsPaid`, số tiền và thông tin hóa đơn. HTTP 404 là lỗi API, không có nghĩa là tài khoản không nợ. `other survey` giữ nguyên body `code: "404"`, `message: "Data Not Found"`, `data: null` khi server trả HTTP 200; trạng thái này chưa xác nhận còn hay hết survey bắt buộc.
 
-### Đăng nhập lại, bỏ qua file ``session.json``
+### Đăng nhập lại bằng trình duyệt
   ```
   myfap login -f
   ```
+
+Session chỉ được thay sau khi đăng nhập và handshake thành công. Xem [quy tắc session và refresh](oauth-session.md) trước khi dùng lại session từ phiên bản cũ.
 ### Trỏ vào file ``session.json`` vào vị trí tùy chỉnh
   ```
   myfap --config "%appdata%\myfap-api-cli\session.json" login

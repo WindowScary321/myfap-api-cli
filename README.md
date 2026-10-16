@@ -33,11 +33,12 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
   myfap campuses
   ```
 
-- Login vào feid (chỉ cần làm 1 lần, mặc định chọn cơ sở Hola).
+- Login vào FEID (dùng campus trong session; lần đầu mặc định Hola/APHL).
   ```
   myfap login
   ```
   Sau khi hoàn thành login, phiên đăng nhập sẽ dc lưu ở ``~/.myfap-api-cli/session.json`` <br>
+  Xem [đăng nhập, refresh và phục hồi session](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/oauth-session.md), bao gồm cách dùng lại session cũ.
 - Login cho cơ sở Xavalo.
   ```
   myfap login -c HCM
@@ -53,6 +54,7 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 
 - [Phát triển với uv](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/development.md#phát-triển-với-uv): tạo môi trường dev, chạy CLI và cập nhật dependency.
 - [CI và kiểm tra artifact](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/development.md#ci-và-kiểm-tra-artifact): phạm vi kiểm tra, build wheel/sdist và smoke test bằng pip.
+- [Đăng nhập và quản lý session](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/oauth-session.md): PKCE, refresh, binding campus và quy tắc phục hồi session.
 
 ## Các Options
 |Option|Chú thích|
@@ -60,7 +62,7 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
 |--timeout <giây>|Timeout HTTP, đặt trước command; ưu tiên hơn biến `MYFAP_TIMEOUT`|
-|-c, --campus <cơ sở>|Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]|
+|-c, --campus <cơ sở>|Mã cơ sở; ưu tiên option → session → APHL khi đăng nhập mới|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|
 |-w, --week <số tuần>|Chọn tuần, chỉ có ở command ``week-timetable``|
@@ -72,7 +74,7 @@ Bạn có thể cài ứng dụng bằng pip theo hướng dẫn bên dưới. �
 |-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, chỉ có ở command ``marks``)|
 |--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
 |--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|
-|-f, --force|Buộc đăng nhập lại, bỏ qua file ``session.json``, chỉ có ở command ``login``|
+|-f, --force|Mở trình duyệt đăng nhập lại, thay session sau khi thành công; chỉ có ở command ``login``|
 
 ## [Các ví dụ sử dụng](./docs/Example.md)
 
