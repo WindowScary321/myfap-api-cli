@@ -2,8 +2,9 @@
 
 ## Lưu ý
 - Do hầu hết các command đểu trả về json, ``*`` đánh dấu những command trả output ra màn hình.
-- Nếu ko thêm flag _thời gian_ hoặc _kỳ_, ``myfap`` sẽ tự động lấy thời gian mới nhất.
-- ``+`` nghĩa là bạn sẽ ko cần thêm flag ``--semester`` hoặc ``-s`` nếu gọi api vào đúng thời gian trong kỳ. Để xem thông tin của kỳ trước, bạn phải thêm flag này.
+- Khi thiếu `--semester`, CLI chọn kỳ có `startDate` mới nhất. Nếu ngày bị thiếu hoặc sai định dạng, bạn cần chỉ định kỳ bằng `--semester` hoặc `-s`.
+- Với `week-timetable`, năm được chọn theo `--year`, rồi năm trong `--date`, sau cùng là năm hiện tại. `--week` ưu tiên hơn việc tra số tuần từ ngày.
+- Dấu `+` đánh dấu command có thể tự chọn kỳ. Để xem kỳ trước, bạn cần truyền `--semester` hoặc `-s`.
 
 ### Xem tất cả command ``*``
   ```
@@ -16,6 +17,7 @@
     -c, --campus TEXT  Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]
     --config TEXT      Đường dẫn file session tùy chỉnh (thay vì mặc định
                       ~/.myfap-api-cli/session.json)
+    --timeout SECONDS  Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
     --help             Show this message and exit.
 
   Commands:
@@ -40,6 +42,36 @@
   ```
   myfap semesters
   ```
+
+### Điều chỉnh timeout HTTP
+
+Bạn đặt `--timeout` trước command, kể cả khi gọi nhóm `other` hoặc `info`:
+
+```sh
+myfap --timeout 20 schedule --stdout
+myfap --timeout 2.5 campuses
+myfap --timeout 45 other subjects --stdout
+```
+
+Để dùng chung cho nhiều lệnh trong PowerShell:
+
+```powershell
+$env:MYFAP_TIMEOUT = "20"
+myfap schedule --stdout
+myfap --timeout 40 other subjects --stdout
+Remove-Item Env:MYFAP_TIMEOUT
+```
+
+Thứ tự ưu tiên là `--timeout` → `MYFAP_TIMEOUT` → mặc định. Cả hai cách nhận số giây hữu hạn lớn hơn 0, gồm số thập phân. Giá trị sai trả lỗi qua stderr trước khi gọi HTTP; option hợp lệ vẫn dùng được khi biến môi trường sai.
+
+| Request | Khi không cấu hình | Khi có option hoặc biến môi trường |
+|---|---|---|
+| Dữ liệu FAP và survey | 10 giây | Giá trị đã chọn |
+| Danh sách môn `other subjects` | 30 giây | Giá trị đã chọn, tối thiểu 30 giây |
+| Kiểm tra session | 5 giây | Giá trị đã chọn |
+| Lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
+
+Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; nay cả biến môi trường và option đều áp dụng cho HTTP ở bước xác thực. Theo cách xử lý của Requests, timeout giới hạn chờ kết nối và chờ dữ liệu giữa các lần đọc, không giới hạn tổng thời gian chạy command. Thời gian chờ đăng nhập trên trình duyệt vẫn là 120 giây.
 ### Xem lịch học của Kỳ bất kỳ 
   ```
   myfap schedule -s Summer2026
@@ -58,7 +90,7 @@
   ```
 ### Xem lịch từng tuần bằng thời gian ngày ``+``
   ```
-  myfap week-timetable --date 2026-6-7
+  myfap week-timetable --date 2026-06-07
   ```
 ### Xem danh sách điểm danh của Kỳ bất kỳ
   ```
@@ -111,18 +143,30 @@
     feedback      Kiểm tra Feedback
     profile       Kiểm tra Update Profile
     notification  Xem thông báo qua MSSV
-    fee           Lấy danh sách học phí chưa thanh toán
+    fee           Lấy danh sách học phí và trạng thái thanh toán từng khoản
     subjects      Lấy danh sách tất cả môn học
   ```
 ### Refresh thủ công ``authen_key`` trong trường hợp cli bị lỗi
   ```
   myfap refresh
   ```
+
+### Xuất JSON hoặc ICS qua stdout
+
+Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. Log và lỗi đi qua stderr; lỗi trả exit code khác 0.
+
+```sh
+myfap schedule --stdout > schedule.json
+myfap schedule --ics --stdout > schedule.ics
+```
+
+`other fee` giữ mọi dòng server trả về, gồm `IsPaid`, số tiền và thông tin hóa đơn. HTTP 404 là lỗi API, không có nghĩa là tài khoản không nợ. `other survey` giữ nguyên body `code: "404"`, `message: "Data Not Found"`, `data: null` khi server trả HTTP 200; trạng thái này chưa xác nhận còn hay hết survey bắt buộc.
+
 ### Đăng nhập lại, bỏ qua file ``session.json``
   ```
   myfap login -f
   ```
-### Trỏ vào file ``session.json`` vào vị trí tuỳ chỉnh
+### Trỏ vào file ``session.json`` vào vị trí tùy chỉnh
   ```
-  myfap login --config "%appdata%\myfap-api-cli\session.json"
+  myfap --config "%appdata%\myfap-api-cli\session.json" login
   ```

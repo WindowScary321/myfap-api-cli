@@ -14,3 +14,7 @@ CLIENT_ID = base64.b64decode(_CLIENT_ID_B64).decode()
 REDIRECT_URI = base64.b64decode(_REDIRECT_URI_B64).decode()
 SECRET_KEY = base64.b64decode(_SECRET_KEY_B64).decode()
 MAGIC_ID = base64.b64decode(_MAGIC_ID_B64).decode()
+
+# Hằng giao thức survey từ app; không phải credential của người dùng.
+_SURVEY_SECRET_KEY_B64 = b'MmViOTc0OTI4MDMxZTcxYmYyNDFjZmNmY2NhMDM3NjJlZDJmMGZlZg=='
+SURVEY_SECRET_KEY = base64.b64decode(_SURVEY_SECRET_KEY_B64).decode()

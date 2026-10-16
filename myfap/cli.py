@@ -10,6 +10,7 @@ from rich.table import Table
 from .auth import MyFapAuth
 from .api import MyFapClient, MyFapEssential, MyFapOther
 from .parsers import parse_marks_html, convert_schedule_to_ics
+from .config import resolve_timeout
 from importlib import metadata
 
 app = typer.Typer(
@@ -26,19 +27,26 @@ app.add_typer(other_app, name="other")
 
 state = {
     "campus": "APHL",
-    "config": None
+    "config": None,
+    "timeout": None
 }
 
 console = Console()
+err_console = Console(stderr=True)
 
 def get_auth(campus=None):
     c = campus if campus else state["campus"]
-    return MyFapAuth(campus=c, session_file=state.get("config"))
+    return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"))
 
 def require_auth():
     auth = get_auth()
-    if not auth.load_session():
-        console.print("[red]Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.[/red]")
+    try:
+        loaded = auth.load_session()
+    except Exception as error:
+        err_console.print(f"[red]Lỗi kiểm tra session: {error}[/red]")
+        raise typer.Exit(code=1)
+    if not loaded:
+        err_console.print("[red]Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.[/red]")
         raise typer.Exit(code=1)
     return auth
 
@@ -46,13 +54,18 @@ def resolve_semester(auth, semester_flag):
     if semester_flag:
         return semester_flag
     essential = MyFapEssential(auth)
-    with console.status("[bold green]Đang lấy danh sách kỳ học..."):
-        semesters_list = essential.get_semesters()
-    if not semesters_list:
-        console.print("[red]Không tìm thấy kỳ học nào.[/red]")
+    try:
+        with err_console.status("[bold green]Đang lấy danh sách kỳ học..."):
+            semesters_list = essential.get_semesters()
+        if not semesters_list:
+            raise ValueError("Không tìm thấy kỳ học nào.")
+        sem = semesters_list[0]['semesterName']
+        if not isinstance(sem, str) or not sem.strip():
+            raise ValueError("Kỳ học thiếu semesterName hợp lệ.")
+    except Exception as error:
+        err_console.print(f"[red]Lỗi chọn kỳ học: {error} Hãy chỉ định --semester.[/red]")
         raise typer.Exit(code=1)
-    sem = semesters_list[0]['semesterName']
-    console.print(f"[yellow]Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}[/yellow]")
+    err_console.print(f"[yellow]Chưa chỉ định kỳ học, tự động chọn kỳ mới nhất: {sem}[/yellow]")
     return sem
 
 def save_output(data, default_filename: str, output_dir: Optional[str], stdout: bool, is_text: bool = False):
@@ -74,9 +87,9 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
                 f.write(data)
             else:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-        console.print(f"[green]Đã lưu dữ liệu thành công ra file: {file_path}[/green]")
+        err_console.print(f"[green]Đã lưu dữ liệu thành công ra file: {file_path}[/green]")
     except Exception as e:
-        console.print(f"[red]Lỗi ghi file: {e}[/red]")
+        err_console.print(f"[red]Lỗi ghi file: {e}[/red]")
         raise typer.Exit(code=1)
 
 
@@ -84,10 +97,15 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 def main(
     campus: str = typer.Option("APHL", "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
+    timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
 ):
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
     state["config"] = config
+    try:
+        state["timeout"] = resolve_timeout(timeout)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
 
 @app.command()
 def version():
@@ -108,21 +126,20 @@ def login(
     auth = get_auth(target_campus)
 
     if target_campus == "APHL":
-        console.print(f"[*] Không nhận được tùy chọn cơ sở, mặc định sử dụng: {target_campus} (Hòa Lạc).")
-        console.print(f"    (Mẹo: Bạn có thể dùng 'myfap login -c HCM' để đổi cơ sở)")
+        err_console.print(f"[*] Không nhận được tùy chọn cơ sở, mặc định sử dụng: {target_campus} (Hòa Lạc).")
+        err_console.print(f"    (Mẹo: Bạn có thể dùng 'myfap login -c HCM' để đổi cơ sở)")
     else:
-        console.print(f"[*] Đang tiến hành đăng nhập với cơ sở: {target_campus}")
-        
-    if not force and auth.load_session():
-        console.print(f"[green]Đã có session hợp lệ (User: {auth.mssv}). Không cần đăng nhập lại.[/green]")
-        return
+        err_console.print(f"[*] Đang tiến hành đăng nhập với cơ sở: {target_campus}")
         
     try:
+        if not force and auth.load_session():
+            err_console.print(f"[green]Đã có session hợp lệ (User: {auth.mssv}). Không cần đăng nhập lại.[/green]")
+            return
         auth.login()
         auth.save_session()
-        console.print("[bold green]Đăng nhập và lưu session thành công![/bold green]")
+        err_console.print("[bold green]Đăng nhập và lưu session thành công![/bold green]")
     except Exception as e:
-        console.print(f"[bold red]Lỗi đăng nhập: {e}[/bold red]", style="red")
+        err_console.print(f"[bold red]Lỗi đăng nhập: {e}[/bold red]", style="red")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -131,16 +148,16 @@ def logout():
     auth = get_auth()
     if auth.session_file.exists():
         auth.session_file.unlink()
-        console.print("[green]Đã xóa session thành công (Đăng xuất).[/green]")
+        err_console.print("[green]Đã xóa session thành công (Đăng xuất).[/green]")
     else:
-        console.print("[yellow]Bạn chưa đăng nhập (không tìm thấy file session).[/yellow]")
+        err_console.print("[yellow]Bạn chưa đăng nhập (không tìm thấy file session).[/yellow]")
 
 @app.command()
 def refresh():
     """Làm mới token (Refresh Token)"""
     auth = get_auth()
     if not auth.session_file.exists():
-        console.print("[red]Lỗi: Không tìm thấy file session. Vui lòng chạy 'myfap login'.[/red]")
+        err_console.print("[red]Lỗi: Không tìm thấy file session. Vui lòng chạy 'myfap login'.[/red]")
         raise typer.Exit(1)
     
     try:
@@ -152,29 +169,29 @@ def refresh():
         auth.mssv = data.get("mssv")
         auth.email = data.get("email")
     except Exception as e:
-        console.print(f"[red]Lỗi đọc file session: {e}[/red]")
+        err_console.print(f"[red]Lỗi đọc file session: {e}[/red]")
         raise typer.Exit(1)
     
     if not auth.refresh_token:
-        console.print("[red]Lỗi: Session cũ không chứa refresh_token. Vui lòng chạy lệnh 'myfap login'.[/red]")
+        err_console.print("[red]Lỗi: Session cũ không chứa refresh_token. Vui lòng chạy lệnh 'myfap login'.[/red]")
         raise typer.Exit(1)
         
-    console.print("[*] Đang tiến hành Refresh Token thủ công...")
-    with console.status("[bold green]Đang làm mới token..."):
+    err_console.print("[*] Đang tiến hành Refresh Token thủ công...")
+    with err_console.status("[bold green]Đang làm mới token..."):
         success = auth.refresh_session()
     
     if success:
-        console.print("[bold green]Refresh token và lưu session thành công![/bold green]")
+        err_console.print("[bold green]Refresh token và lưu session thành công![/bold green]")
     else:
-        console.print("[bold red]Lỗi: Refresh thất bại.[/bold red]")
+        err_console.print("[bold red]Lỗi: Refresh thất bại.[/bold red]")
         raise typer.Exit(1)
 
 @app.command()
 def campuses():
     """Xem danh sách các cơ sở (Campus)"""
-    essential = MyFapEssential()
+    essential = MyFapEssential(timeout=state.get("timeout"))
     try:
-        with console.status("[bold green]Đang lấy dữ liệu..."):
+        with err_console.status("[bold green]Đang lấy dữ liệu..."):
             data = essential.get_campuses()
         
         table = Table(title="Danh sách các cơ sở (Campus)")
@@ -186,7 +203,7 @@ def campuses():
         
         console.print(table)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy danh sách cơ sở: {e}[/red]", style="red")
+        err_console.print(f"[red]Lỗi lấy danh sách cơ sở: {e}[/red]", style="red")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -195,7 +212,7 @@ def semesters():
     auth = require_auth()
     other = MyFapEssential(auth)
     try:
-        with console.status("[bold green]Đang lấy dữ liệu..."):
+        with err_console.status("[bold green]Đang lấy dữ liệu..."):
             data = other.get_semesters()
         
         table = Table(title=f"Danh sách kỳ học (Cơ sở {state['campus']})")
@@ -206,7 +223,7 @@ def semesters():
             
         console.print(table)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy danh sách kỳ học: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy danh sách kỳ học: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -222,7 +239,7 @@ def schedule(
     sem = resolve_semester(auth, semester)
             
     try:
-        with console.status("[bold green]Đang tải lịch học..."):
+        with err_console.status("[bold green]Đang tải lịch học..."):
             data = client.get_schedule(sem)
         
         if ics:
@@ -234,7 +251,7 @@ def schedule(
             save_output(data, filename, output, stdout)
             
     except Exception as e:
-        console.print(f"[red]Lỗi lấy lịch học: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy lịch học: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -247,7 +264,7 @@ def marks(
 ):
     """Xem bảng điểm"""
     if pretty and not courseid:
-        console.print("[red]Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)[/red]")
+        err_console.print("[red]Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)[/red]")
         raise typer.Exit(code=1)
         
     auth = require_auth()
@@ -255,7 +272,7 @@ def marks(
 
     if courseid:
         try:
-            with console.status(f"[bold green]Đang tải điểm chi tiết môn {courseid}..."):
+            with err_console.status(f"[bold green]Đang tải điểm chi tiết môn {courseid}..."):
                 data = client.get_mark_by_course(courseid)
             
             filename = f"BangDiem_{courseid}.json"
@@ -265,19 +282,19 @@ def marks(
                 
             save_output(data, filename, output, stdout)
         except Exception as e:
-            console.print(f"[red]Lỗi lấy điểm môn {courseid}: {e}[/red]")
+            err_console.print(f"[red]Lỗi lấy điểm môn {courseid}: {e}[/red]")
             raise typer.Exit(code=1)
         return
     
     sem = resolve_semester(auth, semester)
             
     try:
-        with console.status("[bold green]Đang tải bảng điểm..."):
+        with err_console.status("[bold green]Đang tải bảng điểm..."):
             data = client.get_marks(sem)
         filename = f"BangDiem_{sem}.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy bảng điểm: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy bảng điểm: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -292,12 +309,12 @@ def exams(
     sem = resolve_semester(auth, semester)
             
     try:
-        with console.status("[bold green]Đang tải lịch thi..."):
+        with err_console.status("[bold green]Đang tải lịch thi..."):
             data = client.get_exams(sem)
         filename = f"LichThi_{sem}.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy lịch thi: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy lịch thi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command(name="week-timetable")
@@ -310,45 +327,44 @@ def week_timetable(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch học theo tuần"""
+    now = datetime.now()
+    requested_date = None
+    if date:
+        try:
+            requested_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            err_console.print("[red]Lỗi: Ngày không hợp lệ. Hãy dùng YYYY-MM-DD (VD: 2026-05-17).[/red]")
+            raise typer.Exit(code=1)
+    target_year = year if year is not None else (requested_date.year if requested_date else now.year)
+
     auth = require_auth()
     client = MyFapClient(auth)
     essential = MyFapEssential(auth)
 
-    now = datetime.now()
-    target_year = year or now.year
-    
-    if week:
+    if week is not None:
         target_week = week
     else:
-        if date:
-            try:
-                datetime.strptime(date, "%Y-%m-%d")
-                date_str = date
-            except ValueError:
-                console.print("[red]Lỗi: Định dạng ngày không hợp lệ. Hãy nhập đúng format YYYY-MM-DD (VD: 2026-05-17).[/red]")
-                raise typer.Exit(code=1)
-        else:
-            date_str = now.strftime("%Y-%m-%d")
+        date_str = requested_date.strftime("%Y-%m-%d") if requested_date else now.strftime("%Y-%m-%d")
             
         try:
             target_week = essential.get_week(date_str)
             if date:
-                console.print(f"Ngày {date_str} tương ứng với: Tuần {target_week}")
+                err_console.print(f"Ngày {date_str} tương ứng với: Tuần {target_week}")
             else:
-                console.print(f"Chưa chỉ định tuần, tự động lấy tuần hiện tại (Tuần {target_week})")
+                err_console.print(f"Chưa chỉ định tuần, tự động lấy tuần hiện tại (Tuần {target_week})")
         except Exception as e:
-            console.print(f"[red]Lỗi lấy thông tin tuần: {e}[/red]")
+            err_console.print(f"[red]Lỗi lấy thông tin tuần: {e}[/red]")
             raise typer.Exit(code=1)
 
     sem = resolve_semester(auth, semester)
             
     try:
-        with console.status(f"[bold green]Đang tải lịch học tuần {target_week}..."):
+        with err_console.status(f"[bold green]Đang tải lịch học tuần {target_week}..."):
             data = client.get_schedule_by_week(target_week, sem, target_year)
         filename = f"LichTuan_{target_week}_{sem}.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy lịch học theo tuần: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy lịch học theo tuần: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -366,25 +382,25 @@ def attendance(
 
     if subject_code or class_name:
         if not (subject_code and class_name):
-            console.print("[red]Lỗi: Bạn phải cung cấp CẢ -sc, --subjectcode VÀ -cn, --classname để xem chi tiết điểm danh từng buổi.[/red]")
+            err_console.print("[red]Lỗi: Bạn phải cung cấp CẢ -sc, --subjectcode VÀ -cn, --classname để xem chi tiết điểm danh từng buổi.[/red]")
             raise typer.Exit(code=1)
             
         try:
-            with console.status(f"[bold green]Đang tải điểm danh môn {subject_code}..."):
+            with err_console.status(f"[bold green]Đang tải điểm danh môn {subject_code}..."):
                 data = client.get_course_attendance(sem, subject_code, class_name)
             filename = f"DiemDanhChiTiet_{subject_code}_{class_name}_{sem}.json"
             save_output(data, filename, output, stdout)
         except Exception as e:
-            console.print(f"[red]Lỗi lấy chi tiết điểm danh: {e}[/red]")
+            err_console.print(f"[red]Lỗi lấy chi tiết điểm danh: {e}[/red]")
             raise typer.Exit(code=1)
     else:
         try:
-            with console.status("[bold green]Đang tải trạng thái điểm danh tổng quát..."):
+            with err_console.status("[bold green]Đang tải trạng thái điểm danh tổng quát..."):
                 data = client.get_attendances(sem)
             filename = f"DiemDanhTongQuat_{sem}.json"
             save_output(data, filename, output, stdout)
         except Exception as e:
-            console.print(f"[red]Lỗi lấy trạng thái điểm danh: {e}[/red]")
+            err_console.print(f"[red]Lỗi lấy trạng thái điểm danh: {e}[/red]")
             raise typer.Exit(code=1)
 
 @app.command()
@@ -397,12 +413,12 @@ def applications(
     client = MyFapClient(auth)
     
     try:
-        with console.status("[bold green]Đang tải danh sách đơn từ..."):
+        with err_console.status("[bold green]Đang tải danh sách đơn từ..."):
             data = client.get_applications()
         filename = f"DonTu.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy danh sách đơn từ: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy danh sách đơn từ: {e}[/red]")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -415,12 +431,12 @@ def news(
     other = MyFapEssential(auth)
     
     try:
-        with console.status("[bold green]Đang tải thông báo..."):
+        with err_console.status("[bold green]Đang tải thông báo..."):
             data = other.get_news()
         filename = f"ThongBao.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi lấy danh sách thông báo: {e}[/red]")
+        err_console.print(f"[red]Lỗi lấy danh sách thông báo: {e}[/red]")
         raise typer.Exit(code=1)
 
 # --- SUBCOMMAND INFO ---
@@ -437,7 +453,7 @@ def info_student(
         filename = f"InfoStudent.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @info_app.command("campus")
@@ -453,7 +469,7 @@ def info_campus(
         filename = f"InfoCampus.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 
@@ -471,7 +487,7 @@ def other_survey(
         filename = f"Survey.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @other_app.command("feedback")
@@ -487,7 +503,7 @@ def other_feedback(
         filename = f"Feedback.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @other_app.command("profile")
@@ -503,7 +519,7 @@ def other_profile(
         filename = f"Profile.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @other_app.command("notification")
@@ -519,7 +535,7 @@ def other_notification(
         filename = f"Notification.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @other_app.command("fee")
@@ -527,7 +543,7 @@ def other_fee(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
-    """Lấy danh sách học phí chưa thanh toán"""
+    """Lấy danh sách học phí và trạng thái thanh toán từng khoản"""
     auth = require_auth()
     other_client = MyFapOther(auth)
     try:
@@ -535,7 +551,7 @@ def other_fee(
         filename = f"Fee.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
 @other_app.command("subjects")
@@ -547,11 +563,11 @@ def other_subjects(
     auth = require_auth()
     other_client = MyFapOther(auth)
     try:
-        with console.status("[bold green]Đang tải danh sách tất cả môn học..."):
+        with err_console.status("[bold green]Đang tải danh sách tất cả môn học..."):
             data = other_client.get_subjects()
         filename = f"Subjects.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
-        console.print(f"[red]Lỗi: {e}[/red]")
+        err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 

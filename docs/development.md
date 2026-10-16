@@ -71,3 +71,11 @@ Smoke test dùng pip để resolve dependency từ metadata package, không áp 
 Reusable workflow hỗ trợ `workflow_call` với input `ref` và luôn chạy đầy đủ các bước kiểm tra. Job `ready` báo lỗi nếu `scope` hoặc source/build/smoke thất bại. Chỉ khi tất cả bước bắt buộc thành công, workflow mới trả `artifact_name`, `package_version` và `manifest_sha256`. Artifact gồm wheel, sdist và `SHA256SUMS` của cùng run, được giữ 14 ngày để dùng trong bước phát hành sau này.
 
 Artifact validator chặn đường dẫn session, credential, capture và file ngoài allowlist. Validator không đọc nội dung dữ liệu nhạy cảm; vẫn cần review secret/PII có thể nằm trong mã Python hợp lệ. Workflow CI chỉ có quyền đọc repository, không có quyền publish.
+
+### Regression cho API v1 và dữ liệu
+
+Suite unittest kiểm tra query và encoding, chọn kỳ theo ngày, survey/học phí, phân loại lỗi, stdout JSON/ICS và parser HTML. Fixture trong `tests/fixtures/` là dữ liệu tổng hợp; credential dùng chuỗi giả và domain `example.invalid`. Test không đăng nhập, không đọc HAR/SAZ và không gọi API thật.
+
+Test và fixture chỉ phục vụ repository, không đóng gói trong wheel/sdist. Bạn chạy regression từ checkout bằng các lệnh ở trên.
+
+ICS dùng timezone Việt Nam từ `pytz`, nên không cần timezone database của hệ điều hành trên Windows. Trạng thái và giới hạn kiểm chứng Phase 1 nằm trong [tasks/phase1.md](../tasks/phase1.md).
