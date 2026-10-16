@@ -20,7 +20,7 @@ Gia cố CI trước các phase sửa v1, OAuth/session và v2. Version package 
 
 ## Kiểm chứng
 
-- Unit suite local: 19 test pass, gồm regression version hiện có. Thử đảo điều kiện kiểm manifest khiến test hash thất bại; khôi phục code và suite pass lại.
+- Unit suite local: 32 test pass sau phần mở rộng, gồm regression version và các case scope/ready. Thử đảo điều kiện kiểm manifest khiến test hash thất bại; khôi phục code và suite pass lại.
 - `uv build`, `twine check --strict`, artifact validation và actionlint pass.
 - Pip smoke thật trên Windows/Python 3.9 và 3.11 pass cho wheel lẫn sdist; bốn tổ hợp OS/Python trên GitHub Actions đều pass.
 - [Run CI 38852306858](https://github.com/WindowScary321/myfap-api-cli/actions/runs/38852306858) của commit `393ced9`: 10/10 job thành công. Kết quả commit mới nhất được cập nhật trong PR.
@@ -28,3 +28,15 @@ Gia cố CI trước các phase sửa v1, OAuth/session và v2. Version package 
 ## Giới hạn
 
 CI không đăng nhập FEID hoặc gọi API FAP thật. Allowlist chỉ chặn đường dẫn/file ngoài chính sách; không chứng minh được không có secret hoặc PII ẩn trong nội dung mã Python. Kết quả Phase 0 không xác nhận OAuth/API v1/v2 đã được sửa.
+
+## Mở rộng: docs/tasks chỉ lưu trong repository
+
+- [x] Thêm `scope` lấy danh sách tên path Git, không đọc nội dung hai thư mục. Rename được xét như delete/add để đổi tên từ code sang docs hoặc ngược lại vẫn chạy đầy đủ CI.
+- [x] Chỉ thay đổi `docs/**` hoặc `tasks/**`: bỏ qua source/build/smoke, không tạo artifact; `ready` vẫn trả success. Thay đổi code/mixed và mọi `workflow_call` chạy đủ gate.
+- [x] `ready` dùng `always()` nhưng xác minh trạng thái từng job, không che lỗi/cancel hoặc trạng thái không xác định.
+- [x] Sparse checkout chỉ giữ code/tests/helpers và file build; không checkout docs/tasks trong các job CI. README/license root vẫn được giữ.
+- [x] Dùng `MANIFEST.in` loại hai thư mục khi build full checkout; validator từ chối docs/tasks trong wheel và sdist.
+- [x] Bổ sung test docs-only/tasks-only, code/mixed, rename/delete, reusable call và gate lỗi; artifact giả kiểm tra cả hai định dạng.
+- Kết quả pipeline của commit mở rộng trên GitHub Actions được theo dõi trong check của PR; comment ghi link run và commit tương ứng.
+
+Phần mở rộng giữ nguyên runtime API, entry point, version và các workflow outputs artifact đã có. Không thêm tài liệu vào `package-data` hoặc `data-files`.

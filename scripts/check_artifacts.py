@@ -71,6 +71,11 @@ def _safe_path(name: str) -> PurePosixPath:
     return path
 
 
+def _repository_only_path(path: PurePosixPath) -> bool:
+    parts = tuple(part.lower() for part in path.parts)
+    return bool(parts and (parts[0] in {"docs", "tasks"} or (len(parts) > 1 and parts[0] == "myfap" and parts[1] in {"docs", "tasks"})))
+
+
 def _metadata(content: bytes, version: str, *, readme: bool = False) -> None:
     message = BytesParser().parsebytes(content)
     if message.get_all("Name") != ["myfap"] or message.get_all("Version") != [version]:
@@ -103,6 +108,8 @@ def _wheel(path: Path, version: str) -> None:
         files = set()
         for member in archive.infolist():
             item = _safe_path(getattr(member, "orig_filename", member.filename))
+            if _repository_only_path(item):
+                raise ArtifactValidationError("Artifact chứa repository-only docs/tasks.")
             if member.filename in names or stat.S_ISLNK(member.external_attr >> 16):
                 raise ArtifactValidationError("Wheel chứa file trùng hoặc symlink.")
             names.add(member.filename)
@@ -134,7 +141,7 @@ def _wheel(path: Path, version: str) -> None:
 
 def _sdist(path: Path, version: str) -> None:
     prefix = f"myfap-{version}"
-    top_files = {"LICENSE", "README.md", "PKG-INFO", "pyproject.toml", "setup.cfg"}
+    top_files = {"LICENSE", "README.md", "PKG-INFO", "pyproject.toml", "setup.cfg", "MANIFEST.in"}
     egg_files = {"PKG-INFO", "SOURCES.txt", "dependency_links.txt", "entry_points.txt", "requires.txt", "top_level.txt"}
     with tarfile.open(path, "r:gz") as archive:
         names = set()
@@ -146,6 +153,8 @@ def _sdist(path: Path, version: str) -> None:
             names.add(member.name)
             if not item.parts or item.parts[0] != prefix:
                 raise ArtifactValidationError("Sdist chứa thư mục gốc không khớp.")
+            if _repository_only_path(PurePosixPath(*item.parts[1:])):
+                raise ArtifactValidationError("Artifact chứa repository-only docs/tasks.")
             if member.isdir():
                 continue
             files.add(member.name)

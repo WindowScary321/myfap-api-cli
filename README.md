@@ -86,7 +86,11 @@ Bạn dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cậ
 
 ## CI và kiểm tra artifact
 
-CI chạy trên Ubuntu/Windows với Python 3.9/3.11. Mỗi run kiểm tra source, build một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine và tạo `SHA256SUMS`. Cả bốn môi trường cài wheel và sdist vào hai venv tạm riêng ngoài checkout bằng pip, rồi chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài browser Playwright.
+CI dùng job `scope` để so sánh tên path thay đổi. Nếu PR hoặc push `main` chỉ thay đổi `docs/` hoặc `tasks/`, source/build/smoke được bỏ qua, không tạo artifact và check cuối vẫn thành công. PR có cả code lẫn tài liệu vẫn chạy đầy đủ; reusable workflow dùng cho release luôn chạy đầy đủ gate. Nếu scope hoặc gate code thất bại, check cuối thất bại.
+
+Khi cần kiểm tra code, CI chạy trên Ubuntu/Windows với Python 3.9/3.11, build một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine và tạo `SHA256SUMS`. Cả bốn môi trường cài wheel và sdist vào hai venv tạm riêng ngoài checkout bằng pip, rồi chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài browser Playwright.
+
+`docs/` và `tasks/` là tài liệu chỉ lưu trong repository: CI không checkout/đọc nội dung hai thư mục này để test hoặc build. `MANIFEST.in` loại chúng khỏi sdist cả khi build local từ checkout đầy đủ; artifact gate từ chối nếu chúng xuất hiện trong wheel/sdist. `README.md` và `LICENSE` ở root vẫn cần cho metadata package.
 
 Cài nhóm công cụ CI và chạy các kiểm tra local bằng Python 3.11:
 

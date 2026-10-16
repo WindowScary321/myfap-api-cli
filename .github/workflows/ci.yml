@@ -30,8 +30,31 @@ env:
   ARTIFACT_DIR: dist
 
 jobs:
+  scope:
+    name: Xác định phạm vi thay đổi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed }}
+    steps:
+      - name: Checkout helper và lịch sử Git
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          sparse-checkout: /scripts/ci_scope.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Chọn gate theo tên path
+        id: scope
+        env:
+          WORKFLOW_INPUTS: ${{ toJSON(inputs) }}
+        run: python scripts/ci_scope.py scope >> "$GITHUB_OUTPUT"
+
   source:
     name: Source / Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    needs: scope
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -44,6 +67,17 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Cài uv và Python
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
@@ -62,7 +96,8 @@ jobs:
 
   build:
     name: Build và kiểm tra artifact
-    needs: source
+    needs: [scope, source]
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -74,6 +109,17 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Cài uv và Python
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
@@ -108,7 +154,8 @@ jobs:
 
   smoke:
     name: Artifact / Python ${{ matrix.python-version }} / ${{ matrix.os }}
-    needs: build
+    needs: [scope, build]
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
@@ -124,6 +171,17 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Cài uv và Python
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
@@ -155,12 +213,26 @@ jobs:
 
   ready:
     name: Toàn bộ gate đã đạt
-    needs: [source, build, smoke]
+    needs: [scope, source, build, smoke]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ needs.build.outputs.artifact_name }}
       package_version: ${{ needs.build.outputs.package_version }}
       manifest_sha256: ${{ needs.build.outputs.manifest_sha256 }}
     steps:
-      - name: Xác nhận artifact có thể dùng cho bước phát hành sau này
-        run: echo "Source tests, metadata, manifest và pip smoke đã đạt."
+      - name: Checkout helper xác nhận gate
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: /scripts/ci_scope.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Kiểm tra kết quả hoặc xác nhận chỉ đổi tài liệu
+        env:
+          CODE_CHANGED: ${{ needs.scope.outputs.code_changed }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SOURCE_RESULT: ${{ needs.source.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: python scripts/ci_scope.py ready

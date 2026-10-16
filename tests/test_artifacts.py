@@ -209,6 +209,18 @@ class ArtifactGateTests(unittest.TestCase):
                     with self.assertRaisesRegex(ArtifactValidationError, "nhạy cảm"):
                         validate_artifacts(self.root, self.dist)
 
+    def test_repository_only_directories_are_rejected_in_both_formats(self):
+        for name in ("docs/Example.md", "tasks/phase0.md", "myfap/docs/example.py", "myfap/tasks/plan.py"):
+            for kind in ("wheel", "sdist"):
+                with self.subTest(path=name, kind=kind):
+                    self.bundle()
+                    if kind == "wheel":
+                        _wheel(self.dist / f"myfap-{VERSION}-py3-none-any.whl", unsafe_name=name)
+                    else:
+                        _sdist(self.dist / f"myfap-{VERSION}.tar.gz", unsafe_name=name)
+                    with self.assertRaisesRegex(ArtifactValidationError, "repository-only"):
+                        validate_artifacts(self.root, self.dist)
+
     def test_unsafe_paths_and_unexpected_files_are_rejected(self):
         self.bundle()
         for path in ("../escaped.py", "/absolute.py", "myfap\\escaped.py", "myfap/data.json"):
