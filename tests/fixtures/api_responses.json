@@ -1,0 +1,6 @@
+{
+  "survey_not_found": {"code": "404", "message": "Data Not Found", "data": null},
+  "survey_success": {"code": "200", "message": "Success", "data": [{"name": "Khảo sát mẫu", "url": "https://example.invalid/survey"}]},
+  "fee_success": {"code": "200", "message": "Success", "data": [{"invoiceNo": "TEST-INVOICE-1", "amount": 1250000, "IsPaid": true, "FeeType": "Test"}, {"invoiceNo": "TEST-INVOICE-2", "amount": 2500000, "IsPaid": false, "FeeType": "Test"}]},
+  "semesters": {"code": "200", "data": [{"termID": "ffffffff-ffff-ffff-ffff-ffffffffffff", "semesterName": "Spring2026", "startDate": "2026-01-05T00:00:00"}, {"termID": "00000000-0000-0000-0000-000000000001", "semesterName": "Fall2026", "startDate": "2026-09-07T00:00:00"}, {"termID": "00000000-0000-0000-0000-000000000002", "semesterName": "Fall2026 second", "startDate": "2026-09-07T00:00:00"}]}
+}

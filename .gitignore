@@ -219,6 +219,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 *.json
+# Fixture tổng hợp cho test offline; không lưu capture thật trong thư mục này.
+!tests/fixtures/*.json
 stuffs/
 *.ics
 temp/

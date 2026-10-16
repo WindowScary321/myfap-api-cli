@@ -3,6 +3,7 @@ import json
 import base64
 import hashlib
 import hmac
+import sys
 import requests
 import pkce
 from pathlib import Path
@@ -11,16 +12,24 @@ import pytz
 from playwright.sync_api import sync_playwright
 
 # Import biến từ file ngoài
-from .auth_var import FEID_HOST, FAP_HOST, CLIENT_ID, REDIRECT_URI, SECRET_KEY, MAGIC_ID
+from .auth_var import FEID_HOST, FAP_HOST, CLIENT_ID, REDIRECT_URI, SECRET_KEY, MAGIC_ID, SURVEY_SECRET_KEY
 CONFIG_DIR = Path.home() / ".myfap-api-cli"
 SESSION_FILE = CONFIG_DIR / "session.json"
 
-def create_checksum(identifier: str, campus: str) -> str:
+def _create_checksum(identifier: str, campus: str, key: str) -> str:
     tz = pytz.timezone('Asia/Ho_Chi_Minh')
     time_str = datetime.now(tz).strftime("%d/%m/%Y %H") + ":00"
     raw = f"{identifier}MYFAP{campus}{time_str}"
-    sig = hmac.new(SECRET_KEY.encode(), raw.encode(), hashlib.sha1).digest()
+    sig = hmac.new(key.encode(), raw.encode(), hashlib.sha1).digest()
     return base64.b64encode(sig).decode()
+
+
+def create_checksum(identifier: str, campus: str) -> str:
+    return _create_checksum(identifier, campus, SECRET_KEY)
+
+
+def create_survey_checksum(username: str) -> str:
+    return _create_checksum(username.strip().lower(), "", SURVEY_SECRET_KEY)
 
 class MyFapAuth:
     def __init__(self, campus="APHL", session_file=None):
@@ -56,6 +65,8 @@ class MyFapAuth:
             pass
 
     def load_session(self):
+        from .api import ApiError, ApiHTTPError, ApiSessionExpiredError, read_response
+
         if not self.session_file.exists():
             return False
         try:
@@ -63,11 +74,11 @@ class MyFapAuth:
                 try:
                     data = json.load(f)
                 except json.JSONDecodeError:
-                    print(f"[!] Lỗi: File cấu hình '{self.session_file}' không đúng định dạng JSON.")
+                    print(f"[!] Lỗi: File cấu hình '{self.session_file}' không đúng định dạng JSON.", file=sys.stderr)
                     return False
             
             if not isinstance(data, dict) or "authen_key" not in data:
-                print(f"[!] Lỗi: File '{self.session_file}' không chứa dữ liệu session hợp lệ của MyFAP.")
+                print(f"[!] Lỗi: File '{self.session_file}' không chứa dữ liệu session hợp lệ của MyFAP.", file=sys.stderr)
                 return False
                 
             self.authen_key = data.get("authen_key")
@@ -80,25 +91,36 @@ class MyFapAuth:
             
             if not self.authen_key: return False
 
-            # Kiểm tra session còn sống không bằng cách gọi thử API
-            checksum = create_checksum(MAGIC_ID, self.campus)
-            url = f"{FAP_HOST}/GetSemester?campusCode={self.campus}&Authen={self.authen_key}&checksum={checksum}"
-            r = self.session.get(url, timeout=5)
-            
-            if r.status_code == 200:
-                resp = r.json()
-                if str(resp.get("code", "")) == "201":
-                    return self.refresh_session()
-                return True
+        except (OSError, ValueError):
+            print("[!] Không đọc được file session. Hãy kiểm tra --config hoặc đăng nhập lại.", file=sys.stderr)
+            return False
+
+        checksum = create_checksum(MAGIC_ID, self.campus)
+        try:
+            r = self.session.get(
+                f"{FAP_HOST}/GetSemester",
+                params={"campusCode": self.campus, "Authen": self.authen_key, "checksum": checksum},
+                timeout=5,
+            )
+        except requests.RequestException:
+            raise ApiError("Không kiểm tra được session do lỗi kết nối. Hãy thử lại sau.") from None
+        try:
+            read_response(r)
+        except ApiSessionExpiredError:
             return self.refresh_session()
-        except Exception:
-            return self.refresh_session()
+        except ApiHTTPError as error:
+            if error.status_code == 401:
+                return self.refresh_session()
+            raise
+        return True
 
 
     def refresh_session(self):
+        from .api import ApiError, read_response
+
         if not self.refresh_token: return False
         try:
-            print("[*] Phiên đăng nhập hết hạn. Đang làm mới (Refresh Token)...")
+            print("[*] Phiên đăng nhập hết hạn. Đang làm mới (Refresh Token)...", file=sys.stderr)
             r = self.session.post(f"{FEID_HOST}/connect/token", data={
                 "client_id": CLIENT_ID, 
                 "refresh_token": self.refresh_token, 
@@ -113,34 +135,36 @@ class MyFapAuth:
                 # Handshake lại để lấy authen_key mới
                 checksum = create_checksum(MAGIC_ID, self.campus)
                 r_handshake = self.session.post(
-                    f"{FAP_HOST}/AuthenticationByFeId?campusCode={self.campus}&checksum={checksum}",
+                    f"{FAP_HOST}/AuthenticationByFeId",
+                    params={"campusCode": self.campus, "checksum": checksum},
                     json={"token": self.jwt_token},
                     headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
                     timeout=10
                 )
-                if r_handshake.status_code == 200:
-                    resp_hs = r_handshake.json()
-                    if 'data' in resp_hs and len(resp_hs['data']) > 0:
-                        self.authen_key = resp_hs['data'][0]['authenKey']
-                        self.save_session()
-                        print("[*] Làm mới phiên đăng nhập thành công!")
-                        return True
-                    else:
-                        print(f"[!] Lỗi handshake sau khi refresh: {resp_hs}")
-                        return False
+                resp_hs = read_response(r_handshake)
+                if 'data' in resp_hs and len(resp_hs['data']) > 0:
+                    self.authen_key = resp_hs['data'][0]['authenKey']
+                    self.save_session()
+                    print("[*] Làm mới phiên đăng nhập thành công!", file=sys.stderr)
+                    return True
                 else:
-                    print(f"[!] Lỗi handshake sau khi refresh (FAP trả về {r_handshake.status_code}): {r_handshake.text}")
+                    print("[!] Handshake sau refresh không trả về session FAP. Hãy đăng nhập lại.", file=sys.stderr)
                     return False
             else:
-                print(f"[!] Lỗi từ FEID (Mã {r.status_code}): {r.text}")
-                print("[!] Refresh Token thất bại hoặc đã bị thu hồi. Vui lòng chạy lệnh 'myfap login -f' để đăng nhập lại.")
+                print(f"[!] FEID trả về HTTP {r.status_code}.", file=sys.stderr)
+                print("[!] Refresh Token thất bại hoặc đã bị thu hồi. Vui lòng chạy lệnh 'myfap login -f' để đăng nhập lại.", file=sys.stderr)
                 return False
-        except Exception as e:
-            print(f"[!] Lỗi khi Refresh Token: {e}")
+        except ApiError as error:
+            print(f"[!] Không làm mới được session FAP: {error}", file=sys.stderr)
+            return False
+        except Exception:
+            print("[!] Không làm mới được session. Hãy thử lại hoặc chạy 'myfap login -f'.", file=sys.stderr)
             return False
 
     def login(self):
-        print("[*] Đang khởi chạy Playwright...")
+        from .api import ApiError, read_response
+
+        print("[*] Đang khởi chạy Playwright...", file=sys.stderr)
         auth_url = (f"{FEID_HOST}/connect/authorize?client_id={CLIENT_ID}"
                     f"&redirect_uri={REDIRECT_URI}&response_type=code"
                     f"&scope=openid%20profile%20offline_access%20identity-service"
@@ -201,7 +225,7 @@ class MyFapAuth:
             page.on("response", handle_response)
             page.on("request", handle_request)
 
-            print(">>> VUI LÒNG ĐĂNG NHẬP TRÊN CỬA SỔ TRÌNH DUYỆT <<<")
+            print(">>> VUI LÒNG ĐĂNG NHẬP TRÊN CỬA SỔ TRÌNH DUYỆT <<<", file=sys.stderr)
             try:
                 page.goto(auth_url)
             except Exception:
@@ -212,7 +236,7 @@ class MyFapAuth:
                 while not code and (time.time() - start_time) < 120:
                     page.wait_for_timeout(500)
             except KeyboardInterrupt:
-                print("\n[!] Hủy đăng nhập bởi người dùng.")
+                print("\n[!] Hủy đăng nhập bởi người dùng.", file=sys.stderr)
                 browser.close()
                 raise Exception("Đăng nhập bị hủy.")
             except Exception:
@@ -222,14 +246,17 @@ class MyFapAuth:
         if not code:
             raise Exception("Lỗi: Không lấy được Code từ FEID (timeout hoặc trình duyệt bị đóng).")
 
-        print("[*] Lấy token từ Code...")
-        r = self.session.post(f"{FEID_HOST}/connect/token", data={
-            "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
-            "code_verifier": self.code_verifier, "grant_type": "authorization_code"
-        }, timeout=10)
+        print("[*] Lấy token từ Code...", file=sys.stderr)
+        try:
+            r = self.session.post(f"{FEID_HOST}/connect/token", data={
+                "client_id": CLIENT_ID, "code": code, "redirect_uri": REDIRECT_URI,
+                "code_verifier": self.code_verifier, "grant_type": "authorization_code"
+            }, timeout=10)
+        except requests.RequestException:
+            raise ApiError("Không kết nối được FEID. Hãy thử đăng nhập lại sau.") from None
         
         if r.status_code != 200:
-            raise Exception(f"Lỗi lấy JWT Token: {r.text}")
+            raise Exception(f"Không lấy được token FEID (HTTP {r.status_code}). Hãy đăng nhập lại.")
 
         self.jwt_token = r.json()['access_token']
         self.refresh_token = r.json().get('refresh_token')
@@ -249,26 +276,27 @@ class MyFapAuth:
                     found = True
                     break
             if not found and projects: self.mssv = projects[0].get('RollNumber')
-            print(f"[*] Xin chào sinh viên: {self.mssv}")
+            print(f"[*] Xin chào sinh viên: {self.mssv}", file=sys.stderr)
         except Exception:
             raise Exception("Không tìm thấy MSSV tự động trong Token. Đăng nhập thất bại.")
 
-        print("[*] Handshake với FAP API để lấy authenKey...")
+        print("[*] Handshake với FAP API để lấy authenKey...", file=sys.stderr)
         checksum = create_checksum(MAGIC_ID, self.campus)
-        r = self.session.post(
-            f"{FAP_HOST}/AuthenticationByFeId?campusCode={self.campus}&checksum={checksum}",
-            json={"token": self.jwt_token},
-            headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-            timeout=10
-        )
-        if r.status_code == 200:
-            resp = r.json()
-            if 'data' in resp and len(resp['data']) > 0:
-                self.authen_key = resp['data'][0]['authenKey']
-                print("[*] Handshake thành công!")
-                return self.authen_key, self.mssv
-            else:
-                raise Exception(f"Lỗi handshake: {resp}")
+        try:
+            r = self.session.post(
+                f"{FAP_HOST}/AuthenticationByFeId",
+                params={"campusCode": self.campus, "checksum": checksum},
+                json={"token": self.jwt_token},
+                headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
+                timeout=10
+            )
+        except requests.RequestException:
+            raise ApiError("Không kết nối được FAP để hoàn tất đăng nhập. Hãy thử lại sau.") from None
+        resp = read_response(r)
+        if 'data' in resp and len(resp['data']) > 0:
+            self.authen_key = resp['data'][0]['authenKey']
+            print("[*] Handshake thành công!", file=sys.stderr)
+            return self.authen_key, self.mssv
         else:
-            raise Exception(f"API Error {r.status_code}: {r.text}")
+            raise Exception("Handshake không trả về session FAP. Hãy đăng nhập lại.")
 
