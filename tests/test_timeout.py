@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from typer.testing import CliRunner
+from rich.text import Text
 
 from myfap import api
 from myfap.auth import MyFapAuth
@@ -78,11 +79,11 @@ class TimeoutTests(unittest.TestCase):
     def test_invalid_environment_does_not_break_help_import(self):
         result = subprocess.run(
             [sys.executable, "-c", "from myfap.cli import app; app()", "--help"],
-            env={**os.environ, "MYFAP_TIMEOUT": "invalid", "PYTHONUTF8": "1"},
+            env={**os.environ, "MYFAP_TIMEOUT": "invalid", "PYTHONUTF8": "1", "FORCE_COLOR": "1"},
             capture_output=True, text=True, encoding="utf-8", timeout=20,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("--timeout", result.stdout)
+        self.assertIn("--timeout", Text.from_ansi(result.stdout).plain)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_auth_preserves_defaults_and_honors_environment_for_probe_and_refresh(self):
