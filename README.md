@@ -84,6 +84,31 @@ Bước cài Firefox là tùy chọn; việc build package không cần trình d
 
 Bạn dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cập nhật dependency trong `pyproject.toml` và `uv.lock`. Nếu sửa dependency trực tiếp trong `pyproject.toml`, chạy `uv lock` rồi `uv sync --locked`. Sau khi kiểm tra, commit cả thay đổi cấu hình và lockfile cùng nhau. Không commit thư mục `.venv`.
 
+## CI và kiểm tra artifact
+
+CI dùng job `scope` để so sánh tên path thay đổi. Nếu PR hoặc push `main` chỉ thay đổi `docs/` hoặc `tasks/`, source/build/smoke được bỏ qua, không tạo artifact và check cuối vẫn thành công. PR có cả code lẫn tài liệu vẫn chạy đầy đủ; reusable workflow dùng cho release luôn chạy đầy đủ gate. Nếu scope hoặc gate code thất bại, check cuối thất bại.
+
+Khi cần kiểm tra code, CI chạy trên Ubuntu/Windows với Python 3.9/3.11, build một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine và tạo `SHA256SUMS`. Cả bốn môi trường cài wheel và sdist vào hai venv tạm riêng ngoài checkout bằng pip, rồi chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài browser Playwright.
+
+`docs/` và `tasks/` là tài liệu chỉ lưu trong repository: CI không checkout/đọc nội dung hai thư mục này để test hoặc build. `MANIFEST.in` loại chúng khỏi sdist cả khi build local từ checkout đầy đủ; artifact gate từ chối nếu chúng xuất hiện trong wheel/sdist. `README.md` và `LICENSE` ở root vẫn cần cho metadata package.
+
+Cài nhóm công cụ CI và chạy các kiểm tra local bằng Python 3.11:
+
+```sh
+uv sync --locked --group ci
+uv run --locked --group ci python -m unittest discover -s tests -v
+uv build --out-dir dist
+uv run --locked --group ci python -m twine check --strict dist/*.whl dist/*.tar.gz
+uv run --locked --group ci python scripts/check_artifacts.py --dist-dir dist
+uv run --locked --group ci python scripts/smoke_install.py --artifact-dir dist --expected-version 0.2.0
+```
+
+Thư mục artifact phải chỉ chứa đúng wheel/sdist của version hiện tại và manifest; không trộn file build cũ. Smoke dùng resolver pip từ metadata package, không áp dụng `uv.lock`. Marker `greenlet` cho Windows/Python 3.9 được khai báo trong dependency runtime để cả pip và uv cùng nhận ràng buộc.
+
+Workflow hỗ trợ `workflow_call` với input `ref`; chỉ sau khi mọi gate pass mới trả `artifact_name`, `package_version` và `manifest_sha256`. Artifact chứa wheel, sdist và `SHA256SUMS` của cùng run, được giữ 14 ngày để dùng lại trong bước phát hành sau này.
+
+Validator chặn các đường dẫn session, credential, capture và file ngoài allowlist; nó không đọc nội dung dữ liệu nhạy cảm và không thay thế review secret/PII trong mã nguồn Python hợp lệ. Toàn bộ CI chỉ có quyền đọc repository, không có quyền publish.
+
 ## Các Options
 |Option|Chú thích|
 |:-|:-|

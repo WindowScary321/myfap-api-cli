@@ -4,41 +4,235 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        description: SHA hoặc ref cần kiểm tra; mặc định là commit của event
+        required: false
+        type: string
+        default: ""
+    outputs:
+      artifact_name:
+        description: Artifact wheel/sdist đã qua toàn bộ gate trong cùng run
+        value: ${{ jobs.ready.outputs.artifact_name }}
+      package_version:
+        description: Version khớp giữa source, lockfile và artifact
+        value: ${{ jobs.ready.outputs.package_version }}
+      manifest_sha256:
+        description: SHA-256 của file SHA256SUMS trong artifact
+        value: ${{ jobs.ready.outputs.manifest_sha256 }}
 
 permissions:
   contents: read
 
 env:
   PYTHONUTF8: "1"
+  ARTIFACT_DIR: dist
 
 jobs:
-  test-and-build:
-    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+  scope:
+    name: Xác định phạm vi thay đổi
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed }}
+    steps:
+      - name: Checkout helper và lịch sử Git
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          sparse-checkout: /scripts/ci_scope.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Chọn gate theo tên path
+        id: scope
+        env:
+          WORKFLOW_INPUTS: ${{ toJSON(inputs) }}
+        run: python scripts/ci_scope.py scope >> "$GITHUB_OUTPUT"
+
+  source:
+    name: Source / Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    needs: scope
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.9", "3.11"]
-
     steps:
-      - name: Checkout mã nguồn
-        uses: actions/checkout@v5
-
-      - name: Cài uv
+      - name: Checkout đúng commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Cài uv và Python
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
           version: "0.13.0"
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-
-      - name: Đồng bộ dependencies
-        run: uv sync --locked
-
+      - name: Đồng bộ dependency đã khóa
+        run: uv sync --locked --group ci
       - name: Chạy regression test
-        run: uv run --locked python -m unittest discover -s tests -v
-
+        run: uv run --locked --group ci python -m unittest discover -s tests -v
       - name: Kiểm tra CLI
-        run: uv run --locked myfap --help
+        run: |
+          uv run --locked --group ci myfap version
+          uv run --locked --group ci myfap --help
 
-      - name: Build package
-        run: uv build
+  build:
+    name: Build và kiểm tra artifact
+    needs: [scope, source]
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+      package_version: ${{ steps.validate.outputs.package_version }}
+      manifest_sha256: ${{ steps.validate.outputs.manifest_sha256 }}
+    steps:
+      - name: Checkout đúng commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Cài uv và Python
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.13.0"
+          python-version: "3.11"
+          enable-cache: true
+      - name: Đồng bộ công cụ CI đã khóa
+        run: uv sync --locked --group ci
+      - name: Build một bộ wheel và sdist
+        run: uv build --out-dir "$ARTIFACT_DIR"
+      - name: Kiểm tra README và metadata bằng Twine
+        run: uv run --locked --group ci python -m twine check --strict "$ARTIFACT_DIR"/*.whl "$ARTIFACT_DIR"/*.tar.gz
+      - name: Kiểm tra version, danh sách file và tạo manifest
+        id: validate
+        shell: bash
+        run: uv run --locked --group ci python scripts/check_artifacts.py --dist-dir "$ARTIFACT_DIR" >> "$GITHUB_OUTPUT"
+      - name: Đặt tên artifact của run
+        id: artifact
+        shell: bash
+        run: echo "name=myfap-dist-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+      - name: Lưu đúng bộ artifact đã kiểm tra
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: |
+            ${{ env.ARTIFACT_DIR }}/*.whl
+            ${{ env.ARTIFACT_DIR }}/*.tar.gz
+            ${{ env.ARTIFACT_DIR }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  smoke:
+    name: Artifact / Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    needs: [scope, build]
+    if: ${{ needs.scope.outputs.code_changed == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.11"]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout helper đúng commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: |
+            /myfap/
+            /tests/
+            /scripts/
+            /pyproject.toml
+            /uv.lock
+            /README.md
+            /LICENSE
+            /.python-version
+            /MANIFEST.in
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Cài uv và Python
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.13.0"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Đồng bộ công cụ CI đã khóa
+        run: uv sync --locked --group ci
+      - name: Tải artifact từ cùng run
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: ${{ env.ARTIFACT_DIR }}
+      - name: Xác minh manifest trước khi cài
+        env:
+          EXPECTED_VERSION: ${{ needs.build.outputs.package_version }}
+          MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
+        run: >-
+          uv run --locked --group ci python scripts/check_artifacts.py
+          --dist-dir "$ARTIFACT_DIR" --verify-manifest
+          --expected-version "$EXPECTED_VERSION" --manifest-sha256 "$MANIFEST_SHA256"
+      - name: Cài wheel và sdist vào hai venv sạch ngoài checkout
+        env:
+          EXPECTED_VERSION: ${{ needs.build.outputs.package_version }}
+        run: >-
+          uv run --locked --group ci python scripts/smoke_install.py
+          --artifact-dir "$ARTIFACT_DIR" --expected-version "$EXPECTED_VERSION"
+
+  ready:
+    name: Toàn bộ gate đã đạt
+    needs: [scope, source, build, smoke]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ needs.build.outputs.artifact_name }}
+      package_version: ${{ needs.build.outputs.package_version }}
+      manifest_sha256: ${{ needs.build.outputs.manifest_sha256 }}
+    steps:
+      - name: Checkout helper xác nhận gate
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout: /scripts/ci_scope.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Kiểm tra kết quả hoặc xác nhận chỉ đổi tài liệu
+        env:
+          CODE_CHANGED: ${{ needs.scope.outputs.code_changed }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SOURCE_RESULT: ${{ needs.source.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: python scripts/ci_scope.py ready
