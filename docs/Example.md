@@ -17,6 +17,7 @@
     -c, --campus TEXT  Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]
     --config TEXT      Đường dẫn file session tùy chỉnh (thay vì mặc định
                       ~/.myfap-api-cli/session.json)
+    --timeout SECONDS  Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
     --help             Show this message and exit.
 
   Commands:
@@ -41,6 +42,36 @@
   ```
   myfap semesters
   ```
+
+### Điều chỉnh timeout HTTP
+
+Bạn đặt `--timeout` trước command, kể cả khi gọi nhóm `other` hoặc `info`:
+
+```sh
+myfap --timeout 20 schedule --stdout
+myfap --timeout 2.5 campuses
+myfap --timeout 45 other subjects --stdout
+```
+
+Để dùng chung cho nhiều lệnh trong PowerShell:
+
+```powershell
+$env:MYFAP_TIMEOUT = "20"
+myfap schedule --stdout
+myfap --timeout 40 other subjects --stdout
+Remove-Item Env:MYFAP_TIMEOUT
+```
+
+Thứ tự ưu tiên là `--timeout` → `MYFAP_TIMEOUT` → mặc định. Cả hai cách nhận số giây hữu hạn lớn hơn 0, gồm số thập phân. Giá trị sai trả lỗi qua stderr trước khi gọi HTTP; option hợp lệ vẫn dùng được khi biến môi trường sai.
+
+| Request | Khi không cấu hình | Khi có option hoặc biến môi trường |
+|---|---|---|
+| Dữ liệu FAP và survey | 10 giây | Giá trị đã chọn |
+| Danh sách môn `other subjects` | 30 giây | Giá trị đã chọn, tối thiểu 30 giây |
+| Kiểm tra session | 5 giây | Giá trị đã chọn |
+| Lấy token và handshake FEID/FAP | 10 giây | Giá trị đã chọn |
+
+Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; nay cả biến môi trường và option đều áp dụng cho HTTP ở bước xác thực. Theo cách xử lý của Requests, timeout giới hạn chờ kết nối và chờ dữ liệu giữa các lần đọc, không giới hạn tổng thời gian chạy command. Thời gian chờ đăng nhập trên trình duyệt vẫn là 120 giây.
 ### Xem lịch học của Kỳ bất kỳ 
   ```
   myfap schedule -s Summer2026

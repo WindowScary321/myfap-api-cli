@@ -123,6 +123,7 @@ class AuthContractTests(unittest.TestCase):
         self.assertEqual(call.kwargs["json"], {"token": "fake-new-access"})
 
     def test_login_handshake_uses_params(self):
+        self.auth.timeout = 2.5
         payload = base64.urlsafe_b64encode(json.dumps({
             "email": "sample@example.invalid",
             "projectCampuses": json.dumps([{"CampusCode": self.auth.campus, "RollNumber": "TEST000"}]),
@@ -143,6 +144,7 @@ class AuthContractTests(unittest.TestCase):
         with patch.object(auth_module, "sync_playwright", return_value=manager), patch.object(auth_module, "create_checksum", return_value="fake+/=="), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(self.auth.login(), ("fake-login-key", "TEST000"))
         self.assert_query(self.auth.session.post.call_args_list[1], {"campusCode": "TEST&campus", "checksum": "fake+/=="})
+        self.assertEqual([call.kwargs["timeout"] for call in self.auth.session.post.call_args_list], [2.5, 2.5])
         for side_effect in (
             requests.Timeout("PRIVATE_SIGNATURE_SENTINEL"),
             [response({"access_token": token}), requests.Timeout("PRIVATE_SIGNATURE_SENTINEL")],
