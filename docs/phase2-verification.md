@@ -25,13 +25,17 @@ Người dùng tự đăng nhập trên cửa sổ FEID. CLI dùng `--config` tr
 | `other notification --stdout` | HTTP 200/body 201, data null; exit 1; không refresh |
 | `refresh` | Token endpoint/JWKS HTTP 200; ID token refresh được trả và qua validation; handshake HTTP 200/body 200; exit 0 |
 | `info student --stdout` sau refresh | Probe và GetStudentById HTTP 200/body 200, data list; stdout parse được JSON; exit 0 |
+| `--campus HCM login` với tài khoản chỉ có APHL | Handshake thật HTTP 200/body 201; exit 1; không gọi request nghiệp vụ; nội dung session được so sánh trong RAM và không đổi |
+| `--campus APHL login` sau lần HCM thất bại | Probe GetSemester HTTP 200/body 200; exit 0 |
+| Fault injection timeout tại handshake sau refresh thật | Refresh token mới được server trả và persist trước lỗi; binding giữ nguyên, FAP đánh dấu cần xác thực lại, exit 1 |
+| `semesters` sau khi bỏ fault handshake | Handshake lại HTTP 200/body 200 rồi GetSemester HTTP 200/body 200; exit 0; không exchange token lần hai |
 | Console entry point `myfap.exe` | Chạy trực tiếp `semesters` và `info student --stdout`, exit 0; JSON hợp lệ |
 | Console entry point `logout` | Xóa session tạm, exit 0 |
 
-Các luồng cần trace operation chạy qua Typer app với tham số CLI thật và Requests thật; console entry point được chạy thêm bằng subprocess để xác minh đường gọi của bản cài editable. Không dùng mock trong các lần kiểm chứng live này. Lần mở trình duyệt đầu chưa có callback; lần đăng nhập sau đã hoàn tất. Hai lỗi body 201 vẫn thuộc backend/contract và được giữ là lỗi operation.
+Các luồng cần trace operation chạy qua Typer app với tham số CLI thật và Requests thật; console entry point được chạy thêm bằng subprocess để xác minh đường gọi của bản cài editable. Login, đổi campus, token exchange và request phục hồi đều gọi server thật; riêng phép thử lỗi handshake chặn request trong bộ nhớ trước khi gửi, không thay token hay file session bằng dữ liệu giả. Lần mở trình duyệt đầu chưa có callback; lần đăng nhập sau đã hoàn tất. Hai lỗi body 201 vẫn thuộc backend/contract và được giữ là lỗi operation.
 
 ## Phần chưa xác nhận live
 
-Đổi campus và phục hồi sau handshake lỗi mới được kiểm bằng fixture. Không cố tình làm hỏng session hoặc ép server rotate lỗi để tạo bằng chứng. Đổi API version hoàn tất khi có adapter v2 ở Phase 3. HTTP 401 tự refresh/retry được kiểm offline, chưa chờ một phiên thật tự hết hạn.
+Đổi campus thất bại với HCM đã được kiểm chứng live và giữ nguyên APHL. Chưa xác nhận chuyển campus thành công vì tài khoản mẫu chỉ có APHL. Phục hồi sau handshake lỗi đã được kiểm bằng fault injection trên session thật; chưa quan sát server tự trả lỗi handshake. FEID trả `expires_in: 3600` khi refresh, nhưng FAP `authenKey` không có contract TTL; hết hạn FEID access token không đồng nghĩa FAP credential hết hạn. Vì vậy HTTP 401 tự refresh/retry mới chỉ có fixture, chưa có bằng chứng phiên thật tự hết hạn. Đổi API version hoàn tất khi có adapter v2 ở Phase 3.
 
 Session cũ chưa có subject OIDC đã xác minh cần `login --force` trước khi refresh. File session vẫn là JSON chứa credential; xem [quy tắc lưu session](oauth-session.md#timeout-và-file-trên-máy). PR này không tạo tag, publish PyPI hoặc triển khai auto release.

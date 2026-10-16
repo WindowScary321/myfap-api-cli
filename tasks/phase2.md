@@ -28,12 +28,12 @@ Các module mới phục vụ trust boundary và tránh circular import; không 
 - [x] Atomic write và lock được kiểm bằng file tạm/process riêng trên Windows và Unix; không đọc session thật trong test offline.
 - [x] Test rotation chứng minh token mới được persist trước handshake và được giữ lại khi validation/handshake lỗi.
 - [x] Matrix Ubuntu/Windows × Python 3.9/3.11, wheel/sdist, Twine và smoke cài bằng pip pass tại commit triển khai `8a369d3`.
-- [x] Live gate ghi rõ phần đã kiểm chứng và phần còn thiếu trong [báo cáo](../docs/phase2-verification.md); chỉ lưu metadata đã che dữ liệu.
+- [x] Live gate ghi rõ phần đã kiểm chứng và phần còn thiếu trong [báo cáo](../docs/phase2-verification.md); đã kiểm campus ngoài tài khoản, phục hồi sau handshake fault injection và chỉ lưu metadata đã che dữ liệu.
 - [x] Review độc lập, kiểm tra tiếng Việt và scan credential/PII trước commit/push; comment từng mốc vào draft PR.
 
 Đã chạy 179 test trên Windows với Python 3.9.25 và 3.11: mỗi môi trường có 176 pass, 3 skip theo điều kiện hệ điều hành/quyền symlink. Build local qua Twine strict, artifact validator và smoke cài wheel/sdist bằng pip. [CI của commit triển khai](https://github.com/WindowScary321/myfap-api-cli/actions/runs/38895605533) đã pass toàn bộ 11 job, gồm đủ matrix; kết quả commit tài liệu cuối được cập nhật qua comment PR.
 
-Live đã xác nhận login mới, ID token validation, handshake, refresh, đọc JSON sau refresh và logout session tạm. News/notification vẫn trả body 201 và không gây refresh. Đổi campus và phục hồi sau handshake lỗi được kiểm bằng fixture, chưa xác nhận live; đổi version chờ Phase 3. PR vẫn giữ draft.
+Live đã xác nhận login mới, ID token validation, handshake, refresh, đọc JSON sau refresh và logout session tạm. News/notification vẫn trả body 201 và không gây refresh. Kiểm tra HCM bằng tài khoản chỉ có APHL trả body 201 và giữ nguyên session; trở lại APHL thành công. Refresh thật kèm timeout handshake được tạo cục bộ giữ token đã rotate; bỏ fault thì handshake và đọc kỳ thành công mà không exchange token lần hai. Chuyển campus thành công, FAP session tự hết hạn và đổi version chưa được xác nhận live; đổi version chờ Phase 3. PR vẫn giữ draft.
 
 ## Giới hạn
 
