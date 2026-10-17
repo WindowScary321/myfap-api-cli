@@ -115,17 +115,14 @@ def request(session, operation, *, credential=None, campus=None, params=None, bo
                 raise ApiError("Operation đọc API v2 không nhận JSON body.")
             params = _read_params(operation, params, campus, credential)
     headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Encoding": "gzip",
+        "User-Agent": "okhttp/4.9.2",
         "ClientCode": V2_CLIENT_CODE,
         "CampusCode": campus,
         "Authorization": f"Bearer {credential}",
         "Checksum": create_checksum(credential),
     }
-    if method == "GET":
-        headers.update({
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Encoding": "gzip",
-            "User-Agent": "okhttp/4.9.2",
-        })
     kwargs = {"params": params, "headers": headers, "timeout": resolve_timeout(timeout, DEFAULT_TIMEOUT), "allow_redirects": False}
     if method == "POST":
         headers["Content-Type"] = "application/json"

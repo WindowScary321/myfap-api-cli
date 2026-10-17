@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import requests
+
 from myfap import v2
 from myfap.errors import ApiError
 
@@ -60,6 +62,28 @@ class Phase4TransportTests(unittest.TestCase):
                 self.assertEqual(second.kwargs["params"]["Authen"], "fake-new")
                 self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer fake-new")
                 self.assertNotIn("Authen", self.query)
+
+    def test_prepared_get_and_post_requests_use_app_headers(self):
+        cases = (
+            ("GetAllActiveCampus", {}),
+            ("GetApiActive", {}),
+            ("AuthenticationByFeId", {"credential": "fake-feid", "campus": "TEST"}),
+            ("GetSemester", {"credential": "fake-key", "campus": "TEST"}),
+            ("GetActivityStudent", {"credential": "fake-key", "campus": "TEST", "params": self.term_query}),
+        )
+        with requests.Session() as session, patch.object(session, "send", return_value=Mock()) as send, patch.object(v2, "V2_BOOTSTRAP_TOKEN", "fake-bootstrap"), patch.object(v2, "create_checksum", return_value="fake-signature"):
+            for operation, kwargs in cases:
+                with self.subTest(operation=operation):
+                    v2.request(session, operation, **kwargs)
+                    prepared = send.call_args.args[0]
+                    self.assertEqual(prepared.headers["User-Agent"], "okhttp/4.9.2")
+                    self.assertEqual(prepared.headers["Accept"], "application/json, text/plain, */*")
+                    self.assertEqual(prepared.headers["Accept-Encoding"], "gzip")
+                    if prepared.method == "GET":
+                        self.assertNotIn("Content-Type", prepared.headers)
+                        self.assertIsNone(prepared.body)
+                    else:
+                        self.assertEqual(prepared.headers["Content-Type"], "application/json")
 
     def test_course_id_text_and_numeric_query_values_keep_their_types(self):
         for course_id in ("FAKE&COURSE", "42", 42):

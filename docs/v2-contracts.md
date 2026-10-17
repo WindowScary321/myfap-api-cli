@@ -14,7 +14,9 @@ Tài liệu này ghi lại phần adapter v2 đã có trong Phase 3 và phạm v
 | `GetSemester` | v2/student/semesters | GET `/MyFAP/GetSemester` | `{}` | Không có | FAP key của binding v2 | Campus của binding | Đọc; refresh/retry tối đa một lần khi expiry rõ | `module_599.js:153-158,898-919` |
 | `GetActivityStudent` | v2/student/schedule | GET `/MyFAP/GetActivityStudent` | `CampusCode`, `rollNumber`, `Semester` | Không có | FAP key của binding v2 | Campus của binding, khớp query | Đọc; refresh/retry tối đa một lần khi expiry rõ | `module_599.js:294-300,898-919` |
 
-Mọi request v2 dùng `ClientCode: MyFAP`, `CampusCode`, `Content-Type: application/json`, `Authorization` khi có credential và `Checksum: <base64-signature>:<unix-second>`. Chữ ký là HMAC-SHA256 trên chuỗi `<credential>MyFAP<timestamp>`, dùng bytes UTF-8 của khóa giao thức. Padding `=` trong Base64 được đổi thành `%3d` đúng một lần ở giá trị header. Query không chứa bearer token hay checksum.
+Mọi request v2 dùng `ClientCode: MyFAP`, `CampusCode`, `Authorization` và `Checksum: <base64-signature>:<unix-second>`. Các header client theo bản ghi app gồm `User-Agent: okhttp/4.9.2`, `Accept: application/json, text/plain, */*` và `Accept-Encoding: gzip`, áp dụng cho cả GET lẫn POST. GET không có body và không thêm `Content-Type`; POST gửi JSON có `Content-Type: application/json`.
+
+Chữ ký là HMAC-SHA256 trên chuỗi `<credential>MyFAP<timestamp>`, dùng bytes UTF-8 của khóa giao thức. Padding `=` trong Base64 được đổi thành `%3d` đúng một lần ở giá trị header. Query không chứa bearer token hay checksum.
 
 Bootstrap dùng campus theo hợp đồng của app, độc lập với campus đang lưu trong session. `GetSemester` giữ query rỗng; lịch học dùng đúng casing `CampusCode`, `rollNumber` và `Semester` của proxy.
 
