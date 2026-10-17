@@ -1,6 +1,7 @@
 import typer
 import json
 import os
+import sys
 from copy import copy
 from functools import wraps
 from pathlib import Path
@@ -129,7 +130,12 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
     """Helper để xuất dữ liệu ra file hoặc stdout"""
     if stdout:
         if is_text:
-            print(data.replace("\r\n", "\n"), end="")
+            stream = getattr(sys.stdout, "buffer", None)
+            if stream is None:
+                sys.stdout.write(data)
+            else:
+                stream.write(data.encode("utf-8"))
+                stream.flush()
         else:
             print(json.dumps(data, ensure_ascii=False, indent=4))
         return

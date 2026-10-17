@@ -52,14 +52,26 @@ class ScheduleParserTests(unittest.TestCase):
 
     def test_stdout_ics_keeps_line_endings_for_independent_reader(self):
         data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
-        buffer = io.BytesIO()
-        with io.TextIOWrapper(buffer, encoding="utf-8", newline="\r\n") as output:
-            with redirect_stdout(output):
-                save_output(convert_schedule_to_ics(data), "schedule.ics", None, True, is_text=True)
-            output.flush()
-            content = buffer.getvalue()
-        self.assertNotIn(b"\r\r\n", content)
-        self.assertEqual(len(IndependentCalendar.from_ical(content).walk("VEVENT")), 1)
+        expected = convert_schedule_to_ics(data)
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline):
+                buffer = io.BytesIO()
+                with io.TextIOWrapper(buffer, encoding="utf-8", newline=newline) as output:
+                    with redirect_stdout(output):
+                        save_output(expected, "schedule.ics", None, True, is_text=True)
+                    output.flush()
+                    content = buffer.getvalue()
+                self.assertEqual(content, expected.encode("utf-8"))
+                self.assertNotIn(b"\r\r\n", content)
+                self.assertEqual(len(IndependentCalendar.from_ical(content).walk("VEVENT")), 1)
+
+    def test_stdout_ics_keeps_crlf_in_text_only_stream(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        expected = convert_schedule_to_ics(data)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            save_output(expected, "schedule.ics", None, True, is_text=True)
+        self.assertEqual(output.getvalue(), expected)
 
     def test_large_synthetic_calendar_imports_with_independent_reader(self):
         base = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))["data"][0]
