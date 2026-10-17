@@ -43,4 +43,8 @@ Phase 4 chưa tích hợp transcript, balance, ảnh, tìm kiếm news, `GetVers
 
 Lượt rà môi trường ngày 17/10 ghi nhận Fiddler có 315 session và 23 path API đã biết trong LiveTraffic; capture và system proxy vẫn tắt. ADB thấy một emulator kết nối và tiến trình `com.fuct` đang chạy. Harness CLI Phase 4 đã mở browser login HN nhưng không nhận callback trong thời hạn 120 giây, vì vậy chưa ghi live smoke CLI trong lượt này. Không dùng dữ liệu capture để giả lập session.
 
+Lượt smoke v2 sau đó đã login và chạy thật trên campus HN: semesters, schedule JSON/ICS, marks, exams, week timetable, attendance, applications, news, student/campus info, fee, subjects, notification, feedback và profile đều exit 0 với HTTP 200/body 200. Survey trả HTTP 200/body 404 và được giữ là not-found hợp lệ. Có 21 operation duy nhất và 23 request; stdout JSON hợp lệ, ICS đọc được bằng `icalendar`, session/lock tạm đã xóa. Không chạy thao tác ghi.
+
+Lượt smoke v1 để đóng lại `news`, `notification` và `fee` không nhận callback đăng nhập nên chưa có kết quả mới. Các finding v1 trước đó vẫn mở: news/notification body `201`, fee HTTP 404. Kết quả v2 thành công không được dùng để thay cho kiểm chứng v1.
+
 ICS được kiểm tra bằng dữ liệu tổng hợp với reader `icalendar` độc lập: 250 sự kiện giữ đúng DTSTART/DTEND theo múi giờ Việt Nam. File và stdout giữ nguyên byte CRLF trên cả stream mô phỏng Unix và Windows. Reader `ics` hiện tại gặp giới hạn recursion ở lịch lớn với recursion limit mặc định; runtime không tăng giới hạn để che lỗi. Khả năng import vào ứng dụng lịch thực tế vẫn cần kiểm chứng riêng.
