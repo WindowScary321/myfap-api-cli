@@ -4,16 +4,17 @@
 
 ## Dùng v2
 
-API v1 vẫn là mặc định cho session mới. Đặt `--api-version v2` trước command để dùng adapter v2 tối thiểu:
+API v1 vẫn là mặc định cho session mới. Đặt `--api-version v2` trước hoặc sau command để dùng adapter v2 tối thiểu:
 
 ```sh
 myfap --api-version v2 campuses
 myfap --api-version v2 --campus HN --config ./state-v2.json login --force
 myfap --api-version v2 --config ./state-v2.json semesters
 myfap --api-version v2 --config ./state-v2.json schedule --stdout
+myfap schedule --ics --api-version v2 --campus HN --config ./state-v2.json
 ```
 
-Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại. CLI chọn version theo option, version đã lưu trong session, rồi mới đến mặc định v1. Session cũ thiếu trường version được hiểu là v1. Sau khi login v2 thành công, cùng file session có thể chạy lệnh mà không cần lặp option version.
+Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại. CLI chọn version theo option, version đã lưu trong session, rồi mới đến mặc định v1. Các option chung `--api-version`, `--campus`, `--config` và `--timeout` đều dùng được trước hoặc sau command, kể cả lệnh con. Option ở lệnh con ưu tiên hơn option ở nhóm cha; nếu lặp trong cùng cấp thì lấy giá trị cuối. Session cũ thiếu trường version được hiểu là v1. Sau khi login v2 thành công, cùng file session có thể chạy lệnh mà không cần lặp option version.
 
 Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứng v2 trả `HN` cho Cơ sở Hà Nội và không có `APHL`; handshake với `APHL` trả body 401, còn `HN` đã login thành công với tài khoản được cho phép. CLI không tự quy đổi mã campus. `HN` trong ví dụ là lựa chọn rõ ràng; campus mặc định của session mới vẫn là `APHL`, nên cần chọn mã đúng khi đăng nhập v2.
 

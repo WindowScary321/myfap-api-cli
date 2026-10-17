@@ -1,11 +1,14 @@
 import typer
 import json
 import os
+from copy import copy
+from functools import wraps
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
+from typer.core import TyperGroup
 
 from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
@@ -13,7 +16,51 @@ from .parsers import parse_marks_html, convert_schedule_to_ics
 from .config import resolve_timeout
 from importlib import metadata
 
+
+def _override_common_option(ctx, param, value):
+    if value is not None:
+        state[param.name] = value
+    return value
+
+
+def _validate_common_options(callback):
+    @wraps(callback)
+    def invoke(*args, **kwargs):
+        if state["api_version"] not in (None, "v1", "v2"):
+            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version")
+        try:
+            state["timeout"] = resolve_timeout(state["timeout"])
+        except ValueError as error:
+            raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
+        return callback(*args, **kwargs)
+    return invoke
+
+
+class CommonOptionsGroup(TyperGroup):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        def inherit(command):
+            existing = {param.name for param in command.params}
+            for param in self.params:
+                if param.name not in existing:
+                    option = copy(param)
+                    option.expose_value = False
+                    option.callback = _override_common_option
+                    command.params.append(option)
+            if isinstance(command, TyperGroup):
+                for child in command.commands.values():
+                    inherit(child)
+            else:
+                # Validate after child options have overridden root values and environment defaults.
+                command.callback = _validate_common_options(command.callback)
+
+        for command in self.commands.values():
+            inherit(command)
+
+
 app = typer.Typer(
+    cls=CommonOptionsGroup,
     help="CLI Tool dựa trên MyFAP dành cho Sinh Viên FPTU",
     rich_markup_mode="rich",
     add_completion=False
@@ -112,13 +159,8 @@ def main(
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
     state["config"] = config
-    if api_version not in (None, "v1", "v2"):
-        raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version")
     state["api_version"] = api_version
-    try:
-        state["timeout"] = resolve_timeout(timeout)
-    except ValueError as error:
-        raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
+    state["timeout"] = timeout
 
 @app.command()
 def version():

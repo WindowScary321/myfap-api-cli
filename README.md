@@ -59,12 +59,23 @@ Khi thiếu `--semester`, cli chọn kỳ theo `startDate` gần đây. Với l�
 
 
 ## Các Options
+
+Các option chung `--campus` (`-c`), `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả giữa nhóm lệnh và lệnh con. Option của riêng từng command vẫn đặt sau command đó.
+
+```sh
+myfap --api-version v2 --campus HN schedule --ics
+myfap schedule --ics --api-version v2 --campus HN
+myfap info student --timeout 20 --stdout
+```
+
+Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con được ưu tiên; lặp trong cùng cấp thì dùng giá trị cuối.
+
 |Option|Chú thích|
 |:-|:-|
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
-|--timeout <giây>|Timeout HTTP, đặt trước command; ưu tiên hơn biến `MYFAP_TIMEOUT`|
-|--api-version <v1 hoặc v2>|Chọn API trước command; ưu tiên option, session, rồi v1. V2 đang hỗ trợ luồng tối thiểu trong Phase 3.|
+|--timeout <giây>|Timeout HTTP; ưu tiên hơn biến `MYFAP_TIMEOUT`|
+|--api-version <v1 hoặc v2>|Chọn API; ưu tiên option, session, rồi v1. V2 đang hỗ trợ luồng tối thiểu trong Phase 3.|
 |-c, --campus <cơ sở>|Mã cơ sở; ưu tiên option → session → APHL khi đăng nhập mới|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|
