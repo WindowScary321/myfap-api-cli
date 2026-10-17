@@ -101,7 +101,8 @@ def require_auth():
 def require_operation(auth, operation):
     if getattr(auth, "api_version", "v1") != "v2":
         return
-    from .v2 import SUPPORTED_OPERATIONS
+    from .v2 import OPERATION_ALIASES, SUPPORTED_OPERATIONS
+    operation = OPERATION_ALIASES.get(operation, operation)
     if operation not in SUPPORTED_OPERATIONS:
         err_console.print(f"[red]Lỗi: {operation} chưa được hỗ trợ trong adapter API v2.[/red]")
         raise typer.Exit(code=1)
@@ -275,6 +276,7 @@ def schedule(
 ):
     """Xem lịch học"""
     auth = require_auth()
+    require_operation(auth, "GetActivityStudent")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
             

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import time
+from datetime import date
 
 import requests
 
@@ -13,12 +14,67 @@ from .errors import ApiError
 
 
 BOOTSTRAP_OPERATIONS = frozenset({"GetAllActiveCampus", "GetApiActive"})
-READ_OPERATIONS = frozenset({"GetSemester", "GetActivityStudent"})
+OPERATION_ALIASES = {"getCourseAttendance": "GetCourseAttendance"}
+_READ_QUERY_FIELDS = {
+    "GetSemester": (),
+    "GetTop10News": ("type",),
+    "CheckOpenFeedBack": ("rollNumber",),
+    "CheckUpdateProfile": ("rollNumber",),
+    "GetNotificationByRoll": ("rollNumber",),
+    "GeFeeByRoll": ("rollNumber",),
+    "GetSubjets": (),
+    "GetActivityStudent": ("rollNumber", "Semester"),
+    "GetStudentMark": ("rollNumber", "Semester"),
+    "GetMarkByCourse": ("rollNumber", "CourseId"),
+    "GetScheduleExam": ("rollNumber", "Semester"),
+    "GetStudentAttendances": ("rollNumber", "Semester"),
+    "GetActivityStudentByWeek": ("rollNumber", "Semester", "week", "year"),
+    "GetCourseAttendance": ("rollNumber", "Semester", "SubjectCode", "ClassName"),
+    "GetApplication": ("rollNumber",),
+    "GetStudentById": ("rollNumber",),
+    "GetCampusInfo": ("rollNumber",),
+    "GetWeekByDate": ("date",),
+}
+_AUTHEN_QUERY_OPERATIONS = frozenset({"CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll"})
+READ_OPERATIONS = frozenset(_READ_QUERY_FIELDS)
 SUPPORTED_OPERATIONS = BOOTSTRAP_OPERATIONS | READ_OPERATIONS | {"AuthenticationByFeId"}
 
 
 def _text(value):
     return isinstance(value, str) and bool(value.strip()) and not any(ord(character) < 32 for character in value)
+
+
+def _positive_int(value):
+    return (
+        isinstance(value, int) and not isinstance(value, bool) and value > 0
+        or isinstance(value, str) and value.isascii() and value.isdecimal() and bool(value.strip("0"))
+    )
+
+
+def _read_params(operation, params, campus, credential):
+    query = {}
+    if operation not in {"GetSemester", "GetWeekByDate"}:
+        if params.pop("CampusCode", campus) != campus:
+            raise ApiError("Campus trong query API v2 không khớp session.")
+        query["CampusCode"] = campus
+    if set(params) != set(_READ_QUERY_FIELDS[operation]):
+        raise ApiError("Query của operation API v2 không hợp lệ.")
+    for field, value in params.items():
+        valid = _positive_int(value) if field in {"type", "week", "year"} else _text(value)
+        if field == "CourseId":
+            valid = valid or isinstance(value, int) and not isinstance(value, bool) and value > 0
+        if field == "date" and valid:
+            try:
+                valid = date.fromisoformat(value).isoformat() == value
+            except ValueError:
+                valid = False
+        if not valid:
+            raise ApiError("Giá trị trong query API v2 không hợp lệ.")
+    query.update(params)
+    if operation in _AUTHEN_QUERY_OPERATIONS:
+        # The query and signature must use the same freshly bound key after refresh.
+        query["Authen"] = credential
+    return query
 
 
 def create_checksum(credential, timestamp=None):
@@ -49,29 +105,30 @@ def request(session, operation, *, credential=None, campus=None, params=None, bo
     else:
         if not _text(credential) or not _text(campus):
             raise ApiError("Thiếu credential hoặc campus hợp lệ cho API v2.")
-        if operation == "GetActivityStudent":
-            query_campus = params.pop("CampusCode", campus)
-            if query_campus != campus or set(params) != {"rollNumber", "Semester"} or not all(_text(value) for value in params.values()) or body is not None:
-                raise ApiError("Query lịch học API v2 không hợp lệ.")
-            params = {"CampusCode": campus, **params}
-        elif params:
-            raise ApiError("Operation API v2 này yêu cầu query rỗng.")
         if operation == "AuthenticationByFeId":
             payload = {"token": credential}
-            if body is not None and body != payload:
+            if params or body is not None and body != payload:
                 raise ApiError("Body handshake API v2 không hợp lệ.")
             method = "POST"
-        elif body is not None:
-            raise ApiError("Operation đọc API v2 không nhận JSON body.")
+        else:
+            if body is not None:
+                raise ApiError("Operation đọc API v2 không nhận JSON body.")
+            params = _read_params(operation, params, campus, credential)
     headers = {
         "ClientCode": V2_CLIENT_CODE,
-        "Content-Type": "application/json",
         "CampusCode": campus,
         "Authorization": f"Bearer {credential}",
         "Checksum": create_checksum(credential),
     }
+    if method == "GET":
+        headers.update({
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Encoding": "gzip",
+            "User-Agent": "okhttp/4.9.2",
+        })
     kwargs = {"params": params, "headers": headers, "timeout": resolve_timeout(timeout, DEFAULT_TIMEOUT), "allow_redirects": False}
     if method == "POST":
+        headers["Content-Type"] = "application/json"
         kwargs["json"] = payload
     try:
         return session.request(method, f"{FAP_PROXY_HOST}/{operation}", **kwargs)

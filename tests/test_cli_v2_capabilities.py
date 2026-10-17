@@ -29,33 +29,104 @@ class CLIV2CapabilityTests(unittest.TestCase):
     @staticmethod
     def reply(method, url, **kwargs):
         operation = urlsplit(url).path.rsplit("/", 1)[-1]
-        data = [{
-            "semesterName": "Fall2026", "startDate": "2026-09-01",
-            "termID": "ffffffff-ffff-ffff-ffff-ffffffffffff",
-        }] if operation == "GetSemester" else []
+        if operation == "GetSemester":
+            data = [{
+                "semesterName": "Fall2026", "startDate": "2026-09-01",
+                "termID": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+            }]
+        else:
+            data = "42" if operation == "GetWeekByDate" else []
         return response({"code": 200, "data": data})
 
-    def test_unsupported_commands_report_operation_before_semester_or_week_lookup(self):
+    @staticmethod
+    def operations(request):
+        return [urlsplit(call.args[1]).path.rsplit("/", 1)[-1] for call in request.call_args_list]
+
+    def test_v2_existing_commands_without_semester_keep_json_and_only_call_proxy(self):
         cases = (
-            (["marks"], "GetStudentMark"),
             (["marks", "--courseid", "DEMO"], "GetMarkByCourse"),
-            (["exams"], "GetScheduleExam"),
-            (["week-timetable"], "GetActivityStudentByWeek"),
-            (["attendance"], "GetStudentAttendances"),
-            (["attendance", "--subjectcode", "DEMO", "--classname", "DEMO"], "getCourseAttendance"),
+            (["applications"], "GetApplication"),
+            (["news"], "GetTop10News"),
+            (["info", "student"], "GetStudentById"),
+            (["info", "campus"], "GetCampusInfo"),
+            (["other", "feedback"], "CheckOpenFeedBack"),
+            (["other", "profile"], "CheckUpdateProfile"),
+            (["other", "notification"], "GetNotificationByRoll"),
+            (["other", "fee"], "GeFeeByRoll"),
+            (["other", "subjects"], "GetSubjets"),
         )
         original = self.path.read_bytes()
         for command, operation in cases:
-            for semester in ([], ["--semester", "Fall2026"]):
-                with self.subTest(command=command, semester=semester), patch("requests.Session.request", side_effect=self.reply) as request:
-                    result = self.runner.invoke(app, ["--config", str(self.path), *command, *semester, "--stdout"])
+            with self.subTest(command=command), patch("requests.Session.request", side_effect=self.reply) as request:
+                result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+            self.assertEqual(self.operations(request), [operation])
+            self.assertEqual(urlsplit(request.call_args.args[1]).netloc, "fap-proxy.fpt.edu.vn")
+            self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "Bearer FAKE_V2_KEY")
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_semester_commands_skip_lookup_for_explicit_semester(self):
+        cases = (
+            (["schedule"], "GetActivityStudent"),
+            (["marks"], "GetStudentMark"),
+            (["exams"], "GetScheduleExam"),
+            (["week-timetable", "--week", "42", "--year", "2026"], "GetActivityStudentByWeek"),
+            (["attendance"], "GetStudentAttendances"),
+            (["attendance", "--subjectcode", "DEMO", "--classname", "DEMO"], "GetCourseAttendance"),
+        )
+        original = self.path.read_bytes()
+        for command, operation in cases:
+            for explicit in (False, True):
+                options = ["--semester", "Fall2026"] if explicit else []
+                with self.subTest(command=command, explicit=explicit), patch("requests.Session.request", side_effect=self.reply) as request:
+                    result = self.runner.invoke(app, ["--config", str(self.path), *command, *options, "--stdout"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+                self.assertEqual(self.operations(request), [operation] if explicit else ["GetSemester", operation])
+                self.assertEqual(request.call_args.kwargs["params"]["Semester"], "Fall2026")
+                self.assertTrue(all(urlsplit(call.args[1]).netloc == "fap-proxy.fpt.edu.vn" for call in request.call_args_list))
+                self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_week_lookup_uses_scalar_data_and_requested_date_year(self):
+        with patch("requests.Session.request", side_effect=self.reply) as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "week-timetable", "--date", "2026-10-17", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+        self.assertEqual(self.operations(request), ["GetWeekByDate", "GetSemester", "GetActivityStudentByWeek"])
+        self.assertEqual(request.call_args.kwargs["params"]["week"], 42)
+        self.assertEqual(request.call_args.kwargs["params"]["year"], 2026)
+
+    def test_invalid_week_data_stops_before_semester_and_timetable_requests(self):
+        for data in (True, None, [], {}, "not-a-week"):
+            with self.subTest(data=data), patch("requests.Session.request", return_value=response({"code": 200, "data": data})) as request:
+                result = self.runner.invoke(app, ["--config", str(self.path), "week-timetable", "--date", "2026-10-17", "--stdout"])
                 self.assertEqual(result.exit_code, 1, result.output)
                 self.assertEqual(result.stdout, "")
-                self.assertIn(operation, result.stderr)
-                self.assertIn("chưa được hỗ trợ", result.stderr)
-                self.assertNotIn("Traceback", result.stderr)
-                request.assert_not_called()
-                self.assertEqual(self.path.read_bytes(), original)
+                self.assertIn("Số tuần trong response API không hợp lệ", result.stderr)
+                self.assertEqual(self.operations(request), ["GetWeekByDate"])
+
+    def test_v2_survey_keeps_separate_service_without_proxy_headers(self):
+        with patch("requests.Session.request", side_effect=self.reply) as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "other", "survey", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+        self.assertEqual(self.operations(request), ["GetRequiredSurvey"])
+        self.assertEqual(urlsplit(request.call_args.args[1]).netloc, "survey.fpt.edu.vn")
+        self.assertNotIn("headers", request.call_args.kwargs)
+
+    def test_missing_capability_stops_before_semester_or_week_lookup(self):
+        from myfap import v2
+
+        for command, operation in ((["schedule"], "GetActivityStudent"), (["marks"], "GetStudentMark"),
+                                   (["week-timetable"], "GetActivityStudentByWeek"),
+                                   (["attendance", "--subjectcode", "DEMO", "--classname", "DEMO"], "GetCourseAttendance")):
+            with self.subTest(command=command), patch.object(v2, "SUPPORTED_OPERATIONS", v2.SUPPORTED_OPERATIONS - {operation}), patch("requests.Session.request") as request:
+                result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+            self.assertEqual(result.exit_code, 1, result.output)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("chưa được hỗ trợ", result.stderr)
+            request.assert_not_called()
 
     def test_supported_schedule_uses_semester_name_and_preserves_guid_metadata(self):
         with patch("requests.Session.request", side_effect=self.reply) as request:

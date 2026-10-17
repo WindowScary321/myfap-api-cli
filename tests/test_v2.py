@@ -96,7 +96,7 @@ class V2TransportTests(unittest.TestCase):
         self.response.json.assert_not_called()
 
     def test_unsupported_operation_fails_before_http_with_no_value_echo(self):
-        for operation in ("GetStudentMark", "getCourseAttendance", "GetCourseAttendance", "AddRate", "https://PRIVATE_SECRET.invalid/", "UnknownOperation", None, []):
+        for operation in ("getCourseAttendance", "GetVersion", "GetStudentFeedbackForm", "AddRate", "https://PRIVATE_SECRET.invalid/", "UnknownOperation", None, []):
             with self.subTest(operation=operation), self.assertRaises(ApiError) as caught:
                 v2.request(self.session, operation, credential="PRIVATE_SECRET", campus="TEST")
             self.assertNotIn("PRIVATE_SECRET", str(caught.exception))
