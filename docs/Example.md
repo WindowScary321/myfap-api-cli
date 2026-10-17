@@ -45,12 +45,14 @@
 
 ### Điều chỉnh timeout HTTP
 
-Bạn đặt `--timeout` trước command, kể cả khi gọi nhóm `other` hoặc `info`:
+Bạn có thể đặt `--timeout` trước hoặc sau command, kể cả khi gọi nhóm `other` hoặc `info`:
 
 ```sh
 myfap --timeout 20 schedule --stdout
 myfap --timeout 2.5 campuses
 myfap --timeout 45 other subjects --stdout
+myfap schedule --stdout --timeout 20
+myfap info student --timeout 20 --stdout
 ```
 
 Để dùng chung cho nhiều lệnh trong PowerShell:

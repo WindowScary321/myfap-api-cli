@@ -247,7 +247,7 @@ class AuthenticatedRequestTests(unittest.TestCase):
         for cls in (api.MyFapEssential, api.MyFapClient, api.MyFapOther):
             with self.subTest(cls=cls):
                 with self.assertRaises(api.ApiError):
-                    cls(self.auth)
+                    cls(self.auth, api_version="v1")
         self.session.get.assert_not_called()
 
 

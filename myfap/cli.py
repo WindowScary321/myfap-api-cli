@@ -1,11 +1,14 @@
 import typer
 import json
 import os
+from copy import copy
+from functools import wraps
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
+from typer.core import TyperGroup
 
 from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
@@ -13,7 +16,51 @@ from .parsers import parse_marks_html, convert_schedule_to_ics
 from .config import resolve_timeout
 from importlib import metadata
 
+
+def _override_common_option(ctx, param, value):
+    if value is not None:
+        state[param.name] = value
+    return value
+
+
+def _validate_common_options(callback):
+    @wraps(callback)
+    def invoke(*args, **kwargs):
+        if state["api_version"] not in (None, "v1", "v2"):
+            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version")
+        try:
+            state["timeout"] = resolve_timeout(state["timeout"])
+        except ValueError as error:
+            raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
+        return callback(*args, **kwargs)
+    return invoke
+
+
+class CommonOptionsGroup(TyperGroup):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        def inherit(command):
+            existing = {param.name for param in command.params}
+            for param in self.params:
+                if param.name not in existing:
+                    option = copy(param)
+                    option.expose_value = False
+                    option.callback = _override_common_option
+                    command.params.append(option)
+            if isinstance(command, TyperGroup):
+                for child in command.commands.values():
+                    inherit(child)
+            else:
+                # Validate after child options have overridden root values and environment defaults.
+                command.callback = _validate_common_options(command.callback)
+
+        for command in self.commands.values():
+            inherit(command)
+
+
 app = typer.Typer(
+    cls=CommonOptionsGroup,
     help="CLI Tool dựa trên MyFAP dành cho Sinh Viên FPTU",
     rich_markup_mode="rich",
     add_completion=False
@@ -28,7 +75,8 @@ app.add_typer(other_app, name="other")
 state = {
     "campus": None,
     "config": None,
-    "timeout": None
+    "timeout": None,
+    "api_version": None,
 }
 
 console = Console()
@@ -36,7 +84,7 @@ err_console = Console(stderr=True)
 
 def get_auth(campus=None):
     c = campus if campus else state["campus"]
-    return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"))
+    return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"), api_version=state.get("api_version"))
 
 def require_auth():
     auth = get_auth()
@@ -49,6 +97,14 @@ def require_auth():
         err_console.print("[red]Lỗi: Chưa đăng nhập hoặc session hết hạn. Hãy chạy 'myfap login' trước.[/red]")
         raise typer.Exit(code=1)
     return auth
+
+def require_operation(auth, operation):
+    if getattr(auth, "api_version", "v1") != "v2":
+        return
+    from .v2 import SUPPORTED_OPERATIONS
+    if operation not in SUPPORTED_OPERATIONS:
+        err_console.print(f"[red]Lỗi: {operation} chưa được hỗ trợ trong adapter API v2.[/red]")
+        raise typer.Exit(code=1)
 
 def resolve_semester(auth, semester_flag):
     if semester_flag:
@@ -98,14 +154,13 @@ def main(
     campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; mặc định dùng session hoặc APHL khi login mới"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
     timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
+    api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn API v1 hoặc v2; mặc định dùng session rồi v1", metavar="[v1|v2]"),
 ):
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
     state["config"] = config
-    try:
-        state["timeout"] = resolve_timeout(timeout)
-    except ValueError as error:
-        raise typer.BadParameter(str(error), param_hint="--timeout / MYFAP_TIMEOUT") from None
+    state["api_version"] = api_version
+    state["timeout"] = timeout
 
 @app.command()
 def version():
@@ -173,8 +228,9 @@ def refresh():
 @app.command()
 def campuses():
     """Xem danh sách các cơ sở (Campus)"""
-    essential = MyFapEssential(timeout=state.get("timeout"))
     try:
+        api_version = state.get("api_version") or get_auth().resolve_api_version()
+        essential = MyFapEssential(timeout=state.get("timeout"), api_version=api_version)
         with err_console.status("[bold green]Đang lấy dữ liệu..."):
             data = essential.get_campuses()
         
@@ -252,6 +308,7 @@ def marks(
         raise typer.Exit(code=1)
         
     auth = require_auth()
+    require_operation(auth, "GetMarkByCourse" if courseid else "GetStudentMark")
     client = MyFapClient(auth)
 
     if courseid:
@@ -289,6 +346,7 @@ def exams(
 ):
     """Xem lịch thi"""
     auth = require_auth()
+    require_operation(auth, "GetScheduleExam")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
             
@@ -322,6 +380,7 @@ def week_timetable(
     target_year = year if year is not None else (requested_date.year if requested_date else now.year)
 
     auth = require_auth()
+    require_operation(auth, "GetActivityStudentByWeek")
     client = MyFapClient(auth)
     essential = MyFapEssential(auth)
 
@@ -364,6 +423,7 @@ def attendance(
         err_console.print("[red]Lỗi: Cần cả --subjectcode (-sc) và --classname (-cn) để xem chi tiết điểm danh.[/red]")
         raise typer.Exit(code=1)
     auth = require_auth()
+    require_operation(auth, "getCourseAttendance" if subject_code else "GetStudentAttendances")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
 

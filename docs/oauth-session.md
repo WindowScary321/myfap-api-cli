@@ -16,16 +16,16 @@ Các claim thời gian `exp`, `iat` và `nbf` của ID token có leeway 30 giây
 
 `--force` mở lại trình duyệt kể cả khi đã có session. Nếu file JSON hỏng hoặc thiếu trường bắt buộc, đăng nhập thành công sẽ thay file đó. Khi đăng nhập thất bại, file cũ được giữ nguyên. Lỗi quyền truy cập hoặc đường dẫn không an toàn vẫn bị chặn.
 
-Khi session cần đăng nhập lại hoặc binding cũ không được hỗ trợ, `myfap login` tự mở trình duyệt nên không cần chạy lại với `--force`. Login mới chỉ kế thừa campus đã lưu, rồi dùng luồng v1/student của Phase 2 dù file cũ có binding v2. Lệnh đọc vẫn từ chối session v2 trước khi gửi HTTP. Binding và credential cũ chỉ được thay sau khi login thành công.
+Khi session cần đăng nhập lại hoặc binding cũ không được hỗ trợ, `myfap login` tự mở trình duyệt nên không cần chạy lại với `--force`. Login mới kế thừa campus và API version đã lưu nếu bạn không chỉ định option tương ứng; luồng FEID hiện hỗ trợ tài khoản student trên v1 và v2 trong phạm vi adapter của từng version. Binding và credential cũ chỉ được thay sau khi login thành công.
 
-CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` nếu chưa có session hợp lệ. Có thể đặt option trước command hoặc trong `login`:
+CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` nếu chưa có session hợp lệ. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
 
 ```sh
 myfap --campus APHL login --force
 myfap login --campus APHL --force
 ```
 
-Session gắn với campus, API version và loại tài khoản. Đổi campus cần handshake lại trước request dữ liệu; binding mới chỉ được lưu sau handshake thành công. Phase 2 hỗ trợ v1 và tài khoản student. Adapter v2 và option chọn version thuộc Phase 3.
+Session gắn với campus, API version và loại tài khoản. Đổi campus hoặc version cần handshake lại trước request dữ liệu; binding mới chỉ được lưu sau handshake thành công. V1 vẫn là mặc định, còn v2 chỉ gửi các operation đã nằm trong capability của adapter; route chưa hỗ trợ bị chặn trước HTTP. Xem [phạm vi API version](api-versions.md) để biết giới hạn hiện tại.
 
 ## Dùng session cũ và refresh
 
