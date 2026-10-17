@@ -13,13 +13,17 @@ Branch `feat/phase3-v2-adapter` bắt đầu từ `origin/main` tại `238c718`,
 
 ## Kiểm chứng
 
-- [ ] Contract matrix ghi method/path/query/body/header, nguồn Bearer và signing identity, account type, read/write và retry. Ghi đủ các route v2 giữ query Authen, kể cả route chưa triển khai.
-- [ ] Test chữ ký bằng dữ liệu giả, timestamp cố định; ngăn decode khóa hex và double-encoding padding.
-- [ ] Test bootstrap, handshake, kỳ học query rỗng, schedule và lỗi unsupported; giữ regression v1.
-- [ ] Test lựa chọn version, session legacy, chuyển v1/v2 hai chiều và rollback binding khi handshake lỗi.
-- [ ] Test CLI, stdout, timeout, HTTP/body 401, App Check và retry dùng key/chữ ký mới.
-- [ ] Matrix Ubuntu/Windows × Python 3.9/3.11, build, Twine strict, artifact validator và pip smoke.
-- [ ] Live bằng session tạm riêng: campuses → login → semesters → schedule. Chỉ ghi metadata đã che; phần chưa kiểm chứng phải được ghi rõ.
-- [ ] Review độc lập và rà tiếng Việt cho tài liệu, commit, comment PR. PR giữ draft.
+- [x] Contract matrix ghi method/path/query/body/header, nguồn Bearer và signing identity, account type, read/write và retry. Ghi đủ các route v2 giữ query Authen, kể cả route chưa triển khai.
+- [x] Test chữ ký bằng dữ liệu giả, timestamp cố định; ngăn decode khóa hex và double-encoding padding.
+- [x] Test bootstrap, handshake, kỳ học query rỗng, schedule và lỗi unsupported; giữ regression v1.
+- [x] Test lựa chọn version, session legacy, chuyển v1/v2 hai chiều và rollback binding khi handshake lỗi.
+- [x] Test CLI, stdout, timeout, HTTP/body 401, App Check và retry dùng key/chữ ký mới.
+- [x] Local Windows/Python 3.9/3.11, build, Twine strict, artifact validator và pip smoke.
+- [x] Live bằng session tạm riêng: campuses → login → semesters → schedule. Chỉ ghi metadata đã che; phần chưa kiểm chứng phải được ghi rõ.
+- [x] Review độc lập và rà tiếng Việt cho tài liệu, commit, comment PR. PR giữ draft.
+
+Local chạy 261 test trên mỗi phiên bản Python: 257 pass, 4 skip theo điều kiện Windows. Matrix CI Ubuntu/Windows × Python 3.9/3.11 của commit cuối được xác nhận trong [checks PR #7](https://github.com/WindowScary321/myfap-api-cli/pull/7/checks) và comment sau khi hoàn tất.
+
+Live v2 thành công với campus HN sau khi người dùng xác nhận mã campus; lần APHL trả body 401 được ghi riêng. Đổi version và refresh v2 có fixture, chưa xác nhận live riêng. Xem [hướng dẫn version](../docs/api-versions.md), [contract](../docs/v2-contracts.md) và [báo cáo](../docs/phase3-verification.md).
 
 Không đọc trực tiếp thư mục session cá nhân, không đưa token, query có credential, raw response, lịch học hoặc điểm thật vào Git. Nguồn contract là tài liệu và module APK trong workspace; capture không được phát lại. Không tạo tag, publish hoặc chuyển mặc định sang v2 trong phase này.

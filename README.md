@@ -49,6 +49,7 @@
   ```
 
 ## Thông tin thêm
+- [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 opt-in hỗ trợ campuses, login, kỳ học và lịch học trong Phase 3.
 - [Các ví dụ sử dụng](./docs/Example.md)
 - [Tạo môi trường dev bằng uv](./docs/development.md)
 - [CI và kiểm tra artifact](./docs/development.md#ci-và-kiểm-tra-artifact)
@@ -63,6 +64,7 @@ Khi thiếu `--semester`, cli chọn kỳ theo `startDate` gần đây. Với l�
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
 |--timeout <giây>|Timeout HTTP, đặt trước command; ưu tiên hơn biến `MYFAP_TIMEOUT`|
+|--api-version <v1 hoặc v2>|Chọn API trước command; ưu tiên option, session, rồi v1. V2 đang hỗ trợ luồng tối thiểu trong Phase 3.|
 |-c, --campus <cơ sở>|Mã cơ sở; ưu tiên option → session → APHL khi đăng nhập mới|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|
