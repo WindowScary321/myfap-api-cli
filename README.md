@@ -49,7 +49,7 @@
   ```
 
 ## Thông tin thêm
-- [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 opt-in hỗ trợ campuses, login, kỳ học và lịch học trong Phase 3.
+- [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 hỗ trợ các command đọc hiện có trong Phase 4.
 - [Các ví dụ sử dụng](./docs/Example.md)
 - [Tạo môi trường dev bằng uv](./docs/development.md)
 - [CI và kiểm tra artifact](./docs/development.md#ci-và-kiểm-tra-artifact)
@@ -75,7 +75,7 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
 |--timeout <giây>|Timeout HTTP; ưu tiên hơn biến `MYFAP_TIMEOUT`|
-|--api-version <v1 hoặc v2>|Chọn API; ưu tiên option, session, rồi v1. V2 đang hỗ trợ luồng tối thiểu trong Phase 3.|
+|--api-version <v1 hoặc v2>|Chọn API; ưu tiên option, session, rồi v1. V2 hỗ trợ các command đọc hiện có trong Phase 4.|
 |-c, --campus <cơ sở>|Mã cơ sở; ưu tiên option rồi session. APHL chỉ mặc định cho v1; v2 cần chọn campus nếu chưa có mã phù hợp trong session.|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|

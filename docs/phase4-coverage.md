@@ -24,7 +24,9 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 ## Quy tắc transport
 
 - V2 chỉ gửi các operation có trong allowlist đọc. Route ghi, stub hoặc chưa có capability vẫn bị chặn trước HTTP.
-- GET dùng header theo capture app: `Accept`, `Accept-Encoding`, `User-Agent`, `ClientCode`, `CampusCode`, `Authorization` và `Checksum`; GET không thêm `Content-Type`.
+- GET và POST dùng header theo capture app: `Accept`, `Accept-Encoding`, `User-Agent`, `ClientCode`, `CampusCode`, `Authorization` và `Checksum`. Chỉ POST có JSON body mới thêm `Content-Type: application/json`.
+- Các command đọc cần session qua proxy, gồm nhóm `info` và `other`, kiểm tra capability trước khi nạp session. Version được chọn theo option rồi metadata session; lệnh thiếu capability không handshake, refresh hoặc gọi API dữ liệu.
+- Survey giữ host và chữ ký riêng. Khi dùng session v2, CLI nhắc trên stderr rằng request đi tới `survey.fpt.edu.vn`; stdout vẫn chỉ chứa JSON khi có `--stdout`.
 - `GetSemester` không có query; `GetWeekByDate` chỉ có `date`; các route còn lại dùng đúng case query trong APK.
 - Bốn route `CheckOpenFeedBack`, `CheckUpdateProfile`, `GetApplication` và `GetNotificationByRoll` vẫn có `Authen` trong query. Giá trị này lấy từ credential binding hiện tại, không giữ bản cũ sau refresh.
 - Retry đọc tối đa một lần khi server báo hết phiên rõ ràng. Timeout, 403, 5xx, App Check và lỗi operation không fallback sang v1.
@@ -43,7 +45,7 @@ Phase 4 chưa tích hợp transcript, balance, ảnh, tìm kiếm news, `GetVers
 
 Lượt rà môi trường ngày 17/10 ghi nhận Fiddler có 315 session và 23 path API đã biết trong LiveTraffic; capture và system proxy vẫn tắt. ADB thấy một emulator kết nối và tiến trình `com.fuct` đang chạy. Harness CLI Phase 4 đã mở browser login HN nhưng không nhận callback trong thời hạn 120 giây, vì vậy chưa ghi live smoke CLI trong lượt này. Không dùng dữ liệu capture để giả lập session.
 
-Lượt smoke v2 sau đó đã login và chạy thật trên campus HN: semesters, schedule JSON/ICS, marks, exams, week timetable, attendance, applications, news, student/campus info, fee, subjects, notification, feedback và profile đều exit 0 với HTTP 200/body 200. Survey trả HTTP 200/body 404 và được giữ là not-found hợp lệ. Có 21 operation duy nhất và 23 request; stdout JSON hợp lệ, ICS đọc được bằng `icalendar`, session/lock tạm đã xóa. Không chạy thao tác ghi.
+Lượt smoke v2 sau đó đã login và chạy thật trên campus HN: semesters, schedule JSON/ICS, marks, exams, week timetable, attendance, applications, news, student/campus info, fee, subjects, notification, feedback và profile đều exit 0 với HTTP 200/body 200. Survey trả HTTP 200/body 404 và được giữ là not-found hợp lệ. Có 21 operation khác nhau và 23 request; stdout JSON hợp lệ, ICS đọc được bằng `icalendar`, session/lock tạm đã xóa. Không chạy thao tác ghi.
 
 Lượt smoke v1 để đóng lại `news`, `notification` và `fee` không nhận callback đăng nhập nên chưa có kết quả mới. Các finding v1 trước đó vẫn mở: news/notification body `201`, fee HTTP 404. Kết quả v2 thành công không được dùng để thay cho kiểm chứng v1.
 

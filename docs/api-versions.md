@@ -4,7 +4,7 @@
 
 ## Dùng v2
 
-API v1 vẫn là mặc định cho session mới. Đặt `--api-version v2` trước hoặc sau command để dùng adapter v2 tối thiểu:
+API v1 vẫn là mặc định cho session mới. Đặt `--api-version v2` trước hoặc sau command để dùng adapter v2:
 
 ```sh
 myfap --api-version v2 campuses
@@ -22,7 +22,7 @@ Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứ
 
 Nếu FEID cấp token nhưng handshake FAP bị từ chối, CLI hướng dẫn kiểm tra campus theo version. Thông báo này chưa chứng minh token hết hạn hoặc campus chắc chắn là nguyên nhân; cần kiểm tra lại mã campus trước khi đăng nhập lặp lại.
 
-## Phạm vi Phase 3
+## Phạm vi hiện tại
 
 | Chức năng | API v2 |
 |---|---|
@@ -30,12 +30,13 @@ Nếu FEID cấp token nhưng handshake FAP bị từ chối, CLI hướng dẫn
 | `login`, `refresh` | FEID/OIDC và handshake v2 |
 | `semesters` | GetSemester với query rỗng |
 | `schedule`, gồm JSON/ICS hiện có | GetActivityStudent |
-| `other survey` | Giữ host, chữ ký và envelope riêng của survey |
-| Các FAP operation đọc còn lại | Báo chưa hỗ trợ; không fallback sang v1 |
+| `other survey` | Dùng dịch vụ survey riêng cho cả v1/v2; có thông báo trên stderr khi dùng v2 |
+| Các command đọc FAP khác đã có trong CLI | Đã có adapter v2 trong Phase 4; xem [bảng coverage](phase4-coverage.md) |
+| Operation chưa có capability | Chặn trước khi nạp session; không fallback sang v1 |
 
 `MyFapEssential.get_api_active()` chỉ gọi khi cần chẩn đoán proxy v2. CLI không dùng kết quả này để tự chọn version hoặc campus. Ma trận method/path/query/body/header, credential và capability nằm trong [contract v2](v2-contracts.md).
 
-Các lệnh chưa được hỗ trợ không gọi route đoán hoặc trả danh sách rỗng để giả thành công. Với marks, exams, lịch tuần và attendance, CLI kiểm capability trước khi tra kỳ hoặc tuần. Nạp session vẫn có thể handshake nếu binding cần đổi. Việc phủ toàn bộ command v2 thuộc Phase 4.
+CLI kiểm tra capability của operation chính trước khi nạp session cho các command đọc cần session qua proxy, gồm `applications`, `news`, nhóm `info` và nhóm `other`. Lệnh chưa hỗ trợ dừng trước handshake, refresh, tra kỳ/tuần hoặc request dữ liệu. Lệnh được hỗ trợ vẫn có thể handshake nếu binding cần đổi. Survey dùng contract độc lập tại `survey.fpt.edu.vn`, giữ nguyên chữ ký và envelope riêng; thông báo trên stderr giúp phân biệt dịch vụ này với proxy v2.
 
 ## Đổi version của session
 

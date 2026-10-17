@@ -87,10 +87,14 @@ def get_auth(campus=None):
     c = campus if campus else state["campus"]
     return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"), api_version=state.get("api_version"))
 
-def require_auth():
+def require_auth(operation=None):
     auth = get_auth()
     try:
+        if operation is not None:
+            require_operation(auth, operation)
         loaded = auth.load_session()
+    except typer.Exit:
+        raise
     except Exception as error:
         err_console.print(f"[red]Lỗi kiểm tra session: {error}[/red]")
         raise typer.Exit(code=1)
@@ -100,7 +104,7 @@ def require_auth():
     return auth
 
 def require_operation(auth, operation):
-    if getattr(auth, "api_version", "v1") != "v2":
+    if auth.resolve_api_version() != "v2":
         return
     from .v2 import OPERATION_ALIASES, SUPPORTED_OPERATIONS
     operation = OPERATION_ALIASES.get(operation, operation)
@@ -256,7 +260,7 @@ def campuses():
 @app.command()
 def semesters():
     """Xem danh sách kỳ học"""
-    auth = require_auth()
+    auth = require_auth("GetSemester")
     other = MyFapEssential(auth)
     try:
         with err_console.status("[bold green]Đang lấy dữ liệu..."):
@@ -281,8 +285,7 @@ def schedule(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch học"""
-    auth = require_auth()
-    require_operation(auth, "GetActivityStudent")
+    auth = require_auth("GetActivityStudent")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
             
@@ -315,8 +318,7 @@ def marks(
         err_console.print("[red]Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)[/red]")
         raise typer.Exit(code=1)
         
-    auth = require_auth()
-    require_operation(auth, "GetMarkByCourse" if courseid else "GetStudentMark")
+    auth = require_auth("GetMarkByCourse" if courseid else "GetStudentMark")
     client = MyFapClient(auth)
 
     if courseid:
@@ -353,8 +355,7 @@ def exams(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch thi"""
-    auth = require_auth()
-    require_operation(auth, "GetScheduleExam")
+    auth = require_auth("GetScheduleExam")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
             
@@ -387,8 +388,7 @@ def week_timetable(
             raise typer.Exit(code=1)
     target_year = year if year is not None else (requested_date.year if requested_date else now.year)
 
-    auth = require_auth()
-    require_operation(auth, "GetActivityStudentByWeek")
+    auth = require_auth("GetActivityStudentByWeek")
     client = MyFapClient(auth)
     essential = MyFapEssential(auth)
 
@@ -430,8 +430,7 @@ def attendance(
     if bool(subject_code) != bool(class_name):
         err_console.print("[red]Lỗi: Cần cả --subjectcode (-sc) và --classname (-cn) để xem chi tiết điểm danh.[/red]")
         raise typer.Exit(code=1)
-    auth = require_auth()
-    require_operation(auth, "getCourseAttendance" if subject_code else "GetStudentAttendances")
+    auth = require_auth("getCourseAttendance" if subject_code else "GetStudentAttendances")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
 
@@ -460,7 +459,7 @@ def applications(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem danh sách đơn từ đã gửi cho trường"""
-    auth = require_auth()
+    auth = require_auth("GetApplication")
     client = MyFapClient(auth)
     
     try:
@@ -478,7 +477,7 @@ def news(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem 10 thông báo gần nhất"""
-    auth = require_auth()
+    auth = require_auth("GetTop10News")
     other = MyFapEssential(auth)
     
     try:
@@ -497,7 +496,7 @@ def info_student(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem thông tin sinh viên"""
-    auth = require_auth()
+    auth = require_auth("GetStudentById")
     client = MyFapClient(auth)
     try:
         data = client.get_student_info()
@@ -513,7 +512,7 @@ def info_campus(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem thông tin phòng dịch vụ sinh viên"""
-    auth = require_auth()
+    auth = require_auth("GetCampusInfo")
     client = MyFapClient(auth)
     try:
         data = client.get_campus_info()
@@ -532,6 +531,8 @@ def other_survey(
 ):
     """Kiểm tra các survey chưa thực hiện"""
     auth = require_auth()
+    if getattr(auth, "api_version", "v1") == "v2":
+        err_console.print("[yellow]Survey dùng dịch vụ riêng tại survey.fpt.edu.vn, không qua proxy API v2.[/yellow]")
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_required_survey()
@@ -547,7 +548,7 @@ def other_feedback(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Kiểm tra Feedback"""
-    auth = require_auth()
+    auth = require_auth("CheckOpenFeedBack")
     other_client = MyFapOther(auth)
     try:
         data = other_client.check_open_feedback()
@@ -563,7 +564,7 @@ def other_profile(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Kiểm tra Update Profile"""
-    auth = require_auth()
+    auth = require_auth("CheckUpdateProfile")
     other_client = MyFapOther(auth)
     try:
         data = other_client.check_update_profile()
@@ -579,7 +580,7 @@ def other_notification(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem thông báo qua MSSV"""
-    auth = require_auth()
+    auth = require_auth("GetNotificationByRoll")
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_notification()
@@ -595,7 +596,7 @@ def other_fee(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Lấy danh sách học phí và trạng thái thanh toán từng khoản"""
-    auth = require_auth()
+    auth = require_auth("GeFeeByRoll")
     other_client = MyFapOther(auth)
     try:
         data = other_client.get_fee()
@@ -611,7 +612,7 @@ def other_subjects(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Lấy danh sách tất cả môn học"""
-    auth = require_auth()
+    auth = require_auth("GetSubjets")
     other_client = MyFapOther(auth)
     try:
         with err_console.status("[bold green]Đang tải danh sách tất cả môn học..."):
