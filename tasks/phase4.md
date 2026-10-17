@@ -15,15 +15,21 @@ Không thêm transcript, balance, ảnh, news search, GetVersion, form feedback 
 
 ## Kiểm chứng
 
-- [ ] Contract test ở biên HTTP và wrapper cho các route đọc v1/v2; dữ liệu fixture hoàn toàn tổng hợp.
-- [ ] CLI test cho nhóm command hiện có, stdout JSON/ICS, capability, option và lỗi trước HTTP.
-- [ ] Regression cho retry dùng key/checksum/Authen mới và giới hạn một lần.
-- [ ] Kiểm tra ICS bằng dữ liệu tổng hợp và một reader độc lập; ghi rõ giới hạn của reader hiện tại nếu còn.
-- [ ] Live trên session tạm riêng, không đọc thư mục session cá nhân. Chỉ giữ metadata đã lọc, không giữ lịch/điểm/hồ sơ hoặc credential thật trong Git.
+- [x] Contract test ở biên HTTP và wrapper cho các route đọc v1/v2; dữ liệu fixture hoàn toàn tổng hợp.
+- [x] CLI test cho nhóm command hiện có, stdout JSON/ICS, capability, option và lỗi trước HTTP.
+- [x] Regression cho retry dùng key/checksum/Authen mới và giới hạn một lần.
+- [x] Kiểm tra ICS bằng dữ liệu tổng hợp và một reader độc lập; ghi rõ giới hạn của reader hiện tại nếu còn.
+- [x] Live trên session tạm riêng, không đọc thư mục session cá nhân. Chỉ giữ metadata đã lọc, không giữ lịch/điểm/hồ sơ hoặc credential thật trong Git.
 - [ ] Chạy lại news, notification và fee của v1; ghi nguyên trạng lỗi còn lại và giới hạn theo version/campus. Không dùng CI xanh thay kết luận live.
 - [ ] Kiểm tra positive fee/survey khi tài khoản có điều kiện phù hợp; nếu thiếu thì giữ trạng thái chưa kiểm chứng.
-- [ ] Review độc lập, kiểm tra tiếng Việt, test Python 3.9/3.11, build, Twine, artifact validator và pip smoke.
-- [ ] Draft PR riêng, comment tiếng Việt sau các mốc quan trọng; maintainer quyết định Ready for review và merge.
+- [x] Review độc lập, kiểm tra tiếng Việt, test Python 3.9/3.11, build, Twine, artifact validator và pip smoke.
+- [x] Draft PR riêng, comment tiếng Việt sau các mốc quan trọng; maintainer quyết định Ready for review và merge.
+
+Đã có bằng chứng cho 7/9 mục. Contract và CLI được kiểm tra tại `tests/test_phase4_transport.py`, `tests/test_api_v2.py`, `tests/test_cli_v2_capabilities.py` và các regression v1. Test ICS dùng reader `icalendar` độc lập. Kết quả live v2 HN đã ghi 21 operation khác nhau, 23 request và dọn session/lock tạm; xem [coverage Phase 4](../docs/phase4-coverage.md). Matrix Ubuntu/Windows × Python 3.9/3.11, build và cài artifact được ghi tại [checks PR #8](https://github.com/WindowScary321/myfap-api-cli/pull/8/checks).
+
+Hai mục live còn mở: lần chạy lại `news`, `notification`, `fee` của v1 chưa nhận callback đăng nhập; positive fee/survey chưa được xác nhận với dữ liệu nghiệp vụ phù hợp. Fee v2 trả HTTP/body 200 chưa đủ để kết luận positive case, còn survey trả body 404. Các ô đã đánh dấu không có nghĩa toàn bộ Phase 4 đã hoàn tất.
+
+Rà soát độc lập bổ sung xác nhận parser điểm còn lỗi khi có ba cột dữ liệu và không có cột ghi chú: hàng trong `rowspan` mất các trường điểm; hàng ba `<td>` độc lập bị gán sai category/item và thiếu weight. Mới tái hiện bằng HTML tổng hợp, chưa có bằng chứng live cho cấu trúc này. Parser chưa được sửa trong lượt cập nhật stdout và checklist.
 
 ## Quy tắc dữ liệu và thiết bị
 

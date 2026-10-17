@@ -37,11 +37,13 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 - Contract fixture cho method, path, query, header, credential, lỗi JSON/HTTP, empty/not-found, refresh retry và App Check.
 - CLI fixture cho command v2, lựa chọn kỳ, `--stdout`, ICS, survey riêng, capability và lỗi trước HTTP.
 - Mutation check: bỏ ánh xạ `getCourseAttendance` làm test capability/transport thất bại.
-- 289 test local pass trên Python 3.11 Windows, gồm 4 skip theo điều kiện môi trường. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
+- Bộ test hiện có 299 test trên Python 3.11 Windows: 295 đạt, 4 skip theo điều kiện môi trường. Regression stdout kiểm tra JSON tiếng Việt/emoji trên stream `cp1252`, stream chỉ hỗ trợ text và tiến trình CLI riêng bị ép `PYTHONIOENCODING=cp1252:strict`; byte output được đọc lại bằng UTF-8. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
 
 ## Giới hạn còn lại
 
 Phase 4 chưa tích hợp transcript, balance, ảnh, tìm kiếm news, `GetVersion`, form feedback hoặc thao tác ghi. Chưa có positive live case cho học phí và survey trong lượt này. Fiddler/Android chỉ xuất metadata cục bộ; không lưu token, identity, payload học vụ hoặc màn hình vào repository.
+
+Parser điểm còn lỗi với hàng thiếu cột ghi chú: ba cột dữ liệu trong `rowspan` chỉ trả category; hàng ba `<td>` độc lập bị gán sai category/item và thiếu weight. Đã tái hiện bằng HTML tổng hợp, chưa kiểm chứng cấu trúc này trên dữ liệu thật và chưa sửa trong lượt cập nhật stdout/checklist.
 
 Lượt rà môi trường ngày 17/10 ghi nhận Fiddler có 315 session và 23 path API đã biết trong LiveTraffic; capture và system proxy vẫn tắt. ADB thấy một emulator kết nối và tiến trình `com.fuct` đang chạy. Harness CLI Phase 4 đã mở browser login HN nhưng không nhận callback trong thời hạn 120 giây, vì vậy chưa ghi live smoke CLI trong lượt này. Không dùng dữ liệu capture để giả lập session.
 
