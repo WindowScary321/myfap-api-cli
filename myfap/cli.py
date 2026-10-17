@@ -129,7 +129,7 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
     """Helper để xuất dữ liệu ra file hoặc stdout"""
     if stdout:
         if is_text:
-            print(data)
+            print(data.replace("\r\n", "\n"), end="")
         else:
             print(json.dumps(data, ensure_ascii=False, indent=4))
         return
@@ -139,7 +139,7 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
     file_path = out_path / default_filename
 
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(file_path, "w", encoding="utf-8", newline="" if is_text else None) as f:
             if is_text:
                 f.write(data)
             else:

@@ -34,6 +34,7 @@ include = ["myfap*"]
 
 [dependency-groups]
 ci = [
+    "icalendar>=6,<7",
     "tomli>=2.2.1; python_version < '3.11'",
     "twine>=6.1.0; python_version >= '3.11'",
 ]
