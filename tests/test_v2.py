@@ -52,7 +52,11 @@ class V2TransportTests(unittest.TestCase):
                 self.assertEqual(call.args, ("POST", f"{v2.FAP_PROXY_HOST}/{operation}"))
                 self.assertEqual(call.kwargs["params"], {})
                 self.assertEqual(call.kwargs["json"], {})
-                self.assertEqual(call.kwargs["headers"], {"ClientCode": "MyFAP", "Content-Type": "application/json", "CampusCode": "HN", "Authorization": "Bearer fake-bootstrap", "Checksum": "fake%3d:123"})
+                self.assertEqual(call.kwargs["headers"], {
+                    "Accept": "application/json, text/plain, */*", "Accept-Encoding": "gzip", "User-Agent": "okhttp/4.9.2",
+                    "ClientCode": "MyFAP", "Content-Type": "application/json", "CampusCode": "HN",
+                    "Authorization": "Bearer fake-bootstrap", "Checksum": "fake%3d:123",
+                })
                 self.assertEqual(call.kwargs["timeout"], 2.5)
                 self.assertFalse(call.kwargs["allow_redirects"])
                 signer.assert_called_once_with("fake-bootstrap")
@@ -96,7 +100,7 @@ class V2TransportTests(unittest.TestCase):
         self.response.json.assert_not_called()
 
     def test_unsupported_operation_fails_before_http_with_no_value_echo(self):
-        for operation in ("GetStudentMark", "getCourseAttendance", "GetCourseAttendance", "AddRate", "https://PRIVATE_SECRET.invalid/", "UnknownOperation", None, []):
+        for operation in ("getCourseAttendance", "GetVersion", "GetStudentFeedbackForm", "AddRate", "https://PRIVATE_SECRET.invalid/", "UnknownOperation", None, []):
             with self.subTest(operation=operation), self.assertRaises(ApiError) as caught:
                 v2.request(self.session, operation, credential="PRIVATE_SECRET", campus="TEST")
             self.assertNotIn("PRIVATE_SECRET", str(caught.exception))

@@ -105,32 +105,103 @@ class VersionedApiTests(unittest.TestCase):
         self.assertEqual(call.kwargs["timeout"], 2.5)
         self.auth.ensure_bound.assert_called_with(campus="TEST", api_version="v2", account_type="student")
 
-    def test_unsupported_v2_operations_never_fall_back_or_send_http(self):
+    def test_existing_read_wrappers_use_v2_contracts_and_preserve_output(self):
+        student = {"CampusCode": "TEST", "rollNumber": "TEST+ROLL"}
+        with_semester = {**student, "Semester": "Fall2026"}
+        with_authen = {**student, "Authen": "FAKE_OLD_KEY"}
         cases = (
-            (api.MyFapEssential, "get_week", ("2026-10-17",)),
-            (api.MyFapEssential, "get_news", ()),
-            (api.MyFapClient, "get_marks", ("Fall2026",)),
-            (api.MyFapClient, "get_mark_by_course", ("DEMO",)),
-            (api.MyFapClient, "get_exams", ("Fall2026",)),
-            (api.MyFapClient, "get_schedule_by_week", (42, "Fall2026", 2026)),
-            (api.MyFapClient, "get_attendances", ("Fall2026",)),
-            (api.MyFapClient, "get_course_attendance", ("Fall2026", "DEMO", "DEMO")),
-            (api.MyFapClient, "get_applications", ()),
-            (api.MyFapClient, "get_student_info", ()),
-            (api.MyFapClient, "get_campus_info", ()),
-            (api.MyFapOther, "check_open_feedback", ()),
-            (api.MyFapOther, "check_update_profile", ()),
-            (api.MyFapOther, "get_notification", ()),
-            (api.MyFapOther, "get_fee", ()),
-            (api.MyFapOther, "get_subjects", ()),
+            (api.MyFapEssential, "get_week", ("2026-10-17",), "GetWeekByDate", {"date": "2026-10-17"}, "42"),
+            (api.MyFapEssential, "get_news", (), "GetTop10News", {"CampusCode": "TEST", "type": 1}, []),
+            (api.MyFapClient, "get_marks", ("Fall2026",), "GetStudentMark", with_semester, [{"courseID": 123, "averageMark": "8.0"}]),
+            (api.MyFapClient, "get_mark_by_course", ("DEMO",), "GetMarkByCourse", {**student, "CourseId": "DEMO"}, "<table><tr><td>TEST</td></tr></table>"),
+            (api.MyFapClient, "get_exams", ("Fall2026",), "GetScheduleExam", with_semester, []),
+            (api.MyFapClient, "get_schedule_by_week", (42, "Fall2026", 2026), "GetActivityStudentByWeek", {**with_semester, "week": 42, "year": 2026}, []),
+            (api.MyFapClient, "get_attendances", ("Fall2026",), "GetStudentAttendances", with_semester, []),
+            (api.MyFapClient, "get_course_attendance", ("Fall2026", "DEMO", "CLASS"), "GetCourseAttendance", {**with_semester, "SubjectCode": "DEMO", "ClassName": "CLASS"}, []),
+            (api.MyFapClient, "get_applications", (), "GetApplication", with_authen, []),
+            (api.MyFapClient, "get_student_info", (), "GetStudentById", student, [{"fixture": "student"}]),
+            (api.MyFapClient, "get_campus_info", (), "GetCampusInfo", student, [{"fixture": "campus"}]),
+            (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack", with_authen, True),
+            (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile", with_authen, False),
+            (api.MyFapOther, "get_notification", (), "GetNotificationByRoll", with_authen, []),
+            (api.MyFapOther, "get_fee", (), "GeFeeByRoll", student, [
+                {"IsPaid": True, "invoice": "FAKE-PAID", "amount": 1000},
+                {"IsPaid": False, "invoice": "FAKE-UNPAID", "amount": "2000.50"},
+            ]),
+            (api.MyFapOther, "get_subjects", (), "GetSubjets", {"CampusCode": "TEST"}, []),
         )
-        for cls, method, args in cases:
+        for cls, method, args, operation, query, data in cases:
             with self.subTest(method=method):
-                with self.assertRaisesRegex(api.ApiError, "chưa.*hỗ trợ"):
-                    getattr(cls(self.auth), method)(*args)
-        self.session.get.assert_not_called()
+                payload = {"code": 200, "data": data}
+                self.session.get.return_value = response(payload)
+                result = getattr(cls(self.auth), method)(*args)
+                self.assertEqual(result, 42 if method == "get_week" else payload)
+                call = self.session.get.call_args
+                self.assertEqual(call.args[0], "https://fap-proxy.fpt.edu.vn/MyFAP/" + operation)
+                self.assertEqual(call.kwargs["params"], query)
+                self.assertEqual(call.kwargs["headers"]["Authorization"], "Bearer FAKE_OLD_KEY")
+                self.assertEqual(call.kwargs["timeout"], 30 if method == "get_subjects" else 2.5)
         self.session.post.assert_not_called()
         self.auth.refresh_session.assert_not_called()
+
+    def test_query_authen_and_canonical_reads_are_rebuilt_after_refresh(self):
+        cases = (
+            (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack"),
+            (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile"),
+            (api.MyFapOther, "get_notification", (), "GetNotificationByRoll"),
+            (api.MyFapClient, "get_applications", (), "GetApplication"),
+            (api.MyFapClient, "get_course_attendance", ("Fall2026", "DEMO", "CLASS"), "GetCourseAttendance"),
+            (api.MyFapEssential, "get_week", ("2026-10-17",), "GetWeekByDate"),
+        )
+        for cls, method, args, operation in cases:
+            with self.subTest(method=method):
+                self.auth.authen_key = "FAKE_OLD_KEY"
+                self.session.get.reset_mock()
+                self.auth.refresh_session.reset_mock()
+                data = 42 if method == "get_week" else []
+                self.session.get.side_effect = [response({"code": 401}), response({"code": 200, "data": data})]
+
+                def refresh():
+                    self.auth.authen_key = "FAKE_NEW_KEY"
+                    return True
+
+                self.auth.refresh_session.side_effect = refresh
+                result = getattr(cls(self.auth), method)(*args)
+                self.assertEqual(result, 42 if method == "get_week" else {"code": 200, "data": []})
+                self.auth.refresh_session.assert_called_once_with()
+                first, second = self.session.get.call_args_list
+                self.assertTrue(second.args[0].endswith("/" + operation))
+                self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer FAKE_NEW_KEY")
+                self.assertNotEqual(first.kwargs["headers"]["Checksum"], second.kwargs["headers"]["Checksum"])
+                if operation in {"CheckOpenFeedBack", "CheckUpdateProfile", "GetNotificationByRoll", "GetApplication"}:
+                    self.assertEqual(first.kwargs["params"]["Authen"], "FAKE_OLD_KEY")
+                    self.assertEqual(second.kwargs["params"]["Authen"], "FAKE_NEW_KEY")
+
+    def test_new_v2_reads_preserve_empty_errors_and_never_fall_back(self):
+        cases = (
+            (api.MyFapClient, "get_marks", ("Fall2026",)),
+            (api.MyFapClient, "get_course_attendance", ("Fall2026", "DEMO", "CLASS")),
+            (api.MyFapOther, "get_fee", ()),
+            (api.MyFapOther, "get_notification", ()),
+        )
+        failures = (
+            response({"code": 201, "data": None}), response({"code": 404, "data": None}),
+            response(status=404), response(status=503),
+            response({"errorMessage": "APP_CHECK_FAILED"}, 401),
+            response("invalid-envelope"), requests.Timeout("PRIVATE_SENTINEL"),
+        )
+        for cls, method, args in cases:
+            for failure in failures:
+                with self.subTest(method=method, failure=type(failure).__name__):
+                    self.session.get.reset_mock()
+                    self.session.get.side_effect = [failure]
+                    with self.assertRaises(api.ApiError) as caught:
+                        getattr(cls(self.auth), method)(*args)
+                    self.assertNotIn("PRIVATE_SENTINEL", str(caught.exception))
+                    self.assertEqual(self.session.get.call_count, 1)
+                    self.assertTrue(self.session.get.call_args.args[0].startswith("https://fap-proxy.fpt.edu.vn/MyFAP/"))
+                    self.auth.refresh_session.assert_not_called()
+        self.session.post.assert_not_called()
 
     def test_v2_session_keeps_independent_survey_signature_and_envelope(self):
         with patch("myfap.api.create_survey_checksum", return_value="FAKE+/CHECKSUM="):

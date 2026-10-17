@@ -9,6 +9,7 @@ from rich.text import Text
 from typer.testing import CliRunner
 
 from myfap.cli import app
+from myfap.auth import MyFapAuth
 
 
 RUNNER_OPTIONS = {"mix_stderr": False} if "mix_stderr" in inspect.signature(CliRunner).parameters else {}
@@ -42,6 +43,59 @@ class CLIVersionTests(unittest.TestCase):
                 result = self.runner.invoke(app, [*flags, "login", "--force"])
                 self.assertEqual(result.exit_code, 0, result.output)
                 self.assertEqual(factory.call_args.kwargs["api_version"], expected)
+
+    def test_v2_login_rejects_implicit_aphl_before_network_with_or_without_force(self):
+        cases = (("v1", "v2"), ("v2", "v2"), ("v2", None))
+        for stored_version, requested_version in cases:
+            for force in (False, True):
+                for expires_at in (None, 1):
+                    with self.subTest(stored=stored_version, requested=requested_version, force=force, expiry=expires_at), TemporaryDirectory() as temporary:
+                        config = Path(temporary) / "state.json"
+                        config.write_text(json.dumps({
+                            "campus": "APHL", "api_version": stored_version,
+                            "authen_key": "fake-key", "mssv": "TEST000", "email": "sample@example.invalid",
+                            "jwt_token": "fake-access", "refresh_token": "fake-refresh",
+                            "oidc_subject": "fake-subject", "oidc_nonce": "fake-nonce", "oidc_validated": True,
+                            "access_token_expires_at": expires_at,
+                        }), encoding="utf-8")
+                        before = config.read_bytes()
+                        flags = ["--api-version", requested_version] if requested_version else []
+                        with patch("requests.Session.request", return_value=Mock(status_code=503)) as request, patch.object(MyFapAuth, "_authorize") as browser:
+                            result = self.runner.invoke(app, ["--config", str(config), *flags, "login", *(["--force"] if force else [])])
+
+                        self.assertEqual(result.exit_code, 1, result.output)
+                        self.assertIn("--campus", result.stderr)
+                        request.assert_not_called()
+                        browser.assert_not_called()
+                        self.assertEqual(config.read_bytes(), before)
+
+    def test_login_accepts_explicit_v2_campus_and_keeps_v1_default(self):
+        for version, campus in (("v2", "HN"), ("v2", "APHL"), ("v1", None)):
+            for force in (False, True):
+                with self.subTest(version=version, campus=campus, force=force), TemporaryDirectory() as temporary:
+                    config = Path(temporary) / "state.json"
+                    config.write_text(json.dumps({
+                        "campus": "APHL", "api_version": "v1", "jwt_token": "fake-access",
+                        "oidc_subject": "fake-subject", "oidc_nonce": "fake-nonce", "oidc_validated": True,
+                    }), encoding="utf-8")
+                    oidc = Mock()
+                    oidc.begin_login.return_value = {"nonce": "fake-nonce", "code_verifier": "fake-verifier"}
+                    oidc.request_token.return_value = {"access_token": "fake-access"}
+                    oidc.validate_tokens.return_value = {"sub": "fake-subject"}
+                    handshake = Mock(status_code=200, json=Mock(return_value={"code": 200, "data": [{
+                        "rollnumber": "TEST000", "email": "sample@example.invalid",
+                        "authenKey": "fake-key", "typeAcc": "student",
+                    }]}))
+                    options = ["--campus", campus] if campus else []
+                    with patch("requests.Session.request", return_value=handshake) as request, patch.object(MyFapAuth, "_oidc", return_value=oidc), patch.object(MyFapAuth, "_authorize", return_value="fake-code"):
+                        result = self.runner.invoke(app, ["--config", str(config), "--api-version", version, "login", *options, *(["--force"] if force else [])])
+
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    saved = json.loads(config.read_text(encoding="utf-8"))
+                    self.assertEqual((saved["api_version"], saved["campus"]), (version, campus or "APHL"))
+                    request.assert_called_once()
+                    if version == "v2":
+                        self.assertEqual(request.call_args.kwargs["headers"]["CampusCode"], campus)
 
     def test_public_campuses_resolves_explicit_then_saved_then_v1(self):
         with TemporaryDirectory() as temporary:

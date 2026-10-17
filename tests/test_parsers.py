@@ -1,10 +1,15 @@
 import json
+import io
 import unittest
-from datetime import datetime, timezone
+from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from icalendar import Calendar as IndependentCalendar
 from ics import Calendar
 
+from myfap.cli import save_output
 from myfap.parsers import convert_schedule_to_ics, parse_marks_html
 
 
@@ -35,6 +40,58 @@ class MarksParserTests(unittest.TestCase):
 
 
 class ScheduleParserTests(unittest.TestCase):
+    def test_saved_ics_keeps_line_endings_for_independent_reader(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+
+        with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
+            save_output(convert_schedule_to_ics(data), "schedule.ics", temporary, False, is_text=True)
+            content = (Path(temporary) / "schedule.ics").read_bytes()
+
+        self.assertNotIn(b"\r\r\n", content)
+        self.assertEqual(len(IndependentCalendar.from_ical(content).walk("VEVENT")), 1)
+
+    def test_stdout_ics_keeps_line_endings_for_independent_reader(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        expected = convert_schedule_to_ics(data)
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline):
+                buffer = io.BytesIO()
+                with io.TextIOWrapper(buffer, encoding="utf-8", newline=newline) as output:
+                    with redirect_stdout(output):
+                        save_output(expected, "schedule.ics", None, True, is_text=True)
+                    output.flush()
+                    content = buffer.getvalue()
+                self.assertEqual(content, expected.encode("utf-8"))
+                self.assertNotIn(b"\r\r\n", content)
+                self.assertEqual(len(IndependentCalendar.from_ical(content).walk("VEVENT")), 1)
+
+    def test_stdout_ics_keeps_crlf_in_text_only_stream(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        expected = convert_schedule_to_ics(data)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            save_output(expected, "schedule.ics", None, True, is_text=True)
+        self.assertEqual(output.getvalue(), expected)
+
+    def test_large_synthetic_calendar_imports_with_independent_reader(self):
+        base = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))["data"][0]
+        rows = []
+        for index in range(250):
+            day = datetime(2026, 1, 1) + timedelta(days=index)
+            rows.append({**base, "date": day.strftime("%m/%d/%Y") + " 12:00:00 AM", "subjectCode": f"TEST{index}", "isOnline": "False"})
+
+        calendar = IndependentCalendar.from_ical(convert_schedule_to_ics({"data": rows}))
+        events = calendar.walk("VEVENT")
+
+        self.assertEqual(len(events), 250)
+        self.assertEqual(len({str(event["UID"]) for event in events}), 250)
+        for event in events:
+            index = int(str(event["SUMMARY"])[4:])
+            day = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(days=index)
+            self.assertEqual(event.decoded("DTSTART"), day.replace(hour=0, minute=30))
+            self.assertEqual(event.decoded("DTEND"), day.replace(hour=2, minute=50))
+            self.assertFalse(event.errors)
+
     def test_ics_preserves_vietnam_time_and_session_details(self):
         data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
 
