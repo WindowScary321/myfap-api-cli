@@ -77,6 +77,42 @@ class AuthV2Tests(unittest.TestCase):
     def stored(self):
         return json.loads(self.path.read_text(encoding="utf-8"))
 
+    def test_fresh_v2_login_requires_campus_instead_of_defaulting_to_aphl(self):
+        cases = (
+            {},
+            {"campus": "APHL", "api_version": "v1"},
+            {"campus": "APHL", "api_version": "v2"},
+        )
+        for saved in cases:
+            with self.subTest(saved=saved):
+                before = json.dumps(saved, sort_keys=True).encode("utf-8")
+                self.path.write_bytes(before)
+                auth = module.MyFapAuth(api_version="v2", session_file=self.path)
+                auth._authorize = Mock(side_effect=AssertionError("browser should not open"))
+
+                with self.assertRaisesRegex(module.AuthError, "--campus") as caught:
+                    auth.login()
+
+                self.assertIn("v2", str(caught.exception))
+                auth._authorize.assert_not_called()
+                self.assertEqual(self.path.read_bytes(), before)
+
+    def test_v2_login_inherits_a_saved_non_aphl_campus(self):
+        saved = {**self.stored(), "campus": "HN", "api_version": "v1"}
+        self.path.write_text(json.dumps(saved), encoding="utf-8")
+        auth = self.target("v2")
+        oidc = Mock()
+        oidc.begin_login.return_value = {"nonce": "fake-new-nonce", "code_verifier": "fake-verifier"}
+        oidc.request_token.return_value = {"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}
+        oidc.validate_tokens.return_value = {"sub": "fake-new-subject"}
+        auth._authorize = Mock(return_value="fake-code")
+
+        with patch.object(auth, "_oidc", return_value=oidc):
+            auth.login()
+
+        self.assertEqual(auth.campus, "HN")
+        self.assertEqual(auth.api_version, "v2")
+
     def target(self, version=None):
         auth = module.MyFapAuth(api_version=version, session_file=self.path, timeout=2.5)
         auth.session.request = Mock(return_value=response({"code": 200, "data": [identity()]}))
