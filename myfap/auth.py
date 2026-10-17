@@ -117,6 +117,19 @@ class MyFapAuth:
         with self.store.lock():
             self.store.write(self._snapshot())
 
+    def resolve_api_version(self):
+        if self._requested[1] is not None:
+            return self._requested[1]
+        try:
+            with self.store.lock():
+                data = self.store.read()
+        except SessionStoreError:
+            raise AuthError("Không đọc được API version trong session an toàn. Hãy kiểm tra --config.") from None
+        version = data.get("api_version", "v1") if data is not None else "v1"
+        if version not in ("v1", "v2"):
+            raise AuthError("Session có API version không hợp lệ. Hãy đăng nhập lại hoặc chỉ định --api-version.")
+        return version
+
     def ensure_bound(self, *, campus=None, api_version=None, account_type=None):
         target = (campus or self.campus, api_version or self.api_version, account_type or self.account_type)
         ready = bool(self.authen_key) if self._fap_ready is None else self._fap_ready
@@ -124,8 +137,8 @@ class MyFapAuth:
             raise SessionBindingError("Session FAP chưa khớp campus/version/loại tài khoản. Hãy đăng nhập hoặc handshake lại.")
 
     def _check_supported(self):
-        if self.api_version != "v1":
-            raise SessionBindingError("Adapter API v2 chưa được triển khai. Hãy dùng v1.")
+        if self.api_version not in ("v1", "v2"):
+            raise SessionBindingError("API version chưa được hỗ trợ.")
         if self.account_type != "student":
             raise SessionBindingError("Luồng FEID hiện chỉ hỗ trợ tài khoản student.")
 
@@ -159,13 +172,18 @@ class MyFapAuth:
         if not self.jwt_token:
             raise AuthError("Không có FEID access token. Hãy đăng nhập lại.")
         try:
-            result = self.session.post(
-                f"{FAP_HOST}/AuthenticationByFeId",
-                params={"campusCode": self.campus, "checksum": create_checksum(MAGIC_ID, self.campus)},
-                json={"token": self.jwt_token},
-                headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
-                timeout=self.timeout or 10, allow_redirects=False,
-            )
+            if self.api_version == "v2":
+                from . import v2
+
+                result = v2.request(self.session, "AuthenticationByFeId", credential=self.jwt_token, campus=self.campus, timeout=self.timeout or 10)
+            else:
+                result = self.session.post(
+                    f"{FAP_HOST}/AuthenticationByFeId",
+                    params={"campusCode": self.campus, "checksum": create_checksum(MAGIC_ID, self.campus)},
+                    json={"token": self.jwt_token},
+                    headers={"Authorization": f"Bearer {self.jwt_token}", "Content-Type": "application/json"},
+                    timeout=self.timeout or 10, allow_redirects=False,
+                )
         except requests.RequestException:
             raise AuthError("Không kết nối được FAP để handshake. Hãy thử lại sau.") from None
         payload = read_response(result, api_version=self.api_version, operation="AuthenticationByFeId")
@@ -187,7 +205,13 @@ class MyFapAuth:
         key, roll, email = row.get("authenKey"), row.get("rollnumber", row.get("rollNumber")), row.get("email")
         if not all(_text(value) for value in (key, roll, email)):
             raise AuthError("Handshake FAP thiếu credential hoặc identity hợp lệ.")
-        if self._binding == (self.campus, self.api_version, self.account_type) and self.mssv and (self.mssv != roll or self.email != email):
+        # Changing API version must not silently switch the FAP identity for the same campus/account.
+        same_identity_scope = (
+            self._binding is not None
+            and self._binding[0] == self.campus
+            and self._binding[2] == self.account_type
+        )
+        if same_identity_scope and self.mssv and (self.mssv != roll or self.email != email):
             raise AuthError("Identity FAP thay đổi ngoài luồng đăng nhập. Hãy đăng nhập lại.")
         self.authen_key, self.mssv, self.email = key, roll, email
         self._binding = (self.campus, self.api_version, self.account_type)
@@ -337,8 +361,9 @@ class MyFapAuth:
                 except SessionFormatError:
                     existing = None
                 stored_campus = existing.get("campus") if existing is not None else None
+                stored_version = existing.get("api_version", "v1") if existing is not None else "v1"
                 self.campus = self._requested[0] or (stored_campus if _text(stored_campus) else "APHL")
-                self.api_version = self._requested[1] or "v1"
+                self.api_version = self._requested[1] or (stored_version if stored_version in ("v1", "v2") else "v1")
                 self.account_type = self._requested[2] or "student"
             self._check_supported()
             oidc = self._oidc()

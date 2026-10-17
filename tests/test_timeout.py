@@ -29,6 +29,9 @@ def response(data):
 class TimeoutTests(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner(**RUNNER_OPTIONS)
+        version_patch = patch("myfap.auth.MyFapAuth.resolve_api_version", return_value="v1")
+        version_patch.start()
+        self.addCleanup(version_patch.stop)
         env_patch = patch.dict(os.environ, {}, clear=False)
         env_patch.start()
         self.addCleanup(env_patch.stop)

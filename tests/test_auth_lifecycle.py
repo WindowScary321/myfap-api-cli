@@ -120,10 +120,11 @@ class AuthLifecycleTests(unittest.TestCase):
         auth.session.get.assert_not_called()
         self.assertEqual(self.path.read_bytes(), before)
 
-    def test_version_change_is_blocked_until_adapter_exists(self):
+    def test_version_change_failure_does_not_commit_new_binding(self):
         auth = module.MyFapAuth(api_version="v2", session_file=self.path)
         auth.session.get, auth.session.post = Mock(), Mock()
-        with self.assertRaises(module.AuthError):
+        auth.session.request = Mock(return_value=response({}, 503))
+        with self.assertRaises(module.ApiError):
             auth.load_session()
         auth.session.get.assert_not_called()
         auth.session.post.assert_not_called()
@@ -231,6 +232,7 @@ class AuthLifecycleTests(unittest.TestCase):
         self.oidc.begin_login.return_value = {"nonce": "new-fake-nonce", "code_verifier": "fake-verifier"}
         self.oidc.validate_tokens.return_value = {"sub": "new-fake-subject"}
         auth.session.post = Mock(return_value=response({"code": "200", "data": [identity()]}))
+        auth.session.request = Mock(return_value=response({"code": "200", "data": [identity()]}))
 
         def authorize(*args):
             self.assertEqual(self.path.read_bytes(), before)
@@ -255,7 +257,7 @@ class AuthLifecycleTests(unittest.TestCase):
                 self.assertEqual(auth.campus, "SAVED" if '"campus":"SAVED"' in content else "APHL")
                 self.assertEqual(self.load_file()["oidc_subject"], "new-fake-subject")
 
-    def test_fresh_login_inherits_campus_but_resets_unsupported_stored_binding(self):
+    def test_fresh_login_inherits_campus_and_version_but_resets_unsupported_account(self):
         for changes in ({"api_version": "v2"}, {"account_type": "donor"}, {"api_version": "v2", "account_type": "donor"}):
             with self.subTest(changes=changes):
                 saved = {**self.auth._snapshot(), **changes, "campus": "SAVED"}
@@ -265,9 +267,10 @@ class AuthLifecycleTests(unittest.TestCase):
                 self._prepare_login(auth, before)
                 self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
                 auth._authorize.assert_called_once()
-                self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("SAVED", "v1", "student"))
+                expected_version = saved["api_version"]
+                self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("SAVED", expected_version, "student"))
                 stored = self.load_file()
-                self.assertEqual((stored["campus"], stored["api_version"], stored["account_type"]), ("SAVED", "v1", "student"))
+                self.assertEqual((stored["campus"], stored["api_version"], stored["account_type"]), ("SAVED", expected_version, "student"))
 
     def test_fresh_login_honors_explicit_parameters_without_fallback(self):
         self.path.write_text(json.dumps({"campus": "SAVED", "api_version": "v2", "account_type": "donor"}), encoding="utf-8")
@@ -276,7 +279,7 @@ class AuthLifecycleTests(unittest.TestCase):
         self._prepare_login(auth, before)
         self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
         self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("EXPLICIT", "v1", "student"))
-        for requested in ({"api_version": "v2"}, {"account_type": "donor"}):
+        for requested in ({"account_type": "donor"},):
             with self.subTest(requested=requested):
                 before = self.path.read_bytes()
                 auth = module.MyFapAuth(session_file=self.path, **requested)
@@ -303,13 +306,14 @@ class AuthLifecycleTests(unittest.TestCase):
         auth = module.MyFapAuth(session_file=self.path)
         self._prepare_login(auth, before)
         auth.session.post.return_value = response({}, 503)
+        auth.session.request.return_value = response({}, 503)
         with self.assertRaises(module.ApiError):
             auth.login()
         auth._authorize.assert_called_once()
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_normal_load_still_refuses_unsupported_stored_binding(self):
-        for changes in ({"api_version": "v2"}, {"account_type": "donor"}):
+        for changes in ({"account_type": "donor"},):
             with self.subTest(changes=changes):
                 self.path.write_text(json.dumps({**self.auth._snapshot(), **changes}), encoding="utf-8")
                 before = self.path.read_bytes()
