@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
+from rich.text import Text
 from typer.testing import CliRunner
 
 from myfap.cli import app
@@ -31,7 +32,7 @@ class CLIVersionTests(unittest.TestCase):
         with patch("myfap.cli.get_auth") as factory, patch("requests.Session.request") as request:
             result = self.runner.invoke(app, ["--api-version", "v3", "campuses"])
         self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("--api-version", result.stderr)
+        self.assertIn("--api-version", Text.from_ansi(result.stderr).plain)
         factory.assert_not_called()
         request.assert_not_called()
 
