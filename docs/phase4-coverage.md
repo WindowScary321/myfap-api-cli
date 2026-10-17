@@ -41,4 +41,6 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 
 Phase 4 chưa tích hợp transcript, balance, ảnh, tìm kiếm news, `GetVersion`, form feedback hoặc thao tác ghi. Chưa có positive live case cho học phí và survey trong lượt này. Fiddler/Android chỉ xuất metadata cục bộ; không lưu token, identity, payload học vụ hoặc màn hình vào repository.
 
+Lượt rà môi trường ngày 17/10 ghi nhận Fiddler có 315 session và 23 path API đã biết trong LiveTraffic; capture và system proxy vẫn tắt. ADB thấy một emulator kết nối và tiến trình `com.fuct` đang chạy. Harness CLI Phase 4 đã mở browser login HN nhưng không nhận callback trong thời hạn 120 giây, vì vậy chưa ghi live smoke CLI trong lượt này. Không dùng dữ liệu capture để giả lập session.
+
 ICS được kiểm tra bằng dữ liệu tổng hợp với reader `icalendar` độc lập: 250 sự kiện giữ đúng DTSTART/DTEND theo múi giờ Việt Nam. File và stdout giữ nguyên byte CRLF trên cả stream mô phỏng Unix và Windows. Reader `ics` hiện tại gặp giới hạn recursion ở lịch lớn với recursion limit mặc định; runtime không tăng giới hạn để che lỗi. Khả năng import vào ứng dụng lịch thực tế vẫn cần kiểm chứng riêng.
