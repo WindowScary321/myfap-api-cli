@@ -133,15 +133,13 @@ def resolve_semester(auth, semester_flag):
 def save_output(data, default_filename: str, output_dir: Optional[str], stdout: bool, is_text: bool = False):
     """Helper để xuất dữ liệu ra file hoặc stdout"""
     if stdout:
-        if is_text:
-            stream = getattr(sys.stdout, "buffer", None)
-            if stream is None:
-                sys.stdout.write(data)
-            else:
-                stream.write(data.encode("utf-8"))
-                stream.flush()
+        content = data if is_text else json.dumps(data, ensure_ascii=False, indent=4) + "\n"
+        stream = getattr(sys.stdout, "buffer", None)
+        if stream is None:
+            sys.stdout.write(content)
         else:
-            print(json.dumps(data, ensure_ascii=False, indent=4))
+            stream.write(content.encode("utf-8"))
+            stream.flush()
         return
 
     out_path = Path(output_dir) if output_dir else Path.cwd()

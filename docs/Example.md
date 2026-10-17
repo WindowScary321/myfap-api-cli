@@ -154,7 +154,7 @@ Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; n
 
 ### Xuất JSON hoặc ICS qua stdout
 
-Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. Log và lỗi đi qua stderr; lỗi trả exit code khác 0.
+Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. JSON được ghi ra stdout bằng UTF-8, giữ nguyên dấu tiếng Việt kể cả khi text encoding của stdout là `cp1252`. ICS giữ nguyên byte và CRLF. Log và lỗi đi qua stderr; lỗi trả exit code khác 0.
 
 ```sh
 myfap schedule --stdout > schedule.json

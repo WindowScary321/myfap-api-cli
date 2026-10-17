@@ -1,0 +1,54 @@
+import io
+import json
+import os
+import subprocess
+import sys
+import unittest
+from contextlib import redirect_stdout
+
+from myfap.cli import save_output
+
+
+class JSONOutputTests(unittest.TestCase):
+    def setUp(self):
+        self.payload = {"code": 200, "data": [{"title": "Thông báo học vụ", "course": "Lập trình cơ bản", "note": "Thử nghiệm 📚"}]}
+
+    def test_json_stdout_uses_utf8_independent_of_text_encoding_and_newline(self):
+        expected = (json.dumps(self.payload, ensure_ascii=False, indent=4) + "\n").encode("utf-8")
+        for encoding in ("cp1252", "utf-8"):
+            for newline in ("\n", "\r\n"):
+                with self.subTest(encoding=encoding, newline=newline):
+                    buffer = io.BytesIO()
+                    with io.TextIOWrapper(buffer, encoding=encoding, newline=newline) as output:
+                        with redirect_stdout(output):
+                            save_output(self.payload, "unused.json", None, True)
+                        output.flush()
+                        raw = buffer.getvalue()
+                    self.assertEqual(raw, expected)
+                    self.assertEqual(json.loads(raw.decode("utf-8")), self.payload)
+
+    def test_json_stdout_supports_text_only_streams(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            save_output(self.payload, "unused.json", None, True)
+        self.assertEqual(output.getvalue(), json.dumps(self.payload, ensure_ascii=False, indent=4) + "\n")
+
+    def test_cli_json_stdout_is_utf8_when_child_process_uses_cp1252(self):
+        code = f"""
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+from myfap.cli import app
+
+auth = SimpleNamespace(campus="TEST", api_version="v1", load_session=Mock(return_value=True), resolve_api_version=Mock(return_value="v1"))
+with patch("myfap.cli.get_auth", return_value=auth), patch("myfap.cli.MyFapClient") as client:
+    client.return_value.get_student_info.return_value = {self.payload!r}
+    app()
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code, "info", "student", "--stdout"],
+            env={**os.environ, "PYTHONIOENCODING": "cp1252:strict", "PYTHONUTF8": "0"},
+            capture_output=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout.decode("utf-8")), self.payload)
+        self.assertEqual(result.stderr, b"")
