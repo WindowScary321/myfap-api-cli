@@ -17,6 +17,10 @@ Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại.
 
 Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứng v2 trả `HN` cho Cơ sở Hà Nội và không có `APHL`; handshake với `APHL` trả body 401, còn `HN` đã login thành công với tài khoản được cho phép. CLI không tự quy đổi mã campus. `HN` trong ví dụ là lựa chọn rõ ràng; campus mặc định của session mới vẫn là `APHL`, nên cần chọn mã đúng khi đăng nhập v2.
 
+`login --force` mở lại luồng đăng nhập nhưng vẫn kế thừa campus trong file session nếu không có `--campus`. Vì vậy, `myfap --api-version v2 login -f` có thể gửi mã campus của v1 sang proxy v2. Với Hà Nội, chỉ định `--campus HN` như ví dụ trên; dùng `--config` riêng nếu muốn giữ session v1. Thư mục đang chạy lệnh và branch Git không quyết định campus.
+
+Nếu FEID cấp token nhưng handshake FAP bị từ chối, CLI hướng dẫn kiểm tra campus theo version. Thông báo này chưa chứng minh token hết hạn hoặc campus chắc chắn là nguyên nhân; cần kiểm tra lại mã campus trước khi đăng nhập lặp lại.
+
 ## Phạm vi Phase 3
 
 | Chức năng | API v2 |

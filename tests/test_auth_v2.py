@@ -211,6 +211,28 @@ class AuthV2Tests(unittest.TestCase):
                 self.assertEqual(auth.session.request.call_count, int(expected == "v2"))
                 self.assertEqual(auth.session.post.call_count, int(expected == "v1"))
 
+    def test_fresh_login_handshake_rejection_explains_version_and_campus_choice(self):
+        auth = self.target("v2")
+        oidc = Mock()
+        oidc.begin_login.return_value = {"nonce": "fake-new-nonce", "code_verifier": "fake-verifier"}
+        oidc.request_token.return_value = {"access_token": "fake-new-access", "refresh_token": "fake-new-refresh"}
+        oidc.validate_tokens.return_value = {"sub": "fake-new-subject"}
+        auth._authorize = Mock(return_value="fake-code")
+        auth.session.request.return_value = response({"code": 401, "data": None})
+        before = self.path.read_bytes()
+
+        with patch.object(auth, "_oidc", return_value=oidc):
+            with self.assertRaises(module.AuthError) as caught:
+                auth.login()
+
+        message = str(caught.exception).lower()
+        self.assertIn("v2", message)
+        self.assertIn("--campus", message)
+        self.assertIn("campuses", message)
+        self.assertNotIn("hết hạn", message)
+        self.assertEqual(auth.session.request.call_args.kwargs["headers"]["CampusCode"], "TEST")
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_v2_refresh_persists_rotation_before_validation_and_handshake(self):
         saved = self.stored()
         saved["api_version"] = "v2"

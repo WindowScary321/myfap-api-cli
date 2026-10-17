@@ -382,7 +382,14 @@ class MyFapAuth:
                 self._oidc_validated = True
                 self._binding = None
                 self.mssv = self.email = None
-                self._handshake()
+                try:
+                    self._handshake()
+                except ApiSessionExpiredError:
+                    raise AuthError(
+                        f"FEID đã cấp token nhưng FAP từ chối handshake API {self.api_version}. "
+                        f"Kiểm tra mã campus bằng 'myfap --api-version {self.api_version} campuses', "
+                        "rồi đăng nhập với '--campus <mã-campus>'. Mã campus có thể khác giữa v1 và v2."
+                    ) from None
                 self.store.write(self._snapshot())
                 return self.authen_key, self.mssv
         except OAuthError as error:
