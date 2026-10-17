@@ -18,7 +18,7 @@ Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại.
 
 Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứng v2 trả `HN` cho Cơ sở Hà Nội và không có `APHL`; handshake với `APHL` trả body 401, còn `HN` đã login thành công với tài khoản được cho phép. CLI không tự quy đổi mã campus. V1 vẫn có mặc định `APHL`; login v2 yêu cầu `--campus` nếu profile mới hoặc session cũ chỉ có `APHL`.
 
-`login --force` mở lại luồng đăng nhập nhưng vẫn kế thừa campus trong file session nếu không có `--campus`. Khi chọn v2, CLI chặn trường hợp campus kế thừa là mặc định `APHL` thay vì gửi request handshake sai. Với Hà Nội, chỉ định `--campus HN` như ví dụ trên; dùng `--config` riêng nếu muốn giữ session v1. Thư mục đang chạy lệnh và branch Git không quyết định campus.
+`login --force` mở lại luồng đăng nhập nhưng vẫn kế thừa campus trong file session nếu không có `--campus`. Khi dùng v2 mà không chỉ định campus, CLI chặn `APHL` trước khi mở trình duyệt, handshake hoặc refresh, kể cả với `login` không có `--force`. Session đã lưu mã khác `APHL` vẫn được kế thừa. Với Hà Nội, chỉ định `--campus HN` như ví dụ trên; dùng `--config` riêng nếu muốn giữ session v1. Thư mục đang chạy lệnh và branch Git không quyết định campus.
 
 Nếu FEID cấp token nhưng handshake FAP bị từ chối, CLI hướng dẫn kiểm tra campus theo version. Thông báo này chưa chứng minh token hết hạn hoặc campus chắc chắn là nguyên nhân; cần kiểm tra lại mã campus trước khi đăng nhập lặp lại.
 

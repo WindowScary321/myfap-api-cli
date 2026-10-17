@@ -141,6 +141,11 @@ class MyFapAuth:
             raise SessionBindingError("API version chưa được hỗ trợ.")
         if self.account_type != "student":
             raise SessionBindingError("Luồng FEID hiện chỉ hỗ trợ tài khoản student.")
+        if self.api_version == "v2" and self._requested[0] is None and self.campus == "APHL":
+            raise SessionBindingError(
+                "Đăng nhập API v2 cần mã campus rõ ràng. "
+                "Hãy chạy 'myfap --api-version v2 campuses' rồi đăng nhập với '--campus <mã-campus>'."
+            )
 
     def load_session(self):
         try:
@@ -362,15 +367,8 @@ class MyFapAuth:
                     existing = None
                 stored_campus = existing.get("campus") if existing is not None else None
                 stored_version = existing.get("api_version", "v1") if existing is not None else "v1"
-                selected_campus = self._requested[0] or (stored_campus if _text(stored_campus) else "APHL")
-                selected_version = self._requested[1] or (stored_version if stored_version in ("v1", "v2") else "v1")
-                if selected_version == "v2" and self._requested[0] is None and selected_campus == "APHL":
-                    raise AuthError(
-                        "Đăng nhập API v2 cần mã campus rõ ràng. "
-                        "Hãy chạy 'myfap --api-version v2 campuses' rồi đăng nhập với '--campus <mã-campus>'."
-                    )
-                self.campus = selected_campus
-                self.api_version = selected_version
+                self.campus = self._requested[0] or (stored_campus if _text(stored_campus) else "APHL")
+                self.api_version = self._requested[1] or (stored_version if stored_version in ("v1", "v2") else "v1")
                 self.account_type = self._requested[2] or "student"
             self._check_supported()
             oidc = self._oidc()

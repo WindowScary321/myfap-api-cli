@@ -158,7 +158,7 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 
 @app.callback()
 def main(
-    campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; mặc định dùng session hoặc APHL khi login mới"),
+    campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; dùng session, APHL chỉ mặc định cho v1"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
     timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
     api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn API v1 hoặc v2; mặc định dùng session rồi v1", metavar="[v1|v2]"),
@@ -180,7 +180,7 @@ def version():
 
 @app.command()
 def login(
-    campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở (VD: APHL, HCM, DN)"),
+    campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở theo API version; ví dụ APHL (v1), HN (v2)"),
     force: bool = typer.Option(False, "--force", "-f", help="Bắt buộc đăng nhập lại từ đầu (mở trình duyệt)")
 ):
     """Đăng nhập vào hệ thống FEID"""

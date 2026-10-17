@@ -18,7 +18,7 @@ Các claim thời gian `exp`, `iat` và `nbf` của ID token có leeway 30 giây
 
 Khi session cần đăng nhập lại hoặc binding cũ không được hỗ trợ, `myfap login` tự mở trình duyệt nên không cần chạy lại với `--force`. Login mới kế thừa campus và API version đã lưu nếu bạn không chỉ định option tương ứng; luồng FEID hiện hỗ trợ tài khoản student trên v1 và v2 trong phạm vi adapter của từng version. Binding và credential cũ chỉ được thay sau khi login thành công.
 
-CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` cho login v1 mới. Login v2 không tự dùng `APHL`; nếu chưa có campus v2 rõ ràng, CLI yêu cầu `--campus`. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
+CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` cho login v1 mới. Với v2, profile mới hoặc session lưu `APHL` cần chỉ định `--campus`. CLI kiểm tra trước khi mở trình duyệt, handshake hoặc refresh; `login` có và không có `--force` đều áp dụng quy tắc này. Session lưu mã khác `APHL` vẫn được kế thừa. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
 
 ```sh
 myfap --campus APHL login --force

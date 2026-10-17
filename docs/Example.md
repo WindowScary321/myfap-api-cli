@@ -14,7 +14,7 @@
     CLI Tool dựa trên MyFAP dành cho Sinh Viên FPTU
 
   Options:
-    -c, --campus TEXT  Mã cơ sở (VD: APHL, HCM, DN)  [default: APHL]
+    -c, --campus TEXT  Mã cơ sở; dùng session, APHL chỉ mặc định cho v1
     --config TEXT      Đường dẫn file session tùy chỉnh (thay vì mặc định
                       ~/.myfap-api-cli/session.json)
     --timeout SECONDS  Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
