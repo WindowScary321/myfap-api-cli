@@ -38,6 +38,39 @@ class MarksParserTests(unittest.TestCase):
     def test_missing_table_returns_empty_list(self):
         self.assertEqual(parse_marks_html("<p>No marks</p>"), [])
 
+    def test_three_data_columns_preserve_item_weight_and_value(self):
+        html = """
+        <table>
+          <tr><th>Category</th><th>Item</th><th>Weight</th><th>Value</th></tr>
+          <tr><td rowspan="2">Quiz</td><td>Q1</td><td>10%</td><td>8</td></tr>
+          <tr><td>Q2</td><td>20%</td><td>7</td></tr>
+          <tr><td>Final</td><td>FE</td><td>70%</td><td>9</td></tr>
+        </table>
+        """
+
+        self.assertEqual(parse_marks_html(html), [
+            {"category": "Quiz", "item": "Q1", "weight": "10%", "value": "8"},
+            {"category": "Quiz", "item": "Q2", "weight": "20%", "value": "7"},
+            {"category": "Final", "item": "FE", "weight": "70%", "value": "9"},
+        ])
+
+    def test_three_columns_without_category_keep_all_values(self):
+        html = """
+        <table>
+          <tr><th>Item</th><th>Weight</th><th>Value</th></tr>
+          <tr><td>Q1</td><td>10%</td><td>8</td></tr>
+        </table>
+        """
+
+        self.assertEqual(parse_marks_html(html), [
+            {"category": "", "item": "Q1", "weight": "10%", "value": "8"},
+        ])
+
+    def test_legacy_three_columns_with_category_are_preserved(self):
+        html = "<table><tr><td>Final</td><td>FE</td><td>7.3</td></tr></table>"
+
+        self.assertEqual(parse_marks_html(html), [{"category": "Final", "item": "FE", "value": "7.3"}])
+
 
 class ScheduleParserTests(unittest.TestCase):
     def test_saved_ics_keeps_line_endings_for_independent_reader(self):
@@ -143,6 +176,15 @@ class ScheduleParserTests(unittest.TestCase):
 
                 with self.assertRaises(ValueError):
                     convert_schedule_to_ics(data)
+
+    def test_slot_time_allows_spaces_around_separator_and_parentheses(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        for slot in ("(7:30 - 9:50)", "( 7:30-9:50 )", "( 7:30 - 9:50 )", "  (7:30 - 9:50)  ", " 7:30 - 9:50 "):
+            with self.subTest(slot=slot):
+                data["data"][0]["slotTime"] = slot
+                event = next(iter(Calendar(convert_schedule_to_ics(data)).events))
+                self.assertEqual(event.begin.datetime, datetime(2026, 10, 15, 0, 30, tzinfo=timezone.utc))
+                self.assertEqual(event.end.datetime, datetime(2026, 10, 15, 2, 50, tzinfo=timezone.utc))
 
 
 if __name__ == "__main__":

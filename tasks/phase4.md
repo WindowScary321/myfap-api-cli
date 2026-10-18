@@ -29,7 +29,9 @@ Không thêm transcript, balance, ảnh, news search, GetVersion, form feedback 
 
 Hai mục live còn mở: lần chạy lại `news`, `notification`, `fee` của v1 chưa nhận callback đăng nhập; positive fee/survey chưa được xác nhận với dữ liệu nghiệp vụ phù hợp. Fee v2 trả HTTP/body 200 chưa đủ để kết luận positive case, còn survey trả body 404. Các ô đã đánh dấu không có nghĩa toàn bộ Phase 4 đã hoàn tất.
 
-Rà soát độc lập bổ sung xác nhận parser điểm còn lỗi khi có ba cột dữ liệu và không có cột ghi chú: hàng trong `rowspan` mất các trường điểm; hàng ba `<td>` độc lập bị gán sai category/item và thiếu weight. Mới tái hiện bằng HTML tổng hợp, chưa có bằng chứng live cho cấu trúc này. Parser chưa được sửa trong lượt cập nhật stdout và checklist.
+Parser điểm đã được sửa cho cấu trúc ba cột `Item`, `Weight`, `Value` khi không có cột ghi chú, gồm cả dòng đầu tiên và dòng tiếp theo trong `rowspan`. Hàng ba `<td>` theo fallback category/item/value cũ vẫn được giữ để tránh thay đổi output tương thích.
+
+Xuất ICS cũng đã xử lý khoảng trắng quanh dấu `-` và dấu ngoặc trong `slotTime`; regression xác nhận giờ bắt đầu/kết thúc không thay đổi. Hai lỗi parser được tái hiện và kiểm thử bằng dữ liệu tổng hợp, chưa dùng dữ liệu tài khoản thật trong lượt sửa này.
 
 Các bản sửa bổ sung xử lý bảng Rich trên stdout `cp1252`, cho `login` tự phục hồi session sai cấu trúc và thêm nhóm dependency `ci` vào hai bước sync/test của workflow publish. Việc này sửa lỗi thiếu `icalendar` trên runner sạch; pipeline tag → reusable CI → publish → smoke → GitHub Release của Phase 5 vẫn chưa được triển khai. Không chạy publish hoặc thay đổi trigger release trong lượt sửa này.
 
