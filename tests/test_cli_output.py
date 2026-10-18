@@ -52,3 +52,28 @@ with patch("myfap.cli.get_auth", return_value=auth), patch("myfap.cli.MyFapClien
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout.decode("utf-8")), self.payload)
         self.assertEqual(result.stderr, b"")
+
+
+class TableOutputTests(unittest.TestCase):
+    def test_cli_tables_use_utf8_when_child_process_uses_cp1252(self):
+        code = """
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+from myfap.cli import app
+
+auth = SimpleNamespace(campus="HN", load_session=Mock(return_value=True), resolve_api_version=Mock(return_value="v1"))
+with patch("myfap.cli.get_auth", return_value=auth), patch("myfap.cli.MyFapEssential") as essential:
+    essential.return_value.get_campuses.return_value = [{"campusName": "Cơ sở Hà Nội", "campusCode": "HN"}]
+    essential.return_value.get_semesters.return_value = [{"semesterName": "Học kỳ mùa thu"}]
+    app()
+"""
+        for command, expected in (("campuses", "Cơ sở Hà Nội"), ("semesters", "Học kỳ mùa thu")):
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, "-c", code, command],
+                    env={**os.environ, "PYTHONIOENCODING": "cp1252:strict", "PYTHONUTF8": "0"},
+                    capture_output=True, timeout=20,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(expected, result.stdout.decode("utf-8"))
+                self.assertEqual(result.stderr, b"")

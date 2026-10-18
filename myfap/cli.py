@@ -158,6 +158,13 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
         raise typer.Exit(code=1)
 
 
+def print_table(table):
+    """Render Rich tables through the UTF-8 stdout writer."""
+    with console.capture() as captured:
+        console.print(table)
+    save_output(captured.get(), "unused.txt", None, True, is_text=True)
+
+
 @app.callback()
 def main(
     campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; dùng session, APHL chỉ mặc định cho v1"),
@@ -250,7 +257,7 @@ def campuses():
         for c in data:
             table.add_row(c.get('campusName', ''), c.get('campusCode', ''))
         
-        console.print(table)
+        print_table(table)
     except Exception as e:
         err_console.print(f"[red]Lỗi lấy danh sách cơ sở: {e}[/red]", style="red")
         raise typer.Exit(code=1)
@@ -270,7 +277,7 @@ def semesters():
         for s in data:
             table.add_row(s.get('semesterName', ''))
             
-        console.print(table)
+        print_table(table)
     except Exception as e:
         err_console.print(f"[red]Lỗi lấy danh sách kỳ học: {e}[/red]")
         raise typer.Exit(code=1)

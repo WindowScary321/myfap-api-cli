@@ -37,7 +37,7 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 - Contract fixture cho method, path, query, header, credential, lỗi JSON/HTTP, empty/not-found, refresh retry và App Check.
 - CLI fixture cho command v2, lựa chọn kỳ, `--stdout`, ICS, survey riêng, capability và lỗi trước HTTP.
 - Mutation check: bỏ ánh xạ `getCourseAttendance` làm test capability/transport thất bại.
-- Bộ test hiện có 299 test trên Python 3.11 Windows: 295 đạt, 4 skip theo điều kiện môi trường. Regression stdout kiểm tra JSON tiếng Việt/emoji trên stream `cp1252`, stream chỉ hỗ trợ text và tiến trình CLI riêng bị ép `PYTHONIOENCODING=cp1252:strict`; byte output được đọc lại bằng UTF-8. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
+- Bộ test hiện có 302 test trên Python 3.11 Windows: 298 đạt, 4 skip theo điều kiện môi trường. Regression stdout kiểm tra JSON tiếng Việt/emoji và hai bảng Rich trên tiến trình CLI riêng bị ép `PYTHONIOENCODING=cp1252:strict`; byte output được đọc lại bằng UTF-8. Stream chỉ hỗ trợ text vẫn có test riêng. Regression login kiểm tra session sai cấu trúc mở lại browser, giữ nội dung cũ khi hủy và không mở browser lại khi gặp lỗi mạng. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
 
 ## Giới hạn còn lại
 

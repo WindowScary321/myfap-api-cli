@@ -156,6 +156,8 @@ Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; n
 
 Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. JSON được ghi ra stdout bằng UTF-8, giữ nguyên dấu tiếng Việt kể cả khi text encoding của stdout là `cp1252`. ICS giữ nguyên byte và CRLF. Log và lỗi đi qua stderr; lỗi trả exit code khác 0.
 
+Hai bảng `campuses` và `semesters` cũng xuất qua UTF-8 để giữ tên cơ sở, kỳ học có dấu khi stdout dùng `cp1252`. Các lệnh này vẫn hiển thị bảng, không đổi sang JSON.
+
 ```sh
 myfap schedule --stdout > schedule.json
 myfap schedule --ics --stdout > schedule.ics

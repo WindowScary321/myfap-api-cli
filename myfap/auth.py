@@ -91,17 +91,17 @@ class MyFapAuth:
 
     def _restore(self, data):
         if not isinstance(data, dict):
-            raise AuthError("Session không hợp lệ. Hãy đăng nhập lại.")
+            raise SessionBindingError("Session không hợp lệ. Hãy đăng nhập lại.")
         campus, version, account = data.get("campus"), data.get("api_version", "v1"), data.get("account_type", "student")
         if not _text(campus) or version not in ("v1", "v2") or not _text(account):
-            raise AuthError("Session thiếu binding hợp lệ. Hãy chạy 'myfap login -f'.")
+            raise SessionBindingError("Session thiếu binding hợp lệ. Hãy chạy 'myfap login -f'.")
         for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):
             value = data.get(field)
             if value is not None and not _text(value):
-                raise AuthError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
+                raise SessionBindingError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
         subject, nonce = data.get("oidc_subject"), data.get("oidc_nonce")
         if any(value is not None and not _text(value) for value in (subject, nonce)):
-            raise AuthError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
+            raise SessionBindingError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
         self._binding = (campus, version, account)
         self.campus, self.api_version, self.account_type = tuple(requested if requested is not None else stored for requested, stored in zip(self._requested, self._binding))
         for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):

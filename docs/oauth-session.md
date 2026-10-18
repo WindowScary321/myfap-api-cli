@@ -14,7 +14,7 @@ CLI mở Chrome, Edge hoặc Firefox để đăng nhập FEID. Mỗi lần đăn
 
 Các claim thời gian `exp`, `iat` và `nbf` của ID token có leeway 30 giây để chịu được lệch đồng hồ nhỏ. Token thiếu `exp`, có thời gian sai kiểu hoặc giá trị không hữu hạn vẫn bị từ chối. Leeway không bỏ qua kiểm tra chữ ký, issuer, audience, subject, nonce hay `at_hash`.
 
-`--force` mở lại trình duyệt kể cả khi đã có session. Nếu file JSON hỏng hoặc thiếu trường bắt buộc, đăng nhập thành công sẽ thay file đó. Khi đăng nhập thất bại, file cũ được giữ nguyên. Lỗi quyền truy cập hoặc đường dẫn không an toàn vẫn bị chặn.
+`myfap login` tự mở lại trình duyệt khi file session hỏng JSON hoặc có cấu trúc sai, như thiếu campus hay API version không hợp lệ. `--force` mở lại trình duyệt kể cả khi đã có session dùng được. File cũ chỉ được thay sau khi đăng nhập thành công; nếu hủy hoặc handshake thất bại, nội dung cũ được giữ nguyên. Lỗi mạng, quyền truy cập hoặc đường dẫn không an toàn vẫn được báo, không bị coi là lỗi cấu trúc session.
 
 Khi session cần đăng nhập lại hoặc binding cũ không được hỗ trợ, `myfap login` tự mở trình duyệt nên không cần chạy lại với `--force`. Login mới kế thừa campus và API version đã lưu nếu bạn không chỉ định option tương ứng; luồng FEID hiện hỗ trợ tài khoản student trên v1 và v2 trong phạm vi adapter của từng version. Binding và credential cũ chỉ được thay sau khi login thành công.
 
