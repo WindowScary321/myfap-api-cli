@@ -8,13 +8,13 @@ Clone this shit
 ```sh
 git clone https://github.com/WindowScary321/myfap-api-cli.git
 cd myfap-api-cli
-uv sync --locked
+uv sync --locked --group ci
 ```
 Test các chức năng cơ bản
 ```sh
 uv run myfap --help
 uv run myfap version
-uv run python -m unittest discover -s tests -v
+uv run --locked --group ci python -m unittest discover -s tests -v
 uv build
 ```
 
