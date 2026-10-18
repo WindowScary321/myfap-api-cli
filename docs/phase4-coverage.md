@@ -1,25 +1,25 @@
 # Coverage Phase 4
 
-Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫn là mặc định. Bảng dưới đây tách kết quả test fixture, request quan sát trong Fiddler và kiểm chứng live trước đó; một route được đánh dấu capture không có nghĩa command CLI đã chạy live với cùng session.
+Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫn là mặc định. Bảng dưới đây phân biệt fixture, capture và kết quả smoke live v2 trên HN đã ghi ở phần cuối tài liệu. HTTP/body 200 không tự xác nhận payload có dữ liệu nghiệp vụ; positive fee/survey vẫn còn trong [TODO live](../tasks/todo.md#kiểm-chứng-live-còn-mở-trước-khi-phát-hành). Trạng thái operation đã triển khai nằm trong [ma trận route v2](v2-contracts.md#ma-trận-route-v2).
 
 | Nhóm command | Operation v1 | Operation v2 | Trạng thái sau Phase 4 |
 |---|---|---|---|
 | Lịch học | `GetActivityStudent` | `GetActivityStudent` | Fixture v1/v2; live v1 và live v2 schedule đã có từ Phase 1/3 |
-| Lịch tuần | `GetActivityStudentByWeek` | `GetActivityStudentByWeek` | Fixture; v1 live trước đó, v2 cần live smoke riêng |
-| Điểm tổng hợp | `GetStudentMark` | `GetStudentMark` | Fixture; v1 live trước đó, v2 cần live smoke riêng |
+| Lịch tuần | `GetActivityStudentByWeek` | `GetActivityStudentByWeek` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
+| Điểm tổng hợp | `GetStudentMark` | `GetStudentMark` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
 | Điểm chi tiết | `GetMarkByCourse` | `GetMarkByCourse` | Fixture; tham số `CourseId` giữ nguyên dạng opaque |
-| Lịch thi | `GetScheduleExam` | `GetScheduleExam` | Fixture; v2 có route trong capture, chưa kết luận live CLI |
-| Điểm danh tổng quát | `GetStudentAttendances` | `GetStudentAttendances` | Fixture; v2 có route trong capture, chưa kết luận live CLI |
+| Lịch thi | `GetScheduleExam` | `GetScheduleExam` | Fixture/capture; smoke v2 HN HTTP/body 200 |
+| Điểm danh tổng quát | `GetStudentAttendances` | `GetStudentAttendances` | Fixture/capture; smoke v2 HN HTTP/body 200 |
 | Điểm danh chi tiết | `getCourseAttendance` | `GetCourseAttendance` | Fixture; v2 đổi đúng tên route và giữ `SubjectCode`/`ClassName` |
-| Đơn từ | `GetApplication` | `GetApplication` | Fixture; query `Authen` được dựng lại sau refresh |
-| Tin tức | `GetTop10News` | `GetTop10News` | V1 live trước đó trả body `201`, chưa đóng finding; v2 fixture/capture |
-| Thông tin sinh viên | `GetStudentById` | `GetStudentById` | Fixture; v1 live trước đó |
-| Thông tin campus | `GetCampusInfo` | `GetCampusInfo` | Fixture; v1 live trước đó |
-| Survey | Survey service riêng | Survey service riêng | Giữ contract riêng; not-found chưa phải positive success |
-| Học phí | `GeFeeByRoll` | `GeFeeByRoll` | V1 live trước đó trả HTTP 404; v2 fixture/capture, chưa kết luận capability đầy đủ |
-| Môn học | `GetSubjets` | `GetSubjets` | Fixture; v2 route đọc có strict query |
-| Feedback/profile | `CheckOpenFeedBack`, `CheckUpdateProfile` | Cùng operation | Fixture; query `Authen` được dựng lại sau refresh |
-| Thông báo | `GetNotificationByRoll` | `GetNotificationByRoll` | V1 live trước đó trả body `201`, chưa đóng finding; v2 fixture/capture |
+| Đơn từ | `GetApplication` | `GetApplication` | Fixture query `Authen` mới sau refresh; smoke v2 HN HTTP/body 200 |
+| Tin tức | `GetTop10News` | `GetTop10News` | Finding v1 body `201` vẫn mở; smoke v2 HN HTTP/body 200 |
+| Thông tin sinh viên | `GetStudentById` | `GetStudentById` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
+| Thông tin campus | `GetCampusInfo` | `GetCampusInfo` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
+| Survey | Survey service riêng | Survey service riêng | Live HTTP 200/body 404 qua dịch vụ survey; positive case chưa xác nhận |
+| Học phí | `GeFeeByRoll` | `GeFeeByRoll` | Finding v1 HTTP 404 vẫn mở; v2 HN HTTP/body 200; positive payload chưa xác nhận |
+| Môn học | `GetSubjets` | `GetSubjets` | Fixture strict query; smoke v2 HN HTTP/body 200 |
+| Feedback/profile | `CheckOpenFeedBack`, `CheckUpdateProfile` | Cùng operation | Fixture query `Authen` mới sau refresh; smoke v2 HN HTTP/body 200 |
+| Thông báo | `GetNotificationByRoll` | `GetNotificationByRoll` | Finding v1 body `201` vẫn mở; smoke v2 HN HTTP/body 200 |
 
 ## Quy tắc transport
 
