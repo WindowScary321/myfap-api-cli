@@ -73,7 +73,7 @@ def parse_marks_html(html_str: str):
 
     return result
 
-from datetime import datetime
+from datetime import datetime, timezone
 import pytz
 from ics import Calendar, Event
 
@@ -103,7 +103,7 @@ def convert_schedule_to_ics(data: dict) -> str:
         end_dt = tz.localize(datetime.strptime(f"{date_str} {end_time_str}", "%m/%d/%Y %H:%M"))
         
         # Create event
-        e = Event()
+        e = Event(created=datetime.now(timezone.utc))
         
         # Title
         title = session['subjectCode']

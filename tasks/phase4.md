@@ -35,6 +35,8 @@ Xuất ICS cũng đã xử lý khoảng trắng quanh dấu `-` và dấu ngoặ
 
 Các bản sửa bổ sung xử lý bảng Rich trên stdout `cp1252`, cho `login` tự phục hồi session sai cấu trúc và thêm nhóm dependency `ci` vào hai bước sync/test của workflow publish. Việc này sửa lỗi thiếu `icalendar` trên runner sạch; pipeline tag → reusable CI → publish → smoke → GitHub Release của Phase 5 vẫn chưa được triển khai. Không chạy publish hoặc thay đổi trigger release trong lượt sửa này.
 
+Sau bàn giao 19/10/2026, đã sửa thêm refresh `invalid_grant` không đánh dấu cần đăng nhập lại, student session thiếu `mssv`/`email`, help trên stdout `cp1252` và ICS thiếu `DTSTAMP`. Bộ test có 313 case; các nhánh lỗi session dùng fixture. Live v2/HN đã xác nhận login, refresh, đọc dữ liệu và ICS có đủ `UID`/`DTSTAMP` UTC, sau đó dọn session/lock tạm. Xem [kết quả sau sửa](../docs/phase4-coverage.md#kiểm-chứng-sau-bàn-giao-ngày-19102026); không dùng kết quả này đóng các TODO live v1 hoặc positive fee/survey.
+
 ## Quy tắc dữ liệu và thiết bị
 
 Fiddler và Android chỉ phục vụ đối chiếu luồng đọc đã được cho phép. Dữ liệu request/response hoặc màn hình được xử lý cục bộ; chỉ tên operation, method, HTTP/body code, kiểu dữ liệu và kết quả kiểm tra được xuất ra. Không replay token từ capture, không đọc hoặc in token bằng tool, không gửi dữ liệu cá nhân ra ngoài PC. Không thay proxy, certificate, quyền truy cập hoặc dữ liệu tài khoản nếu không cần cho phép thử.

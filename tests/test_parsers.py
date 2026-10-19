@@ -75,12 +75,14 @@ class MarksParserTests(unittest.TestCase):
 class ScheduleParserTests(unittest.TestCase):
     def test_saved_ics_keeps_line_endings_for_independent_reader(self):
         data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["roomNo"] = "Phòng thử nghiệm"
 
         with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
             save_output(convert_schedule_to_ics(data), "schedule.ics", temporary, False, is_text=True)
             content = (Path(temporary) / "schedule.ics").read_bytes()
 
         self.assertNotIn(b"\r\r\n", content)
+        self.assertIn("Phòng thử nghiệm".encode("utf-8"), content)
         self.assertEqual(len(IndependentCalendar.from_ical(content).walk("VEVENT")), 1)
 
     def test_stdout_ics_keeps_line_endings_for_independent_reader(self):
@@ -119,6 +121,13 @@ class ScheduleParserTests(unittest.TestCase):
         self.assertEqual(len(events), 250)
         self.assertEqual(len({str(event["UID"]) for event in events}), 250)
         for event in events:
+            properties = [name for name, _ in event.property_items()]
+            self.assertEqual(properties.count("UID"), 1)
+            self.assertEqual(properties.count("DTSTAMP"), 1)
+            dtstamp = event.decoded("DTSTAMP")
+            self.assertIsInstance(dtstamp, datetime)
+            self.assertEqual(dtstamp.utcoffset(), timedelta(0))
+            self.assertRegex(event["DTSTAMP"].to_ical().decode("ascii"), r"^\d{8}T\d{6}Z$")
             index = int(str(event["SUMMARY"])[4:])
             day = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(days=index)
             self.assertEqual(event.decoded("DTSTART"), day.replace(hour=0, minute=30))

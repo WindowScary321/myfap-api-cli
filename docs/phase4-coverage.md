@@ -37,7 +37,7 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 - Contract fixture cho method, path, query, header, credential, lỗi JSON/HTTP, empty/not-found, refresh retry và App Check.
 - CLI fixture cho command v2, lựa chọn kỳ, `--stdout`, ICS, survey riêng, capability và lỗi trước HTTP.
 - Mutation check: bỏ ánh xạ `getCourseAttendance` làm test capability/transport thất bại.
-- Bộ test hiện có 306 test trên Python 3.11 Windows: 302 đạt, 4 skip theo điều kiện môi trường. Regression stdout kiểm tra JSON tiếng Việt/emoji và hai bảng Rich trên tiến trình CLI riêng bị ép `PYTHONIOENCODING=cp1252:strict`; byte output được đọc lại bằng UTF-8. Stream chỉ hỗ trợ text vẫn có test riêng. Regression login kiểm tra session sai cấu trúc mở lại browser, giữ nội dung cũ khi hủy và không mở browser lại khi gặp lỗi mạng. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
+- Bộ test hiện có 313 test trên Python 3.11 Windows: 309 đạt, 4 skip theo điều kiện môi trường. Regression stdout kiểm tra JSON tiếng Việt/emoji, hai bảng Rich và help root/nhóm/lệnh con trên tiến trình CLI riêng bị ép `PYTHONIOENCODING=cp1252:strict`; byte output được đọc lại bằng UTF-8. Help thuần text và stdout UTF-8 cũng được kiểm tra. Regression session phủ `invalid_grant`, thiếu identity, legacy hợp lệ, bảo toàn file khi hủy và lỗi mạng/storage. Matrix Python 3.9/3.11 và Ubuntu/Windows, build, Twine, artifact validator và pip smoke chạy lại trong CI của PR.
 
 - Regression parser giữ đủ `item`, `weight`, `value` khi thiếu cột ghi chú, nhận diện bảng `Item/Weight/Value` không có category và giữ fallback cũ. ICS chấp nhận khoảng trắng quanh dấu `-`, trong hoặc ngoài dấu ngoặc; thời gian sự kiện vẫn đúng múi giờ Việt Nam.
 
@@ -54,3 +54,12 @@ Lượt smoke v2 sau đó đã login và chạy thật trên campus HN: semester
 Lượt smoke v1 để đóng lại `news`, `notification` và `fee` không nhận callback đăng nhập nên chưa có kết quả mới. Các finding v1 trước đó vẫn mở: news/notification body `201`, fee HTTP 404. Kết quả v2 thành công không được dùng để thay cho kiểm chứng v1.
 
 ICS được kiểm tra bằng dữ liệu tổng hợp với reader `icalendar` độc lập: 250 sự kiện giữ đúng DTSTART/DTEND theo múi giờ Việt Nam. File và stdout giữ nguyên byte CRLF trên cả stream mô phỏng Unix và Windows. Reader `ics` hiện tại gặp giới hạn recursion ở lịch lớn với recursion limit mặc định; runtime không tăng giới hạn để che lỗi. Khả năng import vào ứng dụng lịch thực tế vẫn cần kiểm chứng riêng.
+
+## Kiểm chứng sau bàn giao ngày 19/10/2026
+
+- Đã sửa session không phục hồi sau refresh `invalid_grant` và session student thiếu identity. Fixture chạy chuỗi CLI v1/v2 với Requests/OIDC thật trong process, chỉ thay HTTP bằng response tổng hợp; lỗi mạng/storage không bị gộp vào lỗi hết phiên.
+- Help root, nhóm và lệnh con giữ nội dung tiếng Việt dưới `cp1252` và UTF-8. Kiểm tra cả Rich lẫn help thuần text; help không nạp session hoặc gọi API.
+- Mỗi VEVENT có đúng một `UID` và một `DTSTAMP` UTC hợp lệ. Reader độc lập kiểm mọi sự kiện trong lịch tổng hợp 250 sự kiện và ICS live; DTSTART/DTEND, UTF-8 và CRLF vẫn được giữ.
+- Login, handshake, refresh và đọc sau refresh đã chạy live trên v2/HN bằng session tạm. Các lệnh `info student`, `schedule --ics`, `marks`, `exams`, `attendance`, `applications`, `news`, `info campus`, fee, subjects, notification, feedback và profile đều exit 0, HTTP/body 200. Survey exit 0 với HTTP 200/body 404; positive case vẫn chưa xác nhận.
+
+Không thay response trong lượt live. Hai nhánh lỗi session được kiểm chứng bằng regression offline, chưa được gây lại trên tài khoản thật. Không lưu payload học vụ hoặc credential vào repo; session và lock tạm đã được dọn. Các finding v1 và positive fee/survey trong TODO vẫn mở.
