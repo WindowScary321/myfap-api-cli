@@ -99,6 +99,8 @@ class MyFapAuth:
             value = data.get(field)
             if value is not None and not _text(value):
                 raise SessionBindingError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
+        if account == "student" and any(not _text(data.get(field)) for field in ("mssv", "email")):
+            raise SessionBindingError("Session thiếu identity sinh viên hợp lệ. Hãy đăng nhập lại.")
         subject, nonce = data.get("oidc_subject"), data.get("oidc_nonce")
         if any(value is not None and not _text(value) for value in (subject, nonce)):
             raise SessionBindingError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
@@ -255,7 +257,14 @@ class MyFapAuth:
         oidc = self._oidc()
         try:
             print("[*] Đang làm mới session FEID...", file=sys.stderr)
-            tokens = oidc.request_token({"client_id": CLIENT_ID, "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
+            try:
+                tokens = oidc.request_token({"client_id": CLIENT_ID, "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
+            except OAuthError as error:
+                if error.code == "invalid_grant":
+                    self._fap_ready = False
+                    self._oidc_validated = False
+                    self.store.write(self._snapshot())
+                raise
             self._set_tokens(tokens)
             self.store.write(self._snapshot())
             claims = oidc.validate_tokens(tokens, self.login_nonce, expected_subject=self.subject, refresh=True)
