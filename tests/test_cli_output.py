@@ -6,6 +6,8 @@ import sys
 import unittest
 from contextlib import redirect_stdout
 
+from rich.text import Text
+
 from myfap.cli import save_output
 
 
@@ -109,11 +111,11 @@ with patch("myfap.cli.get_auth", side_effect=AssertionError("help must not load 
                 with self.subTest(command=command, encoding=encoding):
                     result = subprocess.run(
                         [sys.executable, "-c", code, *command, "--help"],
-                        env={**os.environ, "PYTHONIOENCODING": encoding, "PYTHONUTF8": utf8, "COLUMNS": "160"},
+                        env={**os.environ, "PYTHONIOENCODING": encoding, "PYTHONUTF8": utf8, "COLUMNS": "160", "FORCE_COLOR": "1"},
                         capture_output=True, timeout=20,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr[-2000:])
-                    output = " ".join(result.stdout.decode("utf-8").split())
+                    output = " ".join(Text.from_ansi(result.stdout.decode("utf-8").replace("\r\n", "\n")).plain.split())
                     self.assertIn("--api-version", output)
                     self.assertIn("--config", output)
                     self.assertIn("Đường dẫn file session tùy chỉnh", output)
