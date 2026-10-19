@@ -1,7 +1,9 @@
 import typer
 import json
+import io
 import os
 import sys
+from contextlib import redirect_stdout
 from copy import copy
 from functools import wraps
 from pathlib import Path
@@ -37,11 +39,26 @@ def _validate_common_options(callback):
     return invoke
 
 
+def _utf8_help(get_help):
+    @wraps(get_help)
+    def render(ctx):
+        if getattr(sys.stdout, "buffer", None) is None or (sys.stdout.encoding or "").lower().startswith("utf"):
+            return get_help(ctx)
+        # Eager help can print through Rich before the app callback runs.
+        with redirect_stdout(io.StringIO()) as captured:
+            help_text = get_help(ctx)
+        save_output(captured.getvalue() + help_text, "unused.txt", None, True, is_text=True)
+        return ""
+    return render
+
+
 class CommonOptionsGroup(TyperGroup):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.get_help = _utf8_help(self.get_help)
 
         def inherit(command):
+            command.get_help = _utf8_help(command.get_help)
             existing = {param.name for param in command.params}
             for param in self.params:
                 if param.name not in existing:

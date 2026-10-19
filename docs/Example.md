@@ -158,6 +158,8 @@ Bạn có thể chuyển output vào file hoặc pipe sang công cụ khác. JSO
 
 Hai bảng `campuses` và `semesters` cũng xuất qua UTF-8 để giữ tên cơ sở, kỳ học có dấu khi stdout dùng `cp1252`. Các lệnh này vẫn hiển thị bảng, không đổi sang JSON.
 
+Root `--help`, help của nhóm và lệnh con cũng giữ đầy đủ nội dung tiếng Việt khi stdout dùng `cp1252`. Chỉ đường xuất help được xử lý; CLI không đổi encoding toàn cục của stdout.
+
 ```sh
 myfap schedule --stdout > schedule.json
 myfap schedule --ics --stdout > schedule.ics

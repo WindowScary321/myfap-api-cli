@@ -77,3 +77,44 @@ with patch("myfap.cli.get_auth", return_value=auth), patch("myfap.cli.MyFapEssen
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(expected, result.stdout.decode("utf-8"))
                 self.assertEqual(result.stderr, b"")
+
+
+class HelpOutputTests(unittest.TestCase):
+    def test_plain_help_preserves_unicode_with_legacy_stdout(self):
+        code = """
+from unittest.mock import patch
+from myfap.cli import app
+app.rich_markup_mode = None
+with patch("myfap.cli.get_auth", side_effect=AssertionError("help must not load auth")):
+    app()
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code, "--help"],
+            env={**os.environ, "PYTHONIOENCODING": "cp1252:strict", "PYTHONUTF8": "0", "COLUMNS": "160"},
+            capture_output=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        self.assertIn("Đường dẫn file session tùy chỉnh", " ".join(result.stdout.decode("utf-8").split()))
+        self.assertEqual(result.stderr, b"")
+
+    def test_root_group_and_command_help_preserve_unicode_with_legacy_stdout(self):
+        code = """
+from unittest.mock import patch
+from myfap.cli import app
+with patch("myfap.cli.get_auth", side_effect=AssertionError("help must not load auth")), patch("requests.Session.request", side_effect=AssertionError("help must not call HTTP")):
+    app()
+"""
+        for command in ([], ["info"], ["info", "student"], ["other", "survey"], ["schedule"]):
+            for encoding, utf8 in (("cp1252:strict", "0"), ("utf-8", "1")):
+                with self.subTest(command=command, encoding=encoding):
+                    result = subprocess.run(
+                        [sys.executable, "-c", code, *command, "--help"],
+                        env={**os.environ, "PYTHONIOENCODING": encoding, "PYTHONUTF8": utf8, "COLUMNS": "160"},
+                        capture_output=True, timeout=20,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+                    output = " ".join(result.stdout.decode("utf-8").split())
+                    self.assertIn("--api-version", output)
+                    self.assertIn("--config", output)
+                    self.assertIn("Đường dẫn file session tùy chỉnh", output)
+                    self.assertEqual(result.stderr, b"")
