@@ -9,9 +9,10 @@ Kết quả GitHub Actions và bình luận kiểm tra được theo dõi trực
 
 ## Kiểm chứng live còn mở trước khi phát hành
 
-- [ ] Chạy lại `news` v1 với session tạm của tài khoản được phép kiểm thử; xác minh ý nghĩa response `code: 201` đã quan sát và đối chiếu trường hợp có dữ liệu. Không gộp mọi code 201 vào hết phiên.
-- [ ] Chạy lại `other notification` v1 với session tạm của tài khoản được phép kiểm thử; phân biệt dữ liệu rỗng với lỗi nghiệp vụ hoặc hết phiên, ghi lại HTTP/body code.
-- [ ] Chạy lại `other fee` v1 và ghi nhận response thành công hoặc bằng chứng route không khả dụng; không suy ra schema từ HTTP 404.
+- [x] Chạy lại `news`, `other notification` và `other fee` trên v1/APHL bằng session tạm ngày 19/10/2026. News/notification nhận HTTP 200/body 201; fee nhận HTTP 404. Lệnh đối chứng `info student` đạt 200/200 trước và sau; session/lock tạm đã xóa. Xem [báo cáo live v1](../docs/phase4-coverage.md#chạy-lại-ba-lệnh-v1-ngày-19102026).
+- [ ] Xác minh ý nghĩa body 201 của `news` v1 và đối chiếu trường hợp có dữ liệu. Lượt live mới vẫn có `data: null`, message null hoặc không có. Không gộp mọi code 201 vào hết phiên hoặc coi đó là danh sách rỗng hợp lệ.
+- [ ] Xác định nguyên nhân body 201 của `other notification` v1. Request khớp path/query/checksum của app; session đối chứng vẫn đọc được, chưa xác nhận lỗi thuộc backend hay điều kiện tài khoản.
+- [ ] Xác nhận `GeFeeByRoll` v1 có response thành công hoặc có bằng chứng từ đơn vị vận hành về phạm vi hỗ trợ. HTTP 404 trên APHL chưa đủ để kết luận route đã ngừng hỗ trợ trên mọi campus hoặc suy ra schema.
 - [ ] Kiểm chứng positive case cho fee bằng tài khoản có khoản học phí cần thanh toán hoặc dữ liệu hóa đơn phù hợp; đối chiếu `IsPaid`, số tiền và thông tin hóa đơn trên payload thật. HTTP/body 200 với dữ liệu rỗng chưa đủ để đóng mục này.
 - [ ] Kiểm chứng positive case cho survey bằng tài khoản có khảo sát bắt buộc; đối chiếu payload có dữ liệu với contract của dịch vụ survey. Trạng thái `Data Not Found` chưa đủ để đóng mục này.
 

@@ -12,14 +12,14 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 | Điểm danh tổng quát | `GetStudentAttendances` | `GetStudentAttendances` | Fixture/capture; smoke v2 HN HTTP/body 200 |
 | Điểm danh chi tiết | `getCourseAttendance` | `GetCourseAttendance` | Fixture; v2 đổi đúng tên route và giữ `SubjectCode`/`ClassName` |
 | Đơn từ | `GetApplication` | `GetApplication` | Fixture query `Authen` mới sau refresh; smoke v2 HN HTTP/body 200 |
-| Tin tức | `GetTop10News` | `GetTop10News` | Finding v1 body `201` vẫn mở; smoke v2 HN HTTP/body 200 |
+| Tin tức | `GetTop10News` | `GetTop10News` | Live v1 APHL ngày 19/10 vẫn HTTP 200/body 201; smoke v2 HN HTTP/body 200 |
 | Thông tin sinh viên | `GetStudentById` | `GetStudentById` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
 | Thông tin campus | `GetCampusInfo` | `GetCampusInfo` | Fixture; v1 live trước đó; smoke v2 HN HTTP/body 200 |
 | Survey | Survey service riêng | Survey service riêng | Live HTTP 200/body 404 qua dịch vụ survey; positive case chưa xác nhận |
-| Học phí | `GeFeeByRoll` | `GeFeeByRoll` | Finding v1 HTTP 404 vẫn mở; v2 HN HTTP/body 200; positive payload chưa xác nhận |
+| Học phí | `GeFeeByRoll` | `GeFeeByRoll` | Live v1 APHL ngày 19/10 vẫn HTTP 404; v2 HN HTTP/body 200; positive payload chưa xác nhận |
 | Môn học | `GetSubjets` | `GetSubjets` | Fixture strict query; smoke v2 HN HTTP/body 200 |
 | Feedback/profile | `CheckOpenFeedBack`, `CheckUpdateProfile` | Cùng operation | Fixture query `Authen` mới sau refresh; smoke v2 HN HTTP/body 200 |
-| Thông báo | `GetNotificationByRoll` | `GetNotificationByRoll` | Finding v1 body `201` vẫn mở; smoke v2 HN HTTP/body 200 |
+| Thông báo | `GetNotificationByRoll` | `GetNotificationByRoll` | Live v1 APHL ngày 19/10 vẫn HTTP 200/body 201; smoke v2 HN HTTP/body 200 |
 
 ## Quy tắc transport
 
@@ -63,3 +63,23 @@ ICS được kiểm tra bằng dữ liệu tổng hợp với reader `icalendar`
 - Login, handshake, refresh và đọc sau refresh đã chạy live trên v2/HN bằng session tạm. Các lệnh `info student`, `schedule --ics`, `marks`, `exams`, `attendance`, `applications`, `news`, `info campus`, fee, subjects, notification, feedback và profile đều exit 0, HTTP/body 200. Survey exit 0 với HTTP 200/body 404; positive case vẫn chưa xác nhận.
 
 Không thay response trong lượt live. Hai nhánh lỗi session được kiểm chứng bằng regression offline, chưa được gây lại trên tài khoản thật. Không lưu payload học vụ hoặc credential vào repo; session và lock tạm đã được dọn. Các finding v1 và positive fee/survey trong TODO vẫn mở.
+
+## Chạy lại ba lệnh v1 ngày 19/10/2026
+
+Đã đăng nhập mới bằng CLI ở API v1, campus APHL, dùng session tạm riêng. FEID và handshake đều thành công. Lệnh đối chứng `info student --stdout` trả HTTP/body 200 và JSON hợp lệ cả trước lẫn sau khi chạy ba lệnh bên dưới.
+
+| Lệnh với `--stdout` | HTTP / body code | Kết quả |
+|---|---|---|
+| `news` | 200 / 201 | Exit 1; `data: null`, message null hoặc không có |
+| `other notification` | 200 / 201 | Exit 1; `data: null`, message null hoặc không có |
+| `other fee` | 404 / không có code FAP | Exit 1; chưa có response thành công để xác nhận schema |
+
+Lượt đầu với timeout mặc định chưa thu được response cho hai lệnh thông báo. Lượt chạy lại với `--timeout 30` thu được các mã trong bảng. Không kết luận lỗi timeout từ việc thiếu response trong lượt đầu.
+
+Đã đối chiếu path, query và định danh ký checksum với mã app v1: `module_550.js`, các hàm `GetTop10News` (dòng 287–294), `GetNotificationByRoll` (528–535) và `GeFeeByRoll` (369–376). Request của CLI khớp các phần này; chưa xác định được sai lệch request cần sửa. App trả `[]` cho nhiều lỗi ở các hàm trên, nên danh sách rỗng trong giao diện không chứng minh body 201 là response rỗng hợp lệ.
+
+CLI tiếp tục báo lỗi operation cho body 201 không có message `Token invalid`, và báo lỗi HTTP cho 404. Không refresh vì các response này, không chuyển sang v2 tự động, không suy ra không có thông báo hoặc không nợ học phí. Hai lệnh đối chứng xác nhận session còn đọc được dữ liệu; chưa xác định nguyên nhân body 201 hoặc chứng minh route học phí đã ngừng hỗ trợ trên mọi campus.
+
+Để dùng các lệnh này trên tài khoản Hà Nội đã kiểm chứng, có thể chọn `--api-version v2 --campus HN` và đăng nhập bằng `--config` trỏ tới session v2 riêng. V2/HN đã trả HTTP/body 200 trong lượt live trước đó; đây là cách chọn adapter rõ ràng, không phải bản sửa backend v1. Positive fee/survey vẫn chưa được kiểm chứng.
+
+Session và lock tạm đã xóa sau `logout`. Chỉ ghi metadata trong bảng, không lưu response, query có giá trị, credential hoặc dữ liệu tài khoản vào Git. Việc chạy lại live đã hoàn tất; các lỗi response v1 vẫn nằm trong [TODO](../tasks/todo.md#kiểm-chứng-live-còn-mở-trước-khi-phát-hành).

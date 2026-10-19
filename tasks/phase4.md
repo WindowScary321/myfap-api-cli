@@ -20,14 +20,16 @@ Không thêm transcript, balance, ảnh, news search, GetVersion, form feedback 
 - [x] Regression cho retry dùng key/checksum/Authen mới và giới hạn một lần.
 - [x] Kiểm tra ICS bằng dữ liệu tổng hợp và một reader độc lập; ghi rõ giới hạn của reader hiện tại nếu còn.
 - [x] Live trên session tạm riêng, không đọc thư mục session cá nhân. Chỉ giữ metadata đã lọc, không giữ lịch/điểm/hồ sơ hoặc credential thật trong Git.
-- [ ] Chạy lại news, notification và fee của v1; ghi nguyên trạng lỗi còn lại và giới hạn theo version/campus. Không dùng CI xanh thay kết luận live.
+- [x] Chạy lại news, notification và fee của v1; ghi nguyên trạng lỗi còn lại và giới hạn theo version/campus. Không dùng CI xanh thay kết luận live.
 - [ ] Kiểm tra positive fee/survey khi tài khoản có điều kiện phù hợp; nếu thiếu thì giữ trạng thái chưa kiểm chứng.
 - [x] Review độc lập, kiểm tra tiếng Việt, test Python 3.9/3.11, build, Twine, artifact validator và pip smoke.
 - [x] Draft PR riêng, comment tiếng Việt sau các mốc quan trọng; maintainer quyết định Ready for review và merge.
 
-Đã có bằng chứng cho 7/9 mục. Contract và CLI được kiểm tra tại `tests/test_phase4_transport.py`, `tests/test_api_v2.py`, `tests/test_cli_v2_capabilities.py` và các regression v1. Test ICS dùng reader `icalendar` độc lập. Kết quả live v2 HN đã ghi 21 operation khác nhau, 23 request và dọn session/lock tạm; xem [coverage Phase 4](../docs/phase4-coverage.md). Matrix Ubuntu/Windows × Python 3.9/3.11, build và cài artifact được ghi tại [checks PR #8](https://github.com/WindowScary321/myfap-api-cli/pull/8/checks).
+Đã có bằng chứng cho 8/9 mục. Contract và CLI được kiểm tra tại `tests/test_phase4_transport.py`, `tests/test_api_v2.py`, `tests/test_cli_v2_capabilities.py` và các regression v1. Test ICS dùng reader `icalendar` độc lập. Kết quả live v2 HN đã ghi 21 operation khác nhau, 23 request và dọn session/lock tạm; xem [coverage Phase 4](../docs/phase4-coverage.md). Matrix Ubuntu/Windows × Python 3.9/3.11, build và cài artifact được ghi tại [checks PR #8](https://github.com/WindowScary321/myfap-api-cli/pull/8/checks).
 
-Hai mục live còn mở: lần chạy lại `news`, `notification`, `fee` của v1 chưa nhận callback đăng nhập; positive fee/survey chưa được xác nhận với dữ liệu nghiệp vụ phù hợp. Fee v2 trả HTTP/body 200 chưa đủ để kết luận positive case, còn survey trả body 404. Các ô đã đánh dấu không có nghĩa toàn bộ Phase 4 đã hoàn tất.
+Đã chạy lại ba lệnh v1/APHL ngày 19/10/2026 với login mới: news/notification vẫn trả HTTP 200/body 201, fee vẫn trả HTTP 404; lệnh đối chứng đọc thông tin sinh viên đạt 200/200 trước và sau. Session và lock tạm đã dọn. Mục chạy lại live được đánh dấu vì đã có kết quả và giới hạn, không có nghĩa ba lỗi response đã được sửa. Xem [kết quả v1](../docs/phase4-coverage.md#chạy-lại-ba-lệnh-v1-ngày-19102026).
+
+Mục nghiệm thu chưa hoàn thành là positive fee/survey. Các lỗi response v1 vẫn mở trong TODO; chưa có cơ sở suy ra body 201 là rỗng hợp lệ hoặc HTTP 404 là route ngừng hỗ trợ toàn bộ. Fee v2 trả HTTP/body 200 chưa đủ để kết luận positive case, còn survey trả body 404. Các ô đã đánh dấu không có nghĩa toàn bộ Phase 4 đã hoàn tất.
 
 Parser điểm đã được sửa cho cấu trúc ba cột `Item`, `Weight`, `Value` khi không có cột ghi chú, gồm cả dòng đầu tiên và dòng tiếp theo trong `rowspan`. Hàng ba `<td>` theo fallback category/item/value cũ vẫn được giữ để tránh thay đổi output tương thích.
 
