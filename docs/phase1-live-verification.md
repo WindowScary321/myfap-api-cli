@@ -1,5 +1,7 @@
 # Kiểm chứng CLI với API thật, ngày 16/10/2026
 
+Đây là báo cáo lịch sử tại commit `07fb289`. Kiểm chứng lại ngày 19/10/2026 trên v1/APHL đã xác nhận cùng các mã lỗi của ba route; policy hiện tại coi body 201 không có message `Token invalid` là lỗi operation, không phải hết phiên. Xem [kết quả mới](phase4-coverage.md#chạy-lại-ba-lệnh-v1-ngày-19102026).
+
 ## Kết quả
 
 Đã chạy executable CLI từ checkout commit `07fb289`, dùng session mẫu qua luồng nạp session thông thường. Đợt kiểm chứng chuẩn gồm 25 lần chạy command, phủ 20 route: 22 lần exit 0, 3 lần exit 1. Có thử điểm ở một kỳ có dữ liệu để kiểm tra điểm chi tiết; không ghi kỳ, mã môn hoặc nội dung điểm vào báo cáo.

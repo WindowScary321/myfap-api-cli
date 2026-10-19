@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 from typer.testing import CliRunner
 
-from myfap.auth import MyFapAuth
+from myfap.auth import AuthError, MyFapAuth
 from myfap.cli import app
 
 
@@ -90,3 +90,29 @@ class CommandRequestTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         self.auth.session.get.assert_not_called()
         self.assertNotIn("session hợp lệ", result.stderr)
+
+    def test_login_recovers_invalid_session_schema_without_force(self):
+        for stored in (
+            {}, {"campus": 42}, {"campus": "TEST", "api_version": "v3"},
+            {"campus": "TEST", "authen_key": []},
+            {"campus": "TEST", "oidc_subject": 42},
+        ):
+            with self.subTest(fields=tuple(stored)):
+                self.path.write_text(json.dumps(stored), encoding="utf-8")
+                before = self.path.read_bytes()
+                with patch.object(self.auth, "_authorize", side_effect=AuthError("Đã hủy đăng nhập.")) as browser:
+                    with patch.object(self.auth, "_oidc"):
+                        result = self.runner.invoke(app, ["login"])
+                self.assertEqual(result.exit_code, 1, result.output)
+                browser.assert_called_once()
+                self.assertIn("Đã hủy đăng nhập", result.stderr)
+                self.assertEqual(self.path.read_bytes(), before)
+                self.auth.session.get.assert_not_called()
+
+    def test_login_does_not_retry_browser_after_a_network_auth_error(self):
+        with patch.object(self.auth, "load_session", side_effect=AuthError("Không kết nối được FAP.")):
+            with patch.object(self.auth, "_authorize") as browser:
+                result = self.runner.invoke(app, ["login"])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("Không kết nối được FAP", result.stderr)
+        browser.assert_not_called()

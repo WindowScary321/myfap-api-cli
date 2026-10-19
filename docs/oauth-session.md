@@ -14,15 +14,18 @@ CLI mở Chrome, Edge hoặc Firefox để đăng nhập FEID. Mỗi lần đăn
 
 Các claim thời gian `exp`, `iat` và `nbf` của ID token có leeway 30 giây để chịu được lệch đồng hồ nhỏ. Token thiếu `exp`, có thời gian sai kiểu hoặc giá trị không hữu hạn vẫn bị từ chối. Leeway không bỏ qua kiểm tra chữ ký, issuer, audience, subject, nonce hay `at_hash`.
 
-`--force` mở lại trình duyệt kể cả khi đã có session. Nếu file JSON hỏng hoặc thiếu trường bắt buộc, đăng nhập thành công sẽ thay file đó. Khi đăng nhập thất bại, file cũ được giữ nguyên. Lỗi quyền truy cập hoặc đường dẫn không an toàn vẫn bị chặn.
+`myfap login` tự mở lại trình duyệt khi file session hỏng JSON hoặc có cấu trúc sai, như thiếu campus hay API version không hợp lệ. `--force` mở lại trình duyệt kể cả khi đã có session dùng được. File cũ chỉ được thay sau khi đăng nhập thành công; nếu hủy hoặc handshake thất bại, nội dung cũ được giữ nguyên. Lỗi mạng, quyền truy cập hoặc đường dẫn không an toàn vẫn được báo, không bị coi là lỗi cấu trúc session.
+
+Session student phải có cả `mssv` và `email` là chuỗi không rỗng, kể cả với session v1/v2 cũ. Trường thiếu, `null`, sai kiểu hoặc rỗng bị chặn trước request dữ liệu; `login` thường mở lại luồng đăng nhập. Metadata OAuth cũ vẫn có thể thiếu nếu FAP session còn dùng được.
 
 Khi session cần đăng nhập lại hoặc binding cũ không được hỗ trợ, `myfap login` tự mở trình duyệt nên không cần chạy lại với `--force`. Login mới kế thừa campus và API version đã lưu nếu bạn không chỉ định option tương ứng; luồng FEID hiện hỗ trợ tài khoản student trên v1 và v2 trong phạm vi adapter của từng version. Binding và credential cũ chỉ được thay sau khi login thành công.
 
-CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` nếu chưa có session hợp lệ. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
+CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` cho login v1 mới. Với v2, profile mới hoặc session lưu `APHL` cần chỉ định `--campus`. CLI kiểm tra trước khi mở trình duyệt, handshake hoặc refresh; `login` có và không có `--force` đều áp dụng quy tắc này. Session lưu mã khác `APHL` vẫn được kế thừa. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
 
 ```sh
 myfap --campus APHL login --force
 myfap login --campus APHL --force
+myfap --api-version v2 --campus HN login --force
 ```
 
 Session gắn với campus, API version và loại tài khoản. Đổi campus hoặc version cần handshake lại trước request dữ liệu; binding mới chỉ được lưu sau handshake thành công. V1 vẫn là mặc định, còn v2 chỉ gửi các operation đã nằm trong capability của adapter; route chưa hỗ trợ bị chặn trước HTTP. Xem [phạm vi API version](api-versions.md) để biết giới hạn hiện tại.
@@ -45,6 +48,8 @@ Body `201` thiếu hoặc sai message vẫn là lỗi operation. News/notificati
 Refresh giữ lock từ lúc đọc session đến lúc lưu xong để hai process không rotate cùng token. Nếu process khác đã refresh cùng tài khoản và binding, CLI dùng session mới. Nếu identity hoặc binding đã đổi, command dừng và yêu cầu chạy lại.
 
 CLI ghi refresh token mới bằng thao tác atomic trước khi xác minh ID token và handshake tiếp theo. Nếu bước sau lỗi, file giữ token đã rotate và đánh dấu FAP cần xác thực lại. Khi ID token đã hợp lệ nhưng handshake gặp lỗi tạm thời, command kế tiếp thử handshake lại.
+
+Nếu FEID từ chối refresh bằng `invalid_grant`, CLI lưu `fap_needs_reauth=true` và `oidc_validated=false` dưới lock hiện có, giữ credential và binding để tránh ghi mất dữ liệu. Lệnh `login` kế tiếp mở lại browser mà không cần `--force`. Timeout hoặc lỗi mạng trước khi nhận token không tự đặt hai cờ này; lỗi storage vẫn đi qua nhánh báo lỗi an toàn. Việc lưu token đã rotate khi lỗi xảy ra sau token exchange vẫn theo quy tắc trên.
 
 Trước handshake hoặc phục hồi binding, access token đã hết hạn hoặc còn tối đa 30 giây sẽ được refresh sớm để bù thời gian request. Buffer này tránh dùng access token sát hạn; leeway ID token chấp nhận lệch đồng hồ trong giới hạn 30 giây. Khi FAP session vẫn dùng được, CLI tiếp tục gọi operation thực tế. Thời hạn FEID không được suy thành thời hạn FAP `authenKey`.
 

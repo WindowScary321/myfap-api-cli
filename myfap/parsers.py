@@ -10,10 +10,14 @@ def parse_marks_html(html_str: str):
     result = []
     current_category = ""
     category_rows_remaining = 0
+    # Header phân biệt ba cột điểm với hàng category/item/value cũ.
+    data_only_header = False
     
     for tr in table.find_all('tr'):
         # Bỏ qua dòng tiêu đề chứa thẻ th
         if tr.find('th'):
+            headers = [th.get_text(strip=True).casefold() for th in tr.find_all('th')]
+            data_only_header = headers == ["item", "weight", "value"]
             continue
             
         tds = tr.find_all('td')
@@ -35,6 +39,8 @@ def parse_marks_html(html_str: str):
             # Dòng tiếp theo thuộc cùng category
             data_tds = td_texts
             category_rows_remaining -= 1
+        elif len(tds) == 3 and data_only_header:
+            data_tds = td_texts
         else:
             # Fallback
             current_category = td_texts[0] if len(td_texts) > 0 else ""
@@ -45,13 +51,14 @@ def parse_marks_html(html_str: str):
         }
         
         # Map các cột dữ liệu theo cấu trúc của FAP
-        if len(data_tds) >= 4:
+        if len(data_tds) >= 3:
             row_data.update({
                 "item": data_tds[0],
                 "weight": data_tds[1],
                 "value": data_tds[2],
-                "comment": data_tds[3]
             })
+            if len(data_tds) >= 4:
+                row_data["comment"] = data_tds[3]
         elif len(data_tds) == 2:
             row_data.update({
                 "item": data_tds[0],
@@ -66,7 +73,7 @@ def parse_marks_html(html_str: str):
 
     return result
 
-from datetime import datetime
+from datetime import datetime, timezone
 import pytz
 from ics import Calendar, Event
 
@@ -88,15 +95,15 @@ def convert_schedule_to_ics(data: dict) -> str:
         date_str = session["date"].split(" ")[0]
         
         # Parse time: "(7:30-9:50)" -> "7:30", "9:50"
-        time_str = session["slotTime"].strip("()")
-        start_time_str, end_time_str = time_str.split("-")
+        time_str = session["slotTime"].strip().strip("()").strip()
+        start_time_str, end_time_str = (part.strip() for part in time_str.split("-", 1))
         
         # Parse full datetime
         start_dt = tz.localize(datetime.strptime(f"{date_str} {start_time_str}", "%m/%d/%Y %H:%M"))
         end_dt = tz.localize(datetime.strptime(f"{date_str} {end_time_str}", "%m/%d/%Y %H:%M"))
         
         # Create event
-        e = Event()
+        e = Event(created=datetime.now(timezone.utc))
         
         # Title
         title = session['subjectCode']

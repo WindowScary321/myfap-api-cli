@@ -61,14 +61,14 @@ def _v2_request(session, auth, operation, *, timeout, campus=None, params=None):
     retried = False
     while True:
         _ensure_bound(auth, campus=campus, api_version="v2")
-        credential = auth.authen_key if auth is not None and operation in AUTHENTICATED_READ_OPERATIONS else None
+        credential = auth.authen_key if auth is not None and operation in v2.READ_OPERATIONS else None
         response = v2.request(session, operation, credential=credential,
                               campus=campus or getattr(auth, "campus", None),
                               params=params, timeout=timeout)
         try:
             return clean_json(read_response(response, api_version="v2", operation=operation))
         except ApiSessionExpiredError:
-            if retried or operation not in AUTHENTICATED_READ_OPERATIONS or auth is None:
+            if retried or operation not in v2.READ_OPERATIONS or auth is None:
                 raise
             refresh = getattr(auth, "refresh_session", None)
             if not callable(refresh) or not refresh():
@@ -106,6 +106,9 @@ def _ensure_bound(auth, *, campus=None, api_version=None):
 def _authenticated_get(session, auth, operation, identifier, *, timeout, campus=None, student=False, params=None, api_version=None):
     version = _resolve_api_version(auth, api_version)
     if version == "v2":
+        from .v2 import OPERATION_ALIASES
+
+        operation = OPERATION_ALIASES.get(operation, operation)
         query = {"rollNumber": auth.mssv, **(params or {})} if student else params
         return _v2_request(session, auth, operation, timeout=timeout, campus=campus, params=query)
 
@@ -172,9 +175,11 @@ class MyFapEssential:
     def get_week(self, date_str: str):
         """Lấy số tuần tương ứng với ngày YYYY-MM-DD."""
         if self.api_version == "v2":
-            return _v2_request(self.session, self.auth, "GetWeekByDate", params={"date": date_str}, timeout=self.timeout)
-        value = _get(self.session, f"{FAP_HOST}/GetWeekByDate", {"date": date_str}, timeout=self.timeout,
-                     auth=self.auth, operation="GetWeekByDate")["data"]
+            payload = _v2_request(self.session, self.auth, "GetWeekByDate", params={"date": date_str}, timeout=self.timeout)
+        else:
+            payload = _get(self.session, f"{FAP_HOST}/GetWeekByDate", {"date": date_str}, timeout=self.timeout,
+                           auth=self.auth, operation="GetWeekByDate")
+        value = payload["data"]
         if isinstance(value, bool) or not isinstance(value, (str, int)):
             raise ApiPayloadError("Số tuần trong response API không hợp lệ.")
         try:

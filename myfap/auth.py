@@ -91,17 +91,19 @@ class MyFapAuth:
 
     def _restore(self, data):
         if not isinstance(data, dict):
-            raise AuthError("Session không hợp lệ. Hãy đăng nhập lại.")
+            raise SessionBindingError("Session không hợp lệ. Hãy đăng nhập lại.")
         campus, version, account = data.get("campus"), data.get("api_version", "v1"), data.get("account_type", "student")
         if not _text(campus) or version not in ("v1", "v2") or not _text(account):
-            raise AuthError("Session thiếu binding hợp lệ. Hãy chạy 'myfap login -f'.")
+            raise SessionBindingError("Session thiếu binding hợp lệ. Hãy chạy 'myfap login -f'.")
         for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):
             value = data.get(field)
             if value is not None and not _text(value):
-                raise AuthError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
+                raise SessionBindingError("Session có trường credential hoặc identity không hợp lệ. Hãy đăng nhập lại.")
+        if account == "student" and any(not _text(data.get(field)) for field in ("mssv", "email")):
+            raise SessionBindingError("Session thiếu identity sinh viên hợp lệ. Hãy đăng nhập lại.")
         subject, nonce = data.get("oidc_subject"), data.get("oidc_nonce")
         if any(value is not None and not _text(value) for value in (subject, nonce)):
-            raise AuthError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
+            raise SessionBindingError("Session có metadata OIDC không hợp lệ. Hãy đăng nhập lại.")
         self._binding = (campus, version, account)
         self.campus, self.api_version, self.account_type = tuple(requested if requested is not None else stored for requested, stored in zip(self._requested, self._binding))
         for field in ("authen_key", "mssv", "email", "jwt_token", "refresh_token"):
@@ -141,6 +143,11 @@ class MyFapAuth:
             raise SessionBindingError("API version chưa được hỗ trợ.")
         if self.account_type != "student":
             raise SessionBindingError("Luồng FEID hiện chỉ hỗ trợ tài khoản student.")
+        if self.api_version == "v2" and self._requested[0] is None and self.campus == "APHL":
+            raise SessionBindingError(
+                "Đăng nhập API v2 cần mã campus rõ ràng. "
+                "Hãy chạy 'myfap --api-version v2 campuses' rồi đăng nhập với '--campus <mã-campus>'."
+            )
 
     def load_session(self):
         try:
@@ -250,7 +257,14 @@ class MyFapAuth:
         oidc = self._oidc()
         try:
             print("[*] Đang làm mới session FEID...", file=sys.stderr)
-            tokens = oidc.request_token({"client_id": CLIENT_ID, "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
+            try:
+                tokens = oidc.request_token({"client_id": CLIENT_ID, "refresh_token": self.refresh_token, "grant_type": "refresh_token"})
+            except OAuthError as error:
+                if error.code == "invalid_grant":
+                    self._fap_ready = False
+                    self._oidc_validated = False
+                    self.store.write(self._snapshot())
+                raise
             self._set_tokens(tokens)
             self.store.write(self._snapshot())
             claims = oidc.validate_tokens(tokens, self.login_nonce, expected_subject=self.subject, refresh=True)
