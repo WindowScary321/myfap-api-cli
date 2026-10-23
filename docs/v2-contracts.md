@@ -78,7 +78,7 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetConnect` | Không có | stub | APK chỉ nối lại một đối tượng kết nối đã có |
 | `GetLoginDonor` | Không có | stub | APK trả trạng thái tạm, chưa có contract login donor |
 
-Ma trận hiện có 21 operation được hỗ trợ: 18 operation đọc, 2 bootstrap và 1 handshake. `GetApiActive` có API method chẩn đoán, chưa có command CLI riêng.
+Ma trận hiện có 21 operation được hỗ trợ: 18 operation đọc, 2 bootstrap và 1 handshake. `GetApiActive` có API method chẩn đoán, chưa có command CLI riêng. Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
 Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai bốn route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack` và `GetNotificationByRoll`; ba route còn lại vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
 

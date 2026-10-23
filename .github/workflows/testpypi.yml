@@ -1,0 +1,217 @@
+name: Rehearsal TestPyPI thủ công
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag stable đã trỏ vào main, ví dụ v0.2.0; không tạo tag tự động
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testpypi-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.validate.outputs.sha }}
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Chốt SHA và version, không chạy theo ref thay đổi được ở các job sau
+        id: validate
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python scripts/release_tools.py validate --tag "$TAG" --commit "$(git rev-parse HEAD)" > "$RUNNER_TEMP/validation.json"
+          version=$(jq -er .version "$RUNNER_TEMP/validation.json")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(jq -er .sha "$RUNNER_TEMP/validation.json")" >> "$GITHUB_OUTPUT"
+          python scripts/release_tools.py notes --version "$version" --output "$RUNNER_TEMP/release-notes.md"
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.validate.outputs.sha }}
+
+  preflight:
+    needs: [validate, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      missing: ${{ steps.state.outputs.missing }}
+      publish_required: ${{ steps.state.outputs.publish_required }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          sparse-checkout: /scripts/release_tools.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - id: state
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          CI_VERSION: ${{ needs.ci.outputs.package_version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+        run: |
+          test "$VERSION" = "$CI_VERSION"
+          python -I scripts/release_tools.py pypi-state --dist-dir dist --version "$VERSION" --manifest-sha256 "$MANIFEST_SHA256" --index-url https://test.pypi.org/pypi > "$RUNNER_TEMP/state.json"
+          echo "missing=$(jq -c .missing "$RUNNER_TEMP/state.json")" >> "$GITHUB_OUTPUT"
+          echo "publish_required=$(jq '.missing | length > 0' "$RUNNER_TEMP/state.json")" >> "$GITHUB_OUTPUT"
+          jq '{state,missing}' "$RUNNER_TEMP/state.json" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: [validate, ci, preflight]
+    if: ${{ needs.preflight.outputs.publish_required == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - name: Kiểm hash bằng inline verifier, không chạy source với OIDC
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+          UPLOAD_FILES: ${{ needs.preflight.outputs.missing }}
+        run: |
+          python -I - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil
+          version = os.environ['VERSION']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Invalid version')
+          root = pathlib.Path('dist')
+          names = sorted([f'myfap-{version}-py3-none-any.whl', f'myfap-{version}.tar.gz'])
+          entries = list(root.iterdir())
+          if root.is_symlink() or {p.name for p in entries} != set(names + ['SHA256SUMS']) or any(p.is_symlink() or not p.is_file() for p in entries):
+              raise SystemExit('Unexpected artifact inventory')
+          manifest = root.joinpath('SHA256SUMS').read_bytes()
+          if hashlib.sha256(manifest).hexdigest() != os.environ['MANIFEST_SHA256']:
+              raise SystemExit('Manifest digest mismatch')
+          canonical = ''.join(hashlib.sha256(root.joinpath(n).read_bytes()).hexdigest() + '  ' + n + '\n' for n in names).encode()
+          if manifest != canonical:
+              raise SystemExit('Artifact checksum mismatch')
+          selected = json.loads(os.environ['UPLOAD_FILES'])
+          if not isinstance(selected, list) or not selected or any(not isinstance(n, str) or n not in names for n in selected) or len(set(selected)) != len(selected):
+              raise SystemExit('Invalid upload subset')
+          target = pathlib.Path('upload')
+          target.mkdir(exist_ok=False)
+          for name in selected:
+              shutil.copyfile(root / name, target / name)
+          PY
+      - name: Đọc lại index khi retry publish, không dùng preflight cũ
+        id: reconcile
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+          INDEX_URL: https://test.pypi.org/pypi
+        run: |
+          python -I - <<'PY'
+          import hashlib, json, os, pathlib, re, urllib.error, urllib.request
+          version = os.environ['VERSION']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Invalid version')
+          root = pathlib.Path('dist')
+          names = sorted([f'myfap-{version}-py3-none-any.whl', f'myfap-{version}.tar.gz'])
+          entries = list(root.iterdir())
+          if root.is_symlink() or {p.name for p in entries} != set(names + ['SHA256SUMS']) or any(p.is_symlink() or not p.is_file() for p in entries):
+              raise SystemExit('Unexpected artifact inventory')
+          hashes = {n: hashlib.sha256(root.joinpath(n).read_bytes()).hexdigest() for n in names}
+          manifest = root.joinpath('SHA256SUMS').read_bytes()
+          if hashlib.sha256(manifest).hexdigest() != os.environ['MANIFEST_SHA256'] or manifest != ''.join(hashes[n] + '  ' + n + '\n' for n in names).encode():
+              raise SystemExit('Artifact checksum mismatch')
+          target = pathlib.Path('upload')
+          selected = list(target.iterdir())
+          if target.is_symlink() or any(p.name not in hashes or p.is_symlink() or not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != hashes[p.name] for p in selected):
+              raise SystemExit('Invalid upload subset')
+          index = os.environ['INDEX_URL']
+          if index not in ('https://pypi.org/pypi', 'https://test.pypi.org/pypi'):
+              raise SystemExit('Unexpected index')
+          try:
+              with urllib.request.urlopen(f'{index}/myfap/{version}/json', timeout=30) as response:
+                  payload = json.loads(response.read(1048577))
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise SystemExit('Index HTTP error; stop before upload') from None
+              payload = {'info': {'name': 'myfap', 'version': version}, 'urls': []}
+          except (urllib.error.URLError, TimeoutError, OSError):
+              raise SystemExit('Index unavailable; stop before upload') from None
+          if not isinstance(payload, dict) or not isinstance(payload.get('info'), dict) or payload['info'].get('name') != 'myfap' or payload['info'].get('version') != version or not isinstance(payload.get('urls'), list):
+              raise SystemExit('Unexpected index metadata')
+          present = set()
+          for item in payload['urls']:
+              if not isinstance(item, dict) or not isinstance(item.get('filename'), str):
+                  raise SystemExit('Unexpected index file')
+              name = item['filename']
+              if name not in hashes or name in present or not isinstance(item.get('digests'), dict) or item['digests'].get('sha256') != hashes[name] or item.get('yanked') is not False:
+                  raise SystemExit('Index conflict; do not overwrite or skip existing')
+              present.add(name)
+          missing = set(names) - present
+          if not missing.issubset({p.name for p in selected}):
+              raise SystemExit('Index changed; rerun preflight before publishing')
+          for path in selected:
+              if path.name in present:
+                  path.unlink()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('publish_required=' + str(bool(missing)).lower() + '\n')
+          PY
+      - name: Upload TestPyPI qua publisher riêng
+        if: ${{ steps.reconcile.outputs.publish_required == 'true' }}
+        uses: pypa/gh-action-pypi-publish@106e0b0b7c337fa67ed433972f777c6357f78598 # v1.13.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: upload/
+
+  verify:
+    needs: [validate, ci, preflight, publish]
+    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.ci.result == 'success' && needs.preflight.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.11"]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          sparse-checkout: /scripts/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - name: Tải wheel không deps từ TestPyPI, chỉ lấy deps từ PyPI
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+        run: >-
+          python -I scripts/smoke_index.py --expected-version "$VERSION"
+          --artifact-dir dist --manifest-sha256 "$MANIFEST_SHA256" --test-pypi --attempts 6 --delay 10

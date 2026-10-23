@@ -24,3 +24,9 @@ Theo quyết định của người dùng ngày 19/10/2026, hoãn positive fee/s
 - [ ] **Survey:** khi có tài khoản với khảo sát bắt buộc, đối chiếu payload có dữ liệu với contract của dịch vụ survey. Trạng thái `Data Not Found` chưa đủ để đóng mục này.
 
 Khi có điều kiện kiểm chứng, dùng session tạm, ghi rõ API version/campus và chỉ lưu metadata đã lọc. Không đưa credential, thông tin cá nhân hoặc raw response lên Git.
+
+## Chuẩn bị phát hành Phase 5
+
+Theo dõi triển khai, kết quả kiểm tra và gate dịch vụ còn mở tại [phase5.md](phase5.md). [Runbook phát hành](../docs/releasing.md) mô tả kiểm tag/version/artifact, Trusted Publishing, retry và TestPyPI; [CHANGELOG.md](../CHANGELOG.md) giữ release notes cùng known issues.
+
+Chuyển Phase 5 không tự đóng ba lỗi live v1, không xác nhận positive fee/survey và không cho phép tạo/push tag hoặc publish. Maintainer phải duyệt phạm vi hỗ trợ và các gate phát hành trước khi thực hiện.

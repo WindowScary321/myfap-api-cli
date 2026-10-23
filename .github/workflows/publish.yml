@@ -1,40 +1,327 @@
-name: Publish to PyPI
+name: Phát hành PyPI và GitHub Release
 
 on:
-  release:
-    types: [published]  # Trigger khi tạo Release
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-publish:
-    name: Build & Publish
+  validate:
+    name: Kiểm tag, main, version và release notes
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    environment: pypi
-
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.validate.outputs.sha }}
+      version: ${{ steps.validate.outputs.version }}
+      notes_artifact: ${{ steps.validate.outputs.notes_artifact }}
+      notes_sha256: ${{ steps.validate.outputs.notes_sha256 }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Cài Python
-        uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          python-version-file: ".python-version"
-
-      - name: Cài uv
-        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch main rõ ràng, không dùng main cache
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Xác minh tag và lấy đúng mục changelog
+        id: validate
+        env:
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          python scripts/release_tools.py validate --tag "$TAG" --commit "$COMMIT" > "$RUNNER_TEMP/validation.json"
+          version=$(jq -er .version "$RUNNER_TEMP/validation.json")
+          sha=$(jq -er .sha "$RUNNER_TEMP/validation.json")
+          python scripts/release_tools.py notes --version "$version" --output "$RUNNER_TEMP/release-notes.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "notes_artifact=myfap-notes-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "notes_sha256=$(sha256sum "$RUNNER_TEMP/release-notes.md" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Lưu notes của đúng commit tag
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          version: "0.13.0"
-          enable-cache: true
+          name: ${{ steps.validate.outputs.notes_artifact }}
+          path: ${{ runner.temp }}/release-notes.md
+          if-no-files-found: error
+          retention-days: 14
 
-      - name: Đồng bộ dependencies
-        run: uv sync --locked --group ci
+  ci:
+    name: Kiểm tra đúng SHA của tag
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.validate.outputs.sha }}
 
-      - name: Chạy regression test
-        run: uv run --locked --group ci python -m unittest discover -s tests -v
+  preflight:
+    name: Đối chiếu artifact và file đã có trên PyPI
+    needs: [validate, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      missing: ${{ steps.state.outputs.missing }}
+      publish_required: ${{ steps.state.outputs.publish_required }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          sparse-checkout: /scripts/release_tools.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - name: So hash trước khi quyết định upload hoặc phục hồi upload một phần
+        id: state
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          CI_VERSION: ${{ needs.ci.outputs.package_version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+        run: |
+          test "$VERSION" = "$CI_VERSION"
+          python -I scripts/release_tools.py pypi-state --dist-dir dist --version "$VERSION" --manifest-sha256 "$MANIFEST_SHA256" > "$RUNNER_TEMP/state.json"
+          echo "missing=$(jq -c .missing "$RUNNER_TEMP/state.json")" >> "$GITHUB_OUTPUT"
+          echo "publish_required=$(jq '.missing | length > 0' "$RUNNER_TEMP/state.json")" >> "$GITHUB_OUTPUT"
+          jq '{state,missing}' "$RUNNER_TEMP/state.json" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build package
-        run: uv build
+  publish:
+    name: Upload đúng file còn thiếu qua Trusted Publishing
+    needs: [validate, ci, preflight]
+    if: ${{ needs.preflight.outputs.publish_required == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - name: Xác minh bytes, không checkout hoặc thực thi mã dự án
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+          UPLOAD_FILES: ${{ needs.preflight.outputs.missing }}
+        run: &verify_artifacts |
+          python -I - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil
+          version = os.environ['VERSION']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Invalid version')
+          root = pathlib.Path('dist')
+          names = sorted([f'myfap-{version}-py3-none-any.whl', f'myfap-{version}.tar.gz'])
+          entries = list(root.iterdir())
+          if root.is_symlink() or {p.name for p in entries} != set(names + ['SHA256SUMS']) or any(p.is_symlink() or not p.is_file() for p in entries):
+              raise SystemExit('Unexpected artifact inventory')
+          manifest = root.joinpath('SHA256SUMS').read_bytes()
+          if hashlib.sha256(manifest).hexdigest() != os.environ['MANIFEST_SHA256']:
+              raise SystemExit('Manifest digest mismatch')
+          canonical = ''.join(hashlib.sha256(root.joinpath(n).read_bytes()).hexdigest() + '  ' + n + '\n' for n in names).encode()
+          if manifest != canonical:
+              raise SystemExit('Artifact checksum mismatch')
+          if 'UPLOAD_FILES' in os.environ:
+              selected = json.loads(os.environ['UPLOAD_FILES'])
+              if not isinstance(selected, list) or not selected or any(not isinstance(n, str) or n not in names for n in selected) or len(set(selected)) != len(selected):
+                  raise SystemExit('Invalid upload subset')
+              target = pathlib.Path('upload')
+              target.mkdir(exist_ok=False)
+              for name in selected:
+                  shutil.copyfile(root / name, target / name)
+          PY
+      - name: Đọc lại index khi retry publish, không dùng preflight cũ
+        id: reconcile
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+          INDEX_URL: https://pypi.org/pypi
+        run: |
+          python -I - <<'PY'
+          import hashlib, json, os, pathlib, re, urllib.error, urllib.request
+          version = os.environ['VERSION']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Invalid version')
+          root = pathlib.Path('dist')
+          names = sorted([f'myfap-{version}-py3-none-any.whl', f'myfap-{version}.tar.gz'])
+          entries = list(root.iterdir())
+          if root.is_symlink() or {p.name for p in entries} != set(names + ['SHA256SUMS']) or any(p.is_symlink() or not p.is_file() for p in entries):
+              raise SystemExit('Unexpected artifact inventory')
+          hashes = {n: hashlib.sha256(root.joinpath(n).read_bytes()).hexdigest() for n in names}
+          manifest = root.joinpath('SHA256SUMS').read_bytes()
+          if hashlib.sha256(manifest).hexdigest() != os.environ['MANIFEST_SHA256'] or manifest != ''.join(hashes[n] + '  ' + n + '\n' for n in names).encode():
+              raise SystemExit('Artifact checksum mismatch')
+          target = pathlib.Path('upload')
+          selected = list(target.iterdir())
+          if target.is_symlink() or any(p.name not in hashes or p.is_symlink() or not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != hashes[p.name] for p in selected):
+              raise SystemExit('Invalid upload subset')
+          index = os.environ['INDEX_URL']
+          if index not in ('https://pypi.org/pypi', 'https://test.pypi.org/pypi'):
+              raise SystemExit('Unexpected index')
+          try:
+              with urllib.request.urlopen(f'{index}/myfap/{version}/json', timeout=30) as response:
+                  payload = json.loads(response.read(1048577))
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise SystemExit('Index HTTP error; stop before upload') from None
+              payload = {'info': {'name': 'myfap', 'version': version}, 'urls': []}
+          except (urllib.error.URLError, TimeoutError, OSError):
+              raise SystemExit('Index unavailable; stop before upload') from None
+          if not isinstance(payload, dict) or not isinstance(payload.get('info'), dict) or payload['info'].get('name') != 'myfap' or payload['info'].get('version') != version or not isinstance(payload.get('urls'), list):
+              raise SystemExit('Unexpected index metadata')
+          present = set()
+          for item in payload['urls']:
+              if not isinstance(item, dict) or not isinstance(item.get('filename'), str):
+                  raise SystemExit('Unexpected index file')
+              name = item['filename']
+              if name not in hashes or name in present or not isinstance(item.get('digests'), dict) or item['digests'].get('sha256') != hashes[name] or item.get('yanked') is not False:
+                  raise SystemExit('Index conflict; do not overwrite or skip existing')
+              present.add(name)
+          missing = set(names) - present
+          if not missing.issubset({p.name for p in selected}):
+              raise SystemExit('Index changed; rerun preflight before publishing')
+          for path in selected:
+              if path.name in present:
+                  path.unlink()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('publish_required=' + str(bool(missing)).lower() + '\n')
+          PY
+      - name: Publish PyPI, không skip-existing
+        if: ${{ steps.reconcile.outputs.publish_required == 'true' }}
+        uses: pypa/gh-action-pypi-publish@106e0b0b7c337fa67ed433972f777c6357f78598 # v1.13.0
+        with:
+          packages-dir: upload/
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  verify:
+    name: PyPI / Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    needs: [validate, ci, preflight, publish]
+    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.ci.result == 'success' && needs.preflight.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.11"]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          sparse-checkout: /scripts/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - name: Cài từ PyPI ngoài checkout và kiểm CLI
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+        run: >-
+          python -I scripts/smoke_index.py --expected-version "$VERSION"
+          --artifact-dir dist --manifest-sha256 "$MANIFEST_SHA256" --attempts 6 --delay 10
+
+  release:
+    name: Tạo hoặc hoàn tất GitHub Release bằng cùng artifact
+    needs: [validate, ci, verify]
+    if: ${{ !cancelled() && needs.verify.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.ci.outputs.artifact_name }}
+          path: dist
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.validate.outputs.notes_artifact }}
+          path: notes
+      - name: Xác minh lại manifest trước khi đính kèm
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
+        run: *verify_artifacts
+      - name: Release idempotent, không đổi tag hoặc ghi đè asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ needs.validate.outputs.sha }}
+          NOTES_SHA256: ${{ needs.validate.outputs.notes_sha256 }}
+        run: |
+          python -I - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def gh(*args):
+              result = subprocess.run(['gh', *args], capture_output=True, check=False)
+              if result.returncode:
+                  raise SystemExit('GitHub command failed; inspect permissions/network before retry')
+              return result.stdout
+          def api(path):
+              return json.loads(gh('api', path))
+          repo, tag, sha = os.environ['GH_REPO'], os.environ['TAG'], os.environ['SHA']
+          ref = api(f'repos/{repo}/git/ref/tags/{tag}')['object']
+          seen = set()
+          while ref['type'] == 'tag':
+              if ref['sha'] in seen:
+                  raise SystemExit('Tag cycle')
+              seen.add(ref['sha'])
+              ref = api(f'repos/{repo}/git/tags/{ref["sha"]}')['object']
+          if ref['type'] != 'commit' or ref['sha'] != sha:
+              raise SystemExit('Tag moved or does not match validated commit')
+          notes = pathlib.Path('notes/release-notes.md')
+          if notes.is_symlink() or hashlib.sha256(notes.read_bytes()).hexdigest() != os.environ['NOTES_SHA256']:
+              raise SystemExit('Release notes digest mismatch')
+          def find_release():
+              # The tag endpoint excludes drafts; list with write access includes them.
+              pages = json.loads(gh('api', '--paginate', '--slurp', f'repos/{repo}/releases?per_page=100'))
+              matches = [item for page in pages for item in page if item['tag_name'] == tag]
+              if len(matches) > 1:
+                  raise SystemExit('Duplicate release tag')
+              return matches[0] if matches else None
+          release = find_release()
+          if release is None:
+              # Draft first: interruption never exposes a release missing assets.
+              gh('release', 'create', tag, '--verify-tag', '--target', sha, '--draft', '--title', tag, '--notes-file', str(notes))
+              release = find_release()
+          if release is None:
+              raise SystemExit('Created draft is not visible; stop before upload')
+          if release['tag_name'] != tag or release['prerelease'] or release['body'] != notes.read_text(encoding='utf-8'):
+              raise SystemExit('Existing release differs; do not overwrite')
+          expected = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in pathlib.Path('dist').iterdir()}
+          assets = api(f'repos/{repo}/releases/{release["id"]}/assets?per_page=100')
+          if len(assets) > len(expected) or len({a['name'] for a in assets}) != len(assets):
+              raise SystemExit('Unexpected or duplicate release assets')
+          for asset in assets:
+              if asset['name'] not in expected:
+                  raise SystemExit('Unexpected release asset')
+              data = gh('api', '-H', 'Accept: application/octet-stream', f'repos/{repo}/releases/assets/{asset["id"]}')
+              if hashlib.sha256(data).hexdigest() != expected[asset['name']]:
+                  raise SystemExit('Existing asset checksum mismatch')
+          present = {a['name'] for a in assets}
+          for name in sorted(expected.keys() - present):
+              gh('release', 'upload', tag, str(pathlib.Path('dist') / name))
+          # Read back every uploaded byte before publishing the draft.
+          assets = api(f'repos/{repo}/releases/{release["id"]}/assets?per_page=100')
+          if len(assets) != len(expected) or {a['name'] for a in assets} != set(expected):
+              raise SystemExit('Incomplete release assets')
+          for asset in assets:
+              data = gh('api', '-H', 'Accept: application/octet-stream', f'repos/{repo}/releases/assets/{asset["id"]}')
+              if hashlib.sha256(data).hexdigest() != expected[asset['name']]:
+                  raise SystemExit('Uploaded asset checksum mismatch')
+          if release['draft']:
+              gh('release', 'edit', tag, '--draft=false')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(f'Release {tag}: đúng SHA, notes và 3 asset SHA-256.\n')
+          PY
