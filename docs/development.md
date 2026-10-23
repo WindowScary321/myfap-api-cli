@@ -78,3 +78,9 @@ Bộ test và fixture chỉ nằm trong repo, không đóng gói vào wheel/sdis
 **Môi trường & Timezone:** File ICS sử dụng timezone Việt Nam từ `pytz`, không phụ thuộc vào timezone database của hệ điều hành trên Windows
 
 Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](../tasks/phase1.md)
+
+## Chuẩn bị phát hành Phase 5
+
+Quy trình tag → reusable CI → Trusted Publishing → post-publish smoke → GitHub Release nằm trong [runbook phát hành](releasing.md). Theo dõi kết quả và các gate chưa kiểm chứng tại [tasks/phase5.md](../tasks/phase5.md); release notes và known issues nằm trong [CHANGELOG.md](../CHANGELOG.md).
+
+Chỉ maintainer tạo/push tag sau khi PR chuẩn bị release đã merge và phạm vi hỗ trợ đã được duyệt. Test offline hoặc cài artifact thành công không xác nhận Trusted Publisher, publish thật hay nghiệm thu backend.
