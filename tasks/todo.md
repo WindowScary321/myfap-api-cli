@@ -30,3 +30,17 @@ Khi có điều kiện kiểm chứng, dùng session tạm, ghi rõ API version/
 Theo dõi triển khai, kết quả kiểm tra và gate dịch vụ còn mở tại [phase5.md](phase5.md). [Runbook phát hành](../docs/releasing.md) mô tả kiểm tag/version/artifact, Trusted Publishing, retry và TestPyPI; [CHANGELOG.md](../CHANGELOG.md) giữ release notes cùng known issues.
 
 Chuyển Phase 5 không tự đóng ba lỗi live v1, không xác nhận positive fee/survey và không cho phép tạo/push tag hoặc publish. Maintainer phải duyệt phạm vi hỗ trợ và các gate phát hành trước khi thực hiện.
+
+## Mở rộng command và endpoint Phase 6
+
+Theo quyết định ngày 23/10/2026, **chưa tag/publish cho đến sau khi hoàn thiện và nghiệm thu phạm vi Phase 6**. PR #9 đã merge tại `75fc7b4aa33a13b9b39eab898f61e2e693f4baf9`; đó là pipeline chuẩn bị, không phải release. Giữ baseline `0.2.0`, v1 mặc định/v2 opt-in.
+
+Checklist, tiêu chí và gate bằng chứng nằm tại [phase6.md](phase6.md). Các mục sau chỉ được đánh dấu khi có kết quả tương ứng:
+
+- [ ] Hoàn thiện các lát cắt đọc: courses, subjects theo kỳ, balance và news search, giữ hành vi command cũ.
+- [ ] Hoàn thiện transcript/training và marks summary sau khi chốt các ngoại lệ credential/response; không đoán query hoặc schema.
+- [ ] Bổ sung photo JSON và doctor an toàn; không tự fetch/decode ảnh hoặc refresh session khi chẩn đoán local.
+- [ ] Chốt rating/push/feedback theo gate schema/capability; không mở write hoặc ghi live khi chưa đủ bằng chứng/xác nhận.
+- [ ] Kiểm regression, artifact, CI và live đọc riêng; giữ nguyên mọi skip/failure/unverified và TODO v1/positive fee/survey ở trên.
+- [ ] Cập nhật Draft PR Phase 6; mỗi commit push có comment ngay sau commit, không tự merge/tag/publish.
+- [ ] Maintainer duyệt phạm vi Phase 6 và các gate dịch vụ Phase 5 trước khi phát hành thật.
