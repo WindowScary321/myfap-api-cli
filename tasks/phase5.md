@@ -2,7 +2,9 @@
 
 Nhánh `feat/phase5-release-automation` bắt đầu từ `origin/main` tại `06d98e115bb63a244d793236f81d7b62f63a5dc7`, sau khi PR #8 đã merge. Package giữ `0.2.0`, Python >=3.9, v1 mặc định và v2 opt-in.
 
-Phạm vi phase là chuẩn bị release notes, gate tag/version/artifact, Trusted Publishing, post-publish smoke và GitHub Release. Người dùng đã xác nhận commit và push **nhánh tính năng** sau kiểm tra. Tạo/push tag, upload và thay đổi cấu hình dịch vụ cần maintainer cho phép riêng. Chưa tạo tag, publish, GitHub Release hoặc PR trong lượt này.
+Phạm vi phase là chuẩn bị release notes, gate tag/version/artifact, Trusted Publishing, post-publish smoke và GitHub Release; thêm endpoint mới thuộc Phase 6 theo kế hoạch workspace. Người dùng đã xác nhận commit và push **nhánh tính năng** sau kiểm tra. Nhánh đang được theo dõi trong [Draft PR #9](https://github.com/WindowScary321/myfap-api-cli/pull/9). Tạo/push tag, upload và thay đổi cấu hình dịch vụ cần maintainer cho phép riêng; chưa tạo tag, publish hoặc GitHub Release.
+
+Mapping command → method → endpoint → URL → capability được hợp nhất tại [command-endpoints.md](../docs/command-endpoints.md), kèm danh sách route còn chưa tích hợp. Không dùng trạng thái triển khai pipeline hoặc live command cốt lõi để tuyên bố đã thêm toàn bộ endpoint.
 
 Hai commit mã nguồn đã kiểm: `671ca5f06b63ce4ae826732fb4f1a3a64c252f62` (công cụ và regression release) và `e0178737b07de80878231f9875a049e755953939` (pipeline và regression workflow). Commit tài liệu bàn giao nằm tiếp sau, không đổi code đã test.
 
@@ -20,7 +22,7 @@ Các finding v1 và positive case nằm trong [TODO](todo.md) và [coverage Phas
 - [ ] Tag stable đúng `vX.Y.Z`, không prerelease/zero đứng đầu; tag, source, lockfile và artifact cùng version.
 - [ ] Fetch rõ `origin/main`; SHA tag đã resolve thuộc lịch sử `main` trước build/upload.
 - [ ] Gọi reusable CI trên đúng SHA, nhận `artifact_name`, `package_version`, `manifest_sha256`; không build lại trong workflow publish.
-- [ ] Matrix source và cài wheel/sdist đạt Ubuntu/Windows × Python 3.9/3.11; artifact không có docs/tasks/tests/session/capture.
+- [x] Matrix source và cài wheel/sdist đạt Ubuntu/Windows × Python 3.9/3.11; artifact không có docs/tasks/tests/session/capture. [CI PR #9 tại commit bc8a7ee](https://github.com/WindowScary321/myfap-api-cli/actions/runs/39960229451) đạt đủ 11 job; không đồng nghĩa pipeline tag/publish đã chạy.
 - [ ] Mọi download đối chiếu inventory và hash; notes lấy đúng mục version, được ràng buộc digest.
 - [ ] Preflight đối chiếu từng file/hash trên index, phân biệt missing/partial/complete; chỉ upload file thiếu đã xác minh, dừng khi có xung đột.
 - [ ] Chỉ job upload có OIDC và environment `pypi`; không checkout/chạy source dự án trong job đặc quyền.
@@ -31,7 +33,7 @@ Các finding v1 và positive case nằm trong [TODO](todo.md) và [coverage Phas
 
 ## Kiểm tra local và offline
 
-Kiểm tra local hoàn tất ngày **23/10/2026**, trên nền commit `06d98e115bb63a244d793236f81d7b62f63a5dc7` cùng thay đổi Phase 5 sau đó được lưu trong hai commit mã nguồn nêu trên. Chưa tạo tag hay phát hành. Các gate GitHub Actions/Trusted Publisher phía trên vẫn để mở vì chưa chạy trên dịch vụ thật.
+Kiểm tra local hoàn tất ngày **23/10/2026**, trên nền commit `06d98e115bb63a244d793236f81d7b62f63a5dc7` cùng thay đổi Phase 5 sau đó được lưu trong hai commit mã nguồn nêu trên. Chưa tạo tag hay phát hành. CI PR đã chạy trên GitHub Actions và đạt tại commit `bc8a7ee`; các gate workflow tag/publish và Trusted Publisher vẫn để mở vì chưa nghiệm thu phát hành thật.
 
 Các lệnh dưới đây chạy từ checkout CLI; với workspace gốc dùng `uv --directory myfap-phase2-review-fixes ...` để giữ đúng working directory. Chỉ `--project` chọn môi trường mà không đổi thư mục làm việc sẽ khiến các test import `tests`/`scripts` và validator metadata thất bại; các lượt sai thư mục trước đó không được tính là đạt.
 
@@ -80,6 +82,12 @@ Ngày 20/10/2026, chạy CLI thật trên **v2/HN** bằng browser FEID cục b�
 | `logout` | 0 | File session đã xóa; thư mục tạm chứa lock được dọn sau harness |
 
 Không ghi nhận HTTP status ở harness này, không suy ra HTTP 200 chỉ từ body code. Không kiểm tra nội dung positive fee/survey; các TODO đó vẫn mở. Không chạy lại v1 trong lượt Phase 5 này và không thay thế kết quả thất bại v1 ngày 19/10. Lượt đầu dùng `python -m myfap.cli` không gọi entry point đã bị loại bỏ; toàn bộ kết quả trong bảng là lượt gọi đúng `app()`.
+
+### Lượt live mới và CI của PR #9
+
+Ngày 23/10/2026, trên commit `bc8a7ee3131093432de427e1954743ee34618f45`, đã login mới hoàn toàn rồi chạy 22 lần command trên v2/HN: tất cả exit 0; 28 request FAP/survey thuộc 19 operation. Lượt này ghi được HTTP/body code tại biên HTTP thật, không thay response. ICS và JSON hợp lệ; refresh và đọc sau refresh đạt. Hai nhóm chi tiết điểm/điểm danh bị skip vì không lấy được tham số phù hợp. Fee có data không rỗng nhưng schema nghiệp vụ chưa được đối chiếu; survey vẫn HTTP 200/body 404. Session/lock tạm đã dọn; chỉ metadata đã lọc được lưu. Xem [mapping và kết quả chi tiết](../docs/command-endpoints.md#lượt-live-mới-ngày-23102026).
+
+[CI run 39960229451](https://github.com/WindowScary321/myfap-api-cli/actions/runs/39960229451) của Draft PR #9 trên commit `bc8a7ee` đã đạt 11/11 job, gồm source và artifact smoke Ubuntu/Windows × Python 3.9/3.11. Đây là CI của PR, không phải một lượt push tag → PyPI → GitHub Release. Lượt local trước đó vẫn có giới hạn môi trường như đã ghi, không được đổi thành kết quả Ubuntu local.
 
 ## Gate dịch vụ và phát hành thực tế
 

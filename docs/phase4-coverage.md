@@ -21,6 +21,10 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 | Feedback/profile | `CheckOpenFeedBack`, `CheckUpdateProfile` | Cùng operation | Fixture query `Authen` mới sau refresh; smoke v2 HN HTTP/body 200 |
 | Thông báo | `GetNotificationByRoll` | `GetNotificationByRoll` | Live v1 APHL ngày 19/10 vẫn HTTP 200/body 201; smoke v2 HN HTTP/body 200 |
 
+## Bảng command, endpoint và URL hợp nhất
+
+Xem [command → method → endpoint → URL → capability](command-endpoints.md) cho cả v1/v2, helper không có command riêng và các route còn thuộc Phase 6. Bảng kèm kết quả live mới ngày 23/10/2026 trên commit `bc8a7ee`: 22 lần chạy command exit 0, 28 request FAP/survey thuộc 19 operation. Điểm chi tiết và điểm danh chi tiết bị skip vì chưa lấy được tham số phù hợp; không ghi live pass cho hai nhóm đó. Fee có data không rỗng nhưng chưa đối chiếu schema nghiệp vụ; survey vẫn not-found. Các kết quả lịch sử bên dưới giữ nguyên, không bị diễn giải thành mọi route đã đạt.
+
 ## Quy tắc transport
 
 - V2 chỉ gửi các operation có trong allowlist đọc. Route ghi, stub hoặc chưa có capability vẫn bị chặn trước HTTP.
