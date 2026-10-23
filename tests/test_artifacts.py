@@ -210,7 +210,7 @@ class ArtifactGateTests(unittest.TestCase):
                         validate_artifacts(self.root, self.dist)
 
     def test_repository_only_directories_are_rejected_in_both_formats(self):
-        for name in ("docs/Example.md", "tasks/phase0.md", "myfap/docs/example.py", "myfap/tasks/plan.py"):
+        for name in ("docs/Example.md", "tasks/phase0.md", "myfap/docs/example.py", "myfap/tasks/plan.py", "tests/test_example.py", "myfap/tests/test_example.py", "myfap/nested/docs/example.py", "myfap/nested/tests/test_example.py"):
             for kind in ("wheel", "sdist"):
                 with self.subTest(path=name, kind=kind):
                     self.bundle()
