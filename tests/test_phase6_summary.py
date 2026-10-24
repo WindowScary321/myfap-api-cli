@@ -4,6 +4,7 @@ import json
 import unittest
 
 import requests
+from rich.text import Text
 
 from myfap.summary import read_semester_marks_response
 
@@ -93,7 +94,7 @@ class SemesterSummaryCommandTests(unittest.TestCase):
             with self.subTest(options=options), patch("myfap.cli.get_auth") as auth:
                 result = CliRunner(**({"mix_stderr": False} if "mix_stderr" in inspect.signature(CliRunner).parameters else {})).invoke(app, ["marks", "--summary", *options, "--stdout"])
             self.assertNotEqual(result.exit_code, 0)
-            self.assertIn("--summary", result.stderr)
+            self.assertIn("--summary", Text.from_ansi(result.stderr).plain)
             auth.assert_not_called()
 
     def test_summary_rebuilds_authen_after_single_refresh(self):

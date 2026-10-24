@@ -9,6 +9,7 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from typer.testing import CliRunner
+from rich.text import Text
 
 from myfap.cli import app
 from tests.test_api import response
@@ -157,7 +158,7 @@ class CoursesCommandTests(unittest.TestCase):
                     ])
                 self.assertIn(result.exit_code, (1, 2))
                 self.assertEqual(result.stdout, "")
-                self.assertIn("--semester", result.stderr)
+                self.assertIn("--semester", Text.from_ansi(result.stderr).plain)
                 request.assert_not_called()
 
 
@@ -194,7 +195,7 @@ class SubjectsBySemesterTests(unittest.TestCase):
         with patch("requests.Session.request") as request:
             result = self.runner.invoke(app, ["other", "subjects", "--semester", " ", "--stdout"])
         self.assertNotEqual(result.exit_code, 0)
-        self.assertIn("--semester", result.stderr)
+        self.assertIn("--semester", Text.from_ansi(result.stderr).plain)
         request.assert_not_called()
 
 
@@ -229,7 +230,7 @@ class SearchNewsTests(unittest.TestCase):
             with self.subTest(value=value), patch("myfap.cli.get_auth") as auth, patch("requests.Session.request") as request:
                 result = self.runner.invoke(app, ["news", "--search", value, "--stdout"])
                 self.assertNotEqual(result.exit_code, 0)
-                self.assertIn("--search", result.stderr)
+                self.assertIn("--search", Text.from_ansi(result.stderr).plain)
                 auth.assert_not_called()
                 request.assert_not_called()
 
