@@ -41,6 +41,8 @@ Test mới dùng CLI/auth/client thật với session tổng hợp và HTTP gi�
 
 Sau rating list, full local Windows có 391 test trên mỗi Python 3.11/3.9, 387 đạt/4 skip, exit 0. Venv Python 3.9 từng lỗi tzdata UTC độc lập với command; cài lại đúng version khóa trong venv test đã phục hồi probe UTC và toàn suite, không đổi lockfile.
 
+Nghiệm thu nhóm mục 1 (24/10/2026): `ReadSliceAcceptanceTests` bổ sung 5 test tại seam CLI cho cả bốn lát cắt đọc trên hai version — header v2 đúng contract client (`ClientCode`, `CampusCode`, `Authorization` Bearer, `Checksum` dạng `chữ ký:timestamp giây`, GET không body/`Content-Type`), expiry retry đúng một lần với credential mới rồi dừng, và App Check/timeout/HTTP 503/malformed giữ một request, không refresh/fallback, stdout rỗng khi lỗi. Test GREEN ngay vì xác nhận hành vi đã có; focused `tests.test_phase6_reads` 22/22, full Windows 399 test, 395 đạt/4 skip, exit 0.
+
 CI run [40064482334](https://github.com/WindowScary321/myfap-api-cli/actions/runs/40064482334) tại `d6d0ee63a7c052bf94112426323ed06b4ca05be6` đạt **11/11 job**, gồm source và artifact smoke Ubuntu/Windows × Python 3.9/3.11. Run trước đó thất bại vì assertion đọc tên option trên chuỗi ANSI; đã tái hiện FORCE_COLOR=1 rồi dùng Text.from_ansi theo test help sẵn có, giữ nguyên kiểm tra nội dung và no-HTTP.
 
 Đã thử mở browser/context mới để kiểm live v2/HN trong lượt này: doctor local exit 0 với JSON hợp lệ và không HTTP; login exit 1, chưa có response FAP được quan sát. Các command xác thực mới sau login **chưa chạy**, không ghi chúng là live pass hoặc live-failed endpoint. Logout exit 0; session và thư mục tạm đã dọn. Không suy nguyên nhân lỗi login từ việc không có response.

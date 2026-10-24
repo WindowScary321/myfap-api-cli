@@ -381,6 +381,150 @@ class V1ObservedFailureTests(unittest.TestCase):
                 self.assertEqual(self.path.read_bytes(), before)
 
 
+class ReadSliceAcceptanceTests(unittest.TestCase):
+    """Nghiệm thu nhóm mục 1: header contract và ma trận lỗi tại seam CLI."""
+
+    COMMANDS = (
+        (["other", "balance"], "GetBalance"),
+        (["courses", "--semester", "FAKE_TERM"], "GetCourseOfSemester"),
+        (["other", "subjects", "--semester", "FAKE_TERM"], "GetSubjectBySemester"),
+        (["news", "--search", "synthetic"], "SearchNews"),
+    )
+
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    def test_v2_headers_carry_client_contract_and_get_has_no_body(self):
+        self.save_session("v2")
+        for command, operation in self.COMMANDS:
+            with self.subTest(operation=operation):
+                with patch("requests.Session.request", return_value=response({"code": 200, "data": []})) as request:
+                    result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+                self.assertEqual(request.call_args.args[0], "GET")
+                self.assertTrue(request.call_args.args[1].endswith("/" + operation))
+                headers = request.call_args.kwargs["headers"]
+                self.assertEqual(headers["ClientCode"], "MyFAP")
+                self.assertEqual(headers["CampusCode"], "TEST")
+                self.assertEqual(headers["Authorization"], "Bearer FAKE_FAP_KEY")
+                signature, separator, timestamp = headers["Checksum"].partition(":")
+                self.assertEqual(separator, ":")
+                self.assertTrue(signature and signature.isascii())
+                self.assertTrue(timestamp and timestamp.isascii() and timestamp.isdecimal())
+                self.assertNotIn("json", request.call_args.kwargs)
+                self.assertNotIn("Content-Type", headers)
+
+    def test_expiry_retries_once_with_fresh_credential_at_cli_seam(self):
+        signals = (
+            ("v1", {"code": 201, "message": "Token invalid", "data": None}, 200),
+            ("v2", {"code": 401, "data": None}, 200),
+            ("v2", {"code": 200, "data": []}, 401),
+        )
+        for command, operation in self.COMMANDS:
+            for version, expired, status in signals:
+                with self.subTest(operation=operation, version=version, status=status):
+                    self.save_session(version)
+                    original = self.path.read_bytes()
+
+                    def refresh(auth):
+                        auth.authen_key = "FAKE_NEW_KEY"
+                        return True
+
+                    with patch("requests.Session.request",
+                               side_effect=[response(expired, status), response({"code": 200, "data": []})]) as request, \
+                         patch("myfap.auth.MyFapAuth.refresh_session", autospec=True, side_effect=refresh) as rotation:
+                        result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+                    self.assertEqual(request.call_count, 2)
+                    rotation.assert_called_once()
+                    first, second = request.call_args_list
+                    self.assertTrue(first.args[1].endswith("/" + operation))
+                    self.assertTrue(second.args[1].endswith("/" + operation))
+                    if version == "v1":
+                        self.assertEqual(first.kwargs["params"]["Authen"], "FAKE_FAP_KEY")
+                        self.assertEqual(second.kwargs["params"]["Authen"], "FAKE_NEW_KEY")
+                    else:
+                        self.assertEqual(first.kwargs["headers"]["Authorization"], "Bearer FAKE_FAP_KEY")
+                        self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer FAKE_NEW_KEY")
+                        self.assertNotEqual(first.kwargs["headers"]["Checksum"], second.kwargs["headers"]["Checksum"])
+                        self.assertEqual(
+                            {key: value for key, value in first.kwargs["params"].items() if key != "Authen"},
+                            {key: value for key, value in second.kwargs["params"].items() if key != "Authen"},
+                        )
+                    self.assertEqual(self.path.read_bytes(), original)
+                    self.assertNotIn("FAKE_FAP_KEY", result.stdout + result.stderr)
+
+    def test_second_expiry_stops_after_single_retry(self):
+        signals = (
+            ("v1", {"code": 201, "message": "Token invalid", "data": None}, 200),
+            ("v2", {"code": 401, "data": None}, 200),
+        )
+        for version, expired, status in signals:
+            with self.subTest(version=version):
+                self.save_session(version)
+
+                def refresh(auth):
+                    auth.authen_key = "FAKE_NEW_KEY"
+                    return True
+
+                with patch("requests.Session.request",
+                           side_effect=[response(expired, status), response(expired, status)]) as request, \
+                     patch("myfap.auth.MyFapAuth.refresh_session", autospec=True, side_effect=refresh) as rotation:
+                    result = self.runner.invoke(app, ["--config", str(self.path), "other", "balance", "--stdout"])
+                self.assertEqual(result.exit_code, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(request.call_count, 2)
+                rotation.assert_called_once()
+
+    def test_app_check_timeout_and_5xx_fail_once_without_refresh_or_fallback(self):
+        import requests as requests_module
+
+        failures = (
+            (response({"code": "APP_CHECK_FAILED"}), "APP_CHECK_FAILED"),
+            (requests_module.Timeout("PRIVATE_SENTINEL_URL"), "thử lại sau"),
+            (response(None, 503), "HTTP 503"),
+        )
+        for version in ("v1", "v2"):
+            for command, operation in self.COMMANDS:
+                for failure, message in failures:
+                    with self.subTest(version=version, operation=operation, message=message):
+                        self.save_session(version)
+                        before = self.path.read_bytes()
+                        with patch("requests.Session.request", side_effect=[failure]) as request, \
+                             patch("myfap.auth.MyFapAuth.refresh_session") as refresh:
+                            result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+                        self.assertEqual(result.exit_code, 1)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn(message, Text.from_ansi(result.stderr).plain)
+                        self.assertNotIn("PRIVATE_SENTINEL_URL", Text.from_ansi(result.stderr).plain)
+                        self.assertEqual(request.call_count, 1)
+                        self.assertTrue(request.call_args.args[1].endswith("/" + operation))
+                        refresh.assert_not_called()
+                        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_malformed_payload_is_reported_without_retry_or_refresh(self):
+        cases = (
+            (response("invalid-envelope"), "phải có code và data"),
+            (response({"code": "ok", "data": []}), "không hợp lệ"),
+        )
+        for version in ("v1", "v2"):
+            for command, operation in self.COMMANDS:
+                for failure, message in cases:
+                    with self.subTest(version=version, operation=operation, message=message):
+                        self.save_session(version)
+                        with patch("requests.Session.request", side_effect=[failure]) as request, \
+                             patch("myfap.auth.MyFapAuth.refresh_session") as refresh:
+                            result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+                        self.assertEqual(result.exit_code, 1)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn(message, Text.from_ansi(result.stderr).plain)
+                        self.assertEqual(request.call_count, 1)
+                        self.assertTrue(request.call_args.args[1].endswith("/" + operation))
+                        refresh.assert_not_called()
+
+
 class OtherCommandLayoutTests(unittest.TestCase):
     setUp = BalanceCommandTests.setUp
     save_session = BalanceCommandTests.save_session
