@@ -29,7 +29,7 @@ Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus 
 ## Policy và phần chưa xác minh
 
 - Các read mới kế thừa binding và tối đa một refresh/retry khi server báo expiry rõ. Không tự refresh/logout từ 201 không rõ nghĩa, 403, timeout, 5xx hoặc App Check. Capability đọc không mở đường ghi.
-- Với transcript/training/summary, caller của APK (module_599.js) gọi wrapper GET **không truyền credential header**: wrapper (dòng 898–906) mặc định credential chuỗi rỗng khi thiếu tham số thứ tư, `_buildHeaders` (747–781) khi đó tạo header không `Authorization` và `_makeChecksum` (726–746) ký bằng bootstrap token. Chỉ `GetSemesterMark` (218–224) đặt FAP key trong query `Authen`; `AcademicTranscript` (266–272) và `GetDiemphongtrao` (280–286) chỉ có query campus/roll/semester. CLI giữ **policy authenticated read dùng FAP key của binding hiện tại** cho cả ba — không sao chép credential rỗng của app, không thử unauth rồi fallback, không nới reader chung — và đã đọc thành công HTTP/body 200 ở lượt 24/10 lẫn lượt nghiệm thu mục 2; không chứng minh server bắt buộc Bearer và không tuyên bố parity byte-for-byte với app.
+- Với transcript/training/summary, caller của APK (module_599.js) gọi wrapper GET **không truyền credential header**: wrapper (dòng 898–906) mặc định credential chuỗi rỗng khi thiếu tham số thứ tư, `_buildHeaders` (747–781) khi đó tạo header không `Authorization` và `_makeChecksum` (726–746) ký bằng bootstrap token. Chỉ `GetSemesterMark` (218–224) đặt FAP key trong query `Authen`; `AcademicTranscript` (266–272) và `GetDiemphongtrao` (280–286) chỉ có query campus/roll/semester. CLI giữ **policy authenticated read dùng FAP key của binding hiện tại** cho cả ba — không sao chép credential rỗng của app, không thử unauth rồi fallback, không nới reader chung. Thí nghiệm transport có kiểm soát (bảng cuối file) cho thấy proxy hiện tại **từ chối** mọi biến thể lệch khỏi policy này; vậy nhánh credential rỗng trong bytecode không được server chấp nhận — hoặc app thật bơm token ở tầng khác (Axios wrapper `module_1(Axios2)` chưa phục dựng) hoặc proxy đã đổi hành vi so với APK build 31. CLI không thay đổi.
 - Reader tổng kết chỉ dành cho `GetSemesterMark`: raw JSON array, envelope có data list, hoặc JSON string chứa trọn array. Giới hạn xử lý cục bộ 1 MiB. Không cắt tùy tiện chuỗi giữa dấu ngoặc; XML/HTML wrapper chưa xác minh bị từ chối bằng lỗi payload an toàn. Reader chung của operation khác không được nới lỏng.
 - Photo JSON không đồng nghĩa đã hỗ trợ xuất ảnh binary. Không tự fetch URL bất kỳ hoặc chuyển credential sang host ảnh.
 - Rating list v1 có code/fixture; URL là `https://api.fpt.edu.vn/fap/api/MyFAP/GetStudentRate`. Rating list v2 là stub và bị chặn. Rating submit/push/feedback đầy đủ chưa được mở bởi các thay đổi này. Những gate tại [tasks/phase6.md](../tasks/phase6.md) vẫn còn pending, Phase 6 **chưa hoàn tất**.
@@ -109,3 +109,16 @@ Chạy trên máy cá nhân bằng session thật của người dùng ở code 
 | `marks --summary` | 200 / 200 | Envelope data list 32 phần tử; mỗi phần tử đúng 5 khóa `SubjectCode`, `ClassName`, `AverageMark`, `Status`, `GradeStatus` — positive schema thật đầu tiên cho GetSemesterMark |
 
 Lượt này cùng bằng chứng bytecode ở phần Policy khép hộp credential v2 của transcript/training/summary trong [phase6.md](../tasks/phase6.md) mục 2. Schema nghiệp vụ transcript (HTML) và training vẫn giữ nhãn chưa kiểm chứng; positive schema summary là xác nhận dạng dữ liệu trên một tài khoản, chưa phải nghiệm thu backend mọi campus.
+
+### Thí nghiệm transport có kiểm soát (24/10/2026)
+
+Sau khi đọc bytecode cho thấy nhánh credential rỗng, maintainer yêu cầu thử đưa biến thể đó vào kiểm chứng. Thí nghiệm gửi trực tiếp năm biến thể header cho cả ba operation bằng session thật (chỉ đọc GET, metadata đã lọc, không giá trị) trước khi đổi CLI:
+
+| Biến thể | Authorization | Checksum ký bằng | Kết quả cả 3 operation |
+|---|---|---|---|
+| App-parity đủ theo `_buildHeaders` (kể cả `Content-Type` json) | không có | bootstrap token | HTTP 400, body không JSON |
+| Bearer FAP key + checksum bootstrap | FAP key | bootstrap token | HTTP 400 — checksum phải ký đúng credential trong Authorization |
+| Bearer bootstrap token (kiểu `_getNoAuth`) | bootstrap token | bootstrap token | HTTP 500 — qua tầng xác thực, hỏng tầng nghiệp vụ |
+| Bearer FAP key + checksum theo key (policy CLI) | FAP key | FAP key | HTTP 200, body 200 — duy nhất được chấp nhận |
+
+Kết luận: proxy v2 hiện tại chỉ chấp nhận cặp `Authorization: Bearer <FAP key>` + `Checksum` ký bằng đúng key đó cho cả ba operation; nhánh credential rỗng trong bytecode bị từ chối. CLI giữ nguyên policy — nay có bằng chứng hai chiều trên một tài khoản/campus (HN), không suy rộng cho mọi campus hay suy luận app thật gửi gì lúc runtime.
