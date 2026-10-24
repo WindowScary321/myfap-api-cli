@@ -17,6 +17,7 @@ AUTHENTICATED_READ_CASES = (
     (api.MyFapOther, "get_notification", (), "GetNotificationByRoll"),
     (api.MyFapOther, "get_fee", (), "GeFeeByRoll"),
     (api.MyFapOther, "get_balance", (), "GetBalance"),
+    (api.MyFapOther, "get_ratings", (), "GetStudentRate"),
     (api.MyFapOther, "get_subjects", (), "GetSubjets"),
     (api.MyFapOther, "get_subjects", ("Fall2026",), "GetSubjectBySemester"),
     (api.MyFapClient, "get_schedule", ("Fall2026",), "GetActivityStudent"),

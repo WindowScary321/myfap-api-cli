@@ -322,5 +322,35 @@ class PublicReadValidationTests(unittest.TestCase):
                         session.get.assert_not_called()
 
 
+class RatingListTests(unittest.TestCase):
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    def test_rating_list_v1_uses_read_contract_without_semester(self):
+        self.save_session("v1")
+        payload = {"code": 200, "data": [{"synthetic": "rating item"}]}
+        with patch("requests.Session.request", return_value=response(payload)) as request, \
+             patch("myfap.api.create_checksum", return_value="SYNTHETIC_RATE_LIST") as checksum:
+            result = self.runner.invoke(app, ["rating", "list", "--config", str(self.path), "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), payload)
+        request.assert_called_once()
+        self.assertEqual(request.call_args.args[0], "GET")
+        self.assertTrue(request.call_args.args[1].endswith("/GetStudentRate"))
+        self.assertEqual(request.call_args.kwargs["params"], {
+            "campusCode": "TEST", "rollNumber": "TEST000", "Authen": "FAKE_FAP_KEY", "checksum": "SYNTHETIC_RATE_LIST"})
+        checksum.assert_called_once_with("TEST000", "TEST")
+
+    def test_rating_list_v2_stub_is_rejected_before_session_load_or_http(self):
+        self.save_session("v2")
+        with patch("myfap.auth.MyFapAuth.load_session") as load, patch("requests.Session.request") as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "rating", "list", "--stdout"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("GetStudentRate", result.stderr)
+        load.assert_not_called()
+        request.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -247,6 +247,13 @@ class MyFapOther:
         return _authenticated_get(self.session, self.auth, "GeFeeByRoll", self.auth.mssv,
                                   student=True, timeout=self.timeout, api_version=self.api_version)
 
+    def get_ratings(self):
+        """Đọc danh sách rating v1; không suy implementation cho stub v2."""
+        if self.api_version != "v1":
+            raise ApiError("GetStudentRate chưa được hỗ trợ trong adapter API v2.")
+        return _authenticated_get(self.session, self.auth, "GetStudentRate", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
     def get_balance(self):
         """Lấy số dư, bảo toàn payload thay vì tự suy diễn thông tin tài chính."""
         return _authenticated_get(self.session, self.auth, "GetBalance", self.auth.mssv,

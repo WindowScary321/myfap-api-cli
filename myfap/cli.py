@@ -90,6 +90,9 @@ app.add_typer(info_app, name="info")
 other_app = typer.Typer(help="Các chức năng phụ trợ khác (survey, feedback, fee...)")
 app.add_typer(other_app, name="other")
 
+rating_app = typer.Typer(help="Đánh giá dịch vụ; list hiện chỉ hỗ trợ API v1")
+app.add_typer(rating_app, name="rating")
+
 state = {
     "campus": None,
     "config": None,
@@ -645,6 +648,21 @@ def info_campus(
         save_output(data, filename, output, stdout)
     except Exception as e:
         err_console.print(f"[red]Lỗi: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@rating_app.command("list")
+def rating_list(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In JSON danh sách; không gửi đánh giá")
+):
+    """Lấy danh sách đánh giá student/v1; v2 stub bị chặn trước HTTP."""
+    auth = require_auth("GetStudentRate")
+    try:
+        data = MyFapOther(auth).get_ratings()
+        save_output(data, "RatingList.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy danh sách đánh giá: {error}[/red]")
         raise typer.Exit(code=1)
 
 
