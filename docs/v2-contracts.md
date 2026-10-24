@@ -69,16 +69,16 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetTokenWithEmp` | `GET` | unsupported | Employee flow |
 | `GetAllActiveCampus` | `POST` | supported | Body `{}` |
 | `GetCampusInfo` | `GET` | supported | Query `CampusCode`, `rollNumber` |
-| `GetStudentFeedbacks` | `GET` | unsupported | Query `CampusCode`, `rollNumber` |
-| `GetStudentFeedbackForm` | `GET` | unsupported | Query `CampusCode`, `rollNumber`, `feedbackId` |
+| `GetStudentFeedbacks` | `GET` | supported | Phase 6 mở rộng: query `CampusCode`, `rollNumber` (không query `Authen` theo bytecode dòng 613); item schema chưa positive |
+| `GetStudentFeedbackForm` | `GET` | unsupported | Query `CampusCode`, `rollNumber`, `feedbackId`; chờ feedbackId thật |
 | `SubmitStudentFeedback` | `POST` | unsupported | Body nghiệp vụ |
-| `GetVersion` | `GET` | unsupported | Query rỗng |
+| `GetVersion` | `POST` | supported | Phase 6 mở rộng: caller APK dùng GET nhưng proxy trả 405 với GET; POST body `{}` bootstrap đã probe 24/10/2026; v1 đã 404 |
 | `GetApiActive` | `POST` | supported | Bootstrap chẩn đoán trạng thái proxy |
 | `GetStudentRate` | Không có | stub | APK export không có implementation request rõ ràng |
 | `GetConnect` | Không có | stub | APK chỉ nối lại một đối tượng kết nối đã có |
 | `GetLoginDonor` | Không có | stub | APK trả trạng thái tạm, chưa có contract login donor |
 
-Sau nhóm đọc Phase 6, ma trận có 29 operation được hỗ trợ trong code: 26 operation đọc, 2 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
+Sau nhóm đọc Phase 6 và đợt mở rộng endpoint 24/10/2026, ma trận có 31 operation được hỗ trợ trong code: 27 operation đọc, 3 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` rồi `GetVersion` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
 Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai năm route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack`, `GetNotificationByRoll` và `GetSemesterMark`; `AddRate`/`GetNotificationByDonor` vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
 

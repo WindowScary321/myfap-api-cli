@@ -4,7 +4,7 @@ Tài liệu này hợp nhất mapping command → operation → method/URL → c
 
 ## Bổ sung Phase 6 đang review
 
-Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](phase6-coverage.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
+Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
 
 ## Phạm vi theo kế hoạch
 
@@ -44,10 +44,11 @@ Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md
 | `other fee` | `GeFeeByRoll` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GeFeeByRoll` | `https://fap-proxy.fpt.edu.vn/MyFAP/GeFeeByRoll` | V2/HN live 200/200, data không rỗng; chưa đối chiếu schema nghiệp vụ. V1/APHL HTTP 404 ngày 19/10 |
 | `other subjects` | `GetSubjets` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetSubjets` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetSubjets` | Student/read; live v2/HN 200/200; timeout tối thiểu 30 giây |
 | `other feedback` | `CheckOpenFeedBack` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/CheckOpenFeedBack` | `https://fap-proxy.fpt.edu.vn/MyFAP/CheckOpenFeedBack` | Chỉ kiểm tra/read, không submit feedback; live v2/HN 200/200, data boolean |
+| `other feedbacks` | `GetStudentFeedbacks` | Không hỗ trợ / GET | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetStudentFeedbacks` | Phase 6 mở rộng, v2-only; query `CampusCode`, `rollNumber`; live 200/200 list rỗng, item schema chưa positive |
 | `other profile` | `CheckUpdateProfile` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/CheckUpdateProfile` | `https://fap-proxy.fpt.edu.vn/MyFAP/CheckUpdateProfile` | Chỉ kiểm tra/read, không cập nhật hồ sơ; live v2/HN 200/200, data boolean |
 | `other notification` | `GetNotificationByRoll` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetNotificationByRoll` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetNotificationByRoll` | V2/HN live 200/200; v1/APHL vẫn lỗi 200/201 ngày 19/10 |
 | `other survey` ở cả hai API version | `GetRequiredSurvey` | GET / GET | `https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey` | `https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey` | Dịch vụ riêng, signer riêng; live HTTP 200/body 404, không phải positive survey |
-| Chỉ Python API `MyFapEssential.get_api_active()`; chưa có command CLI | `GetApiActive` | Không hỗ trợ / POST | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetApiActive` | Public/bootstrap diagnostic v2; fixture, chưa gọi trong lượt live mới; không auto-switch/fallback |
+| `doctor --api-version v2 --online` | `GetApiActive`, `GetVersion` | Không hỗ trợ / POST bootstrap | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetApiActive`, `https://fap-proxy.fpt.edu.vn/MyFAP/GetVersion` | Phase 6 mở rộng: probe `api_active` boolean và `backend_version` chuỗi ngắn; GET với GetVersion bị 405, POST body `{}` đạt 200; không xác nhận session/campus tài khoản |
 
 `version` và `--help` không cần API. `logout` chỉ xóa session local, không phải request logout FEID/FAP. Các command export JSON/ICS/pretty dùng cùng endpoint dữ liệu, không tạo route mới.
 
@@ -80,9 +81,9 @@ Không chạy lại v1 trong lượt này. Kết quả v2 không đóng ba findi
 | Transcript / marks summary | `AcademicTranscript`, `GetSemesterMark` | Phase 6; transcript có ở cả v1/v2, chưa tích hợp CLI |
 | Courses / subjects theo kỳ / training | `GetCourseOfSemester`, `GetSubjectBySemester`, `GetDiemphongtrao` | Phase 6; phải giữ đúng case từng query |
 | Balance / tìm news / ảnh | `GetBalance`, `SearchNews`, `RetriveImage` | Phase 6; chưa có command tương ứng |
-| Doctor / kiểm version backend | `GetApiActive`, `GetVersion` | `GetApiActive` đã có Python method v2 nhưng chưa có CLI; `GetVersion` chưa hỗ trợ |
+| Doctor / kiểm version backend | `GetApiActive`, `GetVersion` | Đã mở cho `doctor --online` (24/10/2026): `GetApiActive` + `GetVersion` POST bootstrap; GET với GetVersion bị 405, route v1 404 |
 | Rating / push | `GetStudentRate`, `AddRate`, `UpdateTokedevices`, `UpdateTokenDonor` | Chưa mở CLI; phân biệt stub v2 và GET ghi; cần schema, xác nhận và không retry ghi |
-| Feedback đầy đủ | `GetStudentFeedbacks`, `GetStudentFeedbackForm`, `SubmitStudentFeedback` | Không đồng nhất với `other feedback`; schema submit/capability chưa đầy đủ |
+| Feedback đầy đủ | `GetStudentFeedbacks`, `GetStudentFeedbackForm`, `SubmitStudentFeedback` | `GetStudentFeedbacks` đã mở `other feedbacks` v2-only (envelope live, item chưa positive); Form chờ feedbackId thật, Submit vẫn gate |
 | Google/donor/employee, FEID server-code exchange | Các flow tương ứng trong inventory | TODO riêng; không suy hỗ trợ chỉ từ route có trong APK |
 
 Inventory và method từng route proxy nằm trong [ma trận v2](v2-contracts.md#ma-trận-route-v2). Thêm các endpoint này vào Phase 5 sẽ là thay đổi phạm vi cần thống nhất lại; smoke command hiện có không chứng minh chúng đã được triển khai.

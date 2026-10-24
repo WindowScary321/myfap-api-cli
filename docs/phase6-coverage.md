@@ -17,8 +17,9 @@ URL dữ liệu v1 là `https://api.fpt.edu.vn/fap/api/MyFAP/<operation>`; v2 l�
 | `marks --summary` | `GetSemesterMark` | Có / Có | Không có query kỳ; v1 `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 có query Authen mới sau refresh | Fixture parser/refresh; live v2/HN 200/200 với envelope data list |
 | `info photo` | `RetriveImage` | Có / Có | Chỉ JSON, bảo toàn chuỗi opaque kể cả HTML entity; không tải URL hoặc decode ảnh | Live v2/HN 200/200, data string; định dạng ảnh chưa xác minh |
 | `other rating list` | `GetStudentRate` | Có / Không | V1 đọc, ký bằng roll number; v2 stub bị chặn trước load session/HTTP | Fixture và live v1/APHL 200/200, danh sách rỗng |
+| `other feedbacks` | `GetStudentFeedbacks` | Không / Có | V2-only; query `CampusCode`, `rollNumber`, không query `Authen` (bytecode dòng 613); credential qua header Bearer | Fixture contract; live 24/10 200/200 list rỗng — item schema chưa positive |
 | `doctor --stdout` | Không gọi HTTP | Local | Chỉ explicit/default, không đọc/khóa/refresh session, không in config path/identity/token | Test CLI và chạy local thật |
-| `doctor --api-version v2 --online` | `GetApiActive` | Không / POST bootstrap | URL proxy; query/body rỗng, bootstrap campus HN; không xác nhận session/campus tài khoản | Fixture và live bootstrap v2 200/200; không kiểm tài khoản |
+| `doctor --api-version v2 --online` | `GetApiActive`, `GetVersion` | Không / POST bootstrap | Probe `api_active` boolean rồi `backend_version` chuỗi; query/body rỗng, bootstrap campus HN; không xác nhận session/campus tài khoản | Fixture và live bootstrap v2 200/200; GetVersion POST 200 (GET 405, v1 404), `myfap version` vẫn offline |
 
 `marks --summary` từ chối `--semester`, `--courseid`, `--pretty` trước auth. `myfap version` vẫn chỉ đọc package version. Doctor không tự lấy version/campus từ session: điều này được ghi rõ trong report để giữ local mode không có tác dụng phụ.
 
@@ -33,7 +34,7 @@ Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus 
 - Reader tổng kết chỉ dành cho `GetSemesterMark`: raw JSON array, envelope có data list, hoặc JSON string chứa trọn array. Giới hạn xử lý cục bộ 1 MiB. Không cắt tùy tiện chuỗi giữa dấu ngoặc; XML/HTML wrapper chưa xác minh bị từ chối bằng lỗi payload an toàn. Reader chung của operation khác không được nới lỏng.
 - Photo JSON không đồng nghĩa đã hỗ trợ xuất ảnh binary. Không tự fetch URL bất kỳ hoặc chuyển credential sang host ảnh.
 - Rating list v1 có code/fixture; URL là `https://api.fpt.edu.vn/fap/api/MyFAP/GetStudentRate`. Rating list v2 là stub và bị chặn. Rating submit/push/feedback đầy đủ chưa được mở bởi các thay đổi này. Những gate tại [tasks/phase6.md](../tasks/phase6.md) vẫn còn pending, Phase 6 **chưa hoàn tất**.
-- `GetVersion` backend tiếp tục unsupported cho đến khi public/text contract đủ rõ. Không thay package `version` thành probe online.
+- `GetVersion` đã mở cho `doctor --online` ngày 24/10/2026 sau khi chốt contract bằng probe: caller APK dùng GET nhưng proxy trả 405; POST body `{}` bootstrap đạt 200 với data chuỗi ngắn (chấp nhận bootstrap lẫn FAP key Bearer); route v1 trả 404. `myfap version` tiếp tục chỉ đọc package version.
 
 ## Kiểm chứng
 
@@ -122,3 +123,12 @@ Sau khi đọc bytecode cho thấy nhánh credential rỗng, maintainer yêu c�
 | Bearer FAP key + checksum theo key (policy CLI) | FAP key | FAP key | HTTP 200, body 200 — duy nhất được chấp nhận |
 
 Kết luận: proxy v2 hiện tại chỉ chấp nhận cặp `Authorization: Bearer <FAP key>` + `Checksum` ký bằng đúng key đó cho cả ba operation; nhánh credential rỗng trong bytecode bị từ chối. CLI giữ nguyên policy — nay có bằng chứng hai chiều trên một tài khoản/campus (HN), không suy rộng cho mọi campus hay suy luận app thật gửi gì lúc runtime.
+
+## Mở rộng endpoint sau phân tích khoảng trống (24/10/2026)
+
+Đối chiếu 82 route của APK với adapter ([phân tích khoảng trống](endpoint-gap-analysis.md)) mở thêm hai capability theo bằng chứng probe cùng ngày, chạy trên máy cá nhân với session thật, metadata đã lọc:
+
+- **`myfap other feedbacks` → `GetStudentFeedbacks`** (v2-only, `module_599.js:601-623`): query `{CampusCode, rollNumber}` không có `Authen` (bytecode dòng 613), credential qua Bearer. Live v2/HN HTTP/body 200, data list rỗng — envelope chuẩn, item schema chưa positive, giữ nhãn unverified như rating list. RED 3 test → GREEN sau implementation.
+- **`doctor --api-version v2 --online` thêm `GetVersion`**: probe chạy sau khi `GetApiActive` hợp lệ, report có `backend_version`. Contract: GET bị 405, POST body `{}` bootstrap đạt 200 với data chuỗi ngắn, route v1 404. Test hiện có cập nhật (2 probe cho lượt online) và test mới chặn version không phải chuỗi; một lỗi thứ tự thật bị test bắt (probe version chạy trước khi validate active) đã sửa.
+
+Full suite sau hai feature: 403 test, 399 đạt/4 skip, exit 0 trên Windows Python 3.11; kiểm CLI thật với session cá nhân: `other feedbacks` exit 0 (200, list rỗng), `doctor --online` exit 0 (`api_active` true, `backend_version` chuỗi 3 ký tự).
