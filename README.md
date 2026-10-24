@@ -61,11 +61,12 @@ myfap transcript --stdout
 myfap training --semester Fall2026 --stdout
 myfap marks --summary --stdout
 myfap info photo --stdout
+myfap rating list --api-version v1 --stdout
 myfap doctor --stdout
 myfap doctor --api-version v2 --online --stdout
 ```
 
-`marks --summary` không nhận kỳ học/courseid/pretty. Photo chỉ xuất JSON, không tự tải hoặc giải mã ảnh. Doctor mặc định không đọc session hoặc gọi mạng; `--online` chỉ probe bootstrap proxy v2, không xác nhận tài khoản đã đăng nhập. Khác với `other feedback`, các luồng rating/push/feedback submit còn có gate riêng và chưa được mở.
+`marks --summary` không nhận kỳ học/courseid/pretty. Photo chỉ xuất JSON, không tự tải hoặc giải mã ảnh. Doctor mặc định không đọc session hoặc gọi mạng; `--online` chỉ probe bootstrap proxy v2, không xác nhận tài khoản đã đăng nhập. `rating list` chỉ hỗ trợ student/v1; v2 là stub và bị chặn. Khác với các lệnh đọc này, rating submit/push/feedback submit còn có gate riêng và chưa được mở.
 
 ## Thông tin thêm
 - [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 hỗ trợ các command đọc hiện có trong Phase 4.

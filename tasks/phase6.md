@@ -55,7 +55,7 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 
 ## 4. Rating và push — chỉ mở sau gate contract
 
-- [ ] **Rating list:** chốt fixture/schema tối thiểu cho student/v1; v2 là stub nên unsupported trước auth/network, không gọi v1 ngầm hoặc trả `[]` giả.
+- [x] **Rating list:** `rating list` student/v1 có code và fixture envelope/query; chưa suy kiểu ID/schema item hoặc xác nhận live. V2 là stub nên unsupported trước load session/HTTP, không gọi v1 ngầm hoặc trả `[]` giả.
 - [ ] **`rating submit --input`:** chốt input/ack bằng bằng chứng đủ tin cậy trước khi mở. `AddRate` là POST; v1 checksum dùng **rateid**, v2 giữ query `Authen` và body `{}`. Dải rating 1–5 có nguồn caller; không tự đặt type ID/comment bounds của backend.
 - [ ] **`push register --token-file`:** chốt contract student; `UpdateTokedevices` là **GET ghi**, v1 ký bằng **email**. Token chỉ đọc từ regular file có giới hạn, kiểm encoding/newline và symlink/reparse/path swap; không token trên argv/preview/log/error. Campus/identity lấy từ session đã bind.
 - [ ] Đường ghi tách khỏi read retry, không thêm AddRate/push vào read allowlist để cấp credential. Trình tự: validate → capability → preview không bí mật → confirmation/`--yes` → auth → một lần gửi. `--yes` không bỏ validation.
@@ -78,10 +78,12 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 - [ ] Draft PR Phase 6 được tạo từ nhánh mới; mỗi commit push có comment ngay sau commit, gồm SHA, thay đổi, lệnh/exit code và giới hạn.
 - [ ] Maintainer nghiệm thu phạm vi Phase 6 trước khi tiếp tục [gate phát hành Phase 5](phase5.md). Không tự merge/tag/publish.
 
-## Trạng thái khởi động
+## Kết quả checkpoint hiện tại
 
 Nhóm command đọc và doctor đã có fixture; focused tests ghi RED trước implementation rồi GREEN. Full suite ngày 24/10/2026 trên Windows: **389 test mỗi Python 3.11 và 3.9, 385 đạt/4 skip, exit 0**. Bốn skip là các phép symlink/POSIX mode không áp dụng hoặc thiếu quyền trên Windows, không phải test bị bỏ mới.
 
 Review độc lập đã tái hiện hai finding bằng HTTP giả: public API v1 chưa validate kỳ trước HTTP, và body summary lỗi quá lớn che HTTP 401/503. Đã sửa và test lại. Lượt full đầu chạy hai interpreter đồng thời bị timeout tiến trình help 20 giây; Python 3.9 còn lộ cách CliRunner tách stderr khác version. Đã sửa cấu hình capture trong test theo mẫu hiện có, giữ nguyên kiểm tra nội dung/timeout; focused help đạt, sau đó hai full suite chạy tuần tự đều đạt. Không hạ tiêu chí hoặc bỏ test.
 
-Build, Twine và artifact validator đã đạt với bộ `dist-phase6-reads`, manifest SHA-256 `f88e6fe7b5795fbb01acfda00df434e74d02965aaab21c2c83328e4bfaff2fea`. Pip smoke wheel/sdist trong hai venv sạch Windows/Python 3.11 đạt, exit 0; không dùng lockfile để resolve dependency. Mutation đổi signer subjects từ semester sang identity khác bị test bắt; chạy trên bản sao tạm, không sửa checkout. Fixture mới dùng identity tổng hợp kể cả nhánh legacy. Doctor local đã chạy qua CLI thật, không đọc session/HTTP. Chưa có live account hoặc CI cho commit runtime mới tại thời điểm ghi nhận; rating/push/feedback vẫn gate, không tuyên bố Phase 6 hoàn tất. Các finding v1 và positive fee/survey giữ tại [todo.md](todo.md).
+Build, Twine và artifact validator đã đạt với bộ `dist-phase6-reads`, manifest SHA-256 `f88e6fe7b5795fbb01acfda00df434e74d02965aaab21c2c83328e4bfaff2fea`. Pip smoke wheel/sdist trong hai venv sạch Windows/Python 3.11 đạt, exit 0; không dùng lockfile để resolve dependency. Mutation đổi signer subjects từ semester sang identity khác bị test bắt; chạy trên bản sao tạm, không sửa checkout. Fixture mới dùng identity tổng hợp kể cả nhánh legacy. Doctor local đã chạy qua CLI thật, không đọc session/HTTP. Sau khi thêm rating list v1: full Windows có 391 test mỗi Python 3.11/3.9, 387 đạt/4 skip, exit 0. CI tại `d6d0ee6` đạt [11/11 job](https://github.com/WindowScary321/myfap-api-cli/actions/runs/40064482334). Đã sửa assertion ANSI gây fail run trước, không đổi runtime; lỗi tzdata UTC của venv test 3.9 được tái hiện bằng probe riêng rồi cài lại đúng package đã khóa, không đổi dependency.
+
+Lượt thử live mới chưa hoàn tất login (exit 1, chưa có response FAP); doctor local đạt, các command xác thực sau login chưa chạy. Session/thư mục tạm đã dọn. Rating list v1 hiện có fixture, chưa live; rating submit/push/feedback vẫn gate, không tuyên bố Phase 6 hoàn tất. Các finding v1 và positive fee/survey giữ tại [todo.md](todo.md).
