@@ -13,7 +13,9 @@ from .config import DEFAULT_TIMEOUT, resolve_timeout
 from .errors import ApiError
 
 
-BOOTSTRAP_OPERATIONS = frozenset({"GetAllActiveCampus", "GetApiActive"})
+# GetVersion: caller APK dùng GET (module_599.js:662) nhưng proxy hiện trả 405 với GET;
+# POST body rỗng được chấp nhận (thí nghiệm 24/10/2026), nên đi theo nhánh bootstrap.
+BOOTSTRAP_OPERATIONS = frozenset({"GetAllActiveCampus", "GetApiActive", "GetVersion"})
 OPERATION_ALIASES = {"getCourseAttendance": "GetCourseAttendance"}
 _READ_QUERY_FIELDS = {
     "GetSemester": (),
@@ -38,6 +40,7 @@ _READ_QUERY_FIELDS = {
     "GetCourseAttendance": ("rollNumber", "Semester", "SubjectCode", "ClassName"),
     "GetApplication": ("rollNumber",),
     "GetStudentById": ("rollNumber",),
+    "GetStudentFeedbacks": ("rollNumber",),
     "AcademicTranscript": ("rollNumber",),
     "RetriveImage": ("rollNumber",),
     "GetCampusInfo": ("rollNumber",),

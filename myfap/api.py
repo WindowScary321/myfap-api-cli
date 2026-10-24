@@ -171,6 +171,12 @@ class MyFapEssential:
             raise ApiError("GetApiActive chưa được hỗ trợ trên API v1. Hãy chọn --api-version v2.")
         return _v2_request(self.session, self.auth, "GetApiActive", timeout=self.timeout)
 
+    def get_version(self):
+        """Đọc version backend qua bootstrap GetVersion; route v1 đã trả 404."""
+        if self.api_version != "v2":
+            raise ApiError("GetVersion chỉ hỗ trợ bootstrap API v2; route v1 đã ngừng phản hồi. Hãy chọn --api-version v2.")
+        return _v2_request(self.session, self.auth, "GetVersion", timeout=self.timeout)
+
     def get_semesters(self, campus: str = None):
         """Lấy kỳ học theo startDate mới nhất; giữ thứ tự server khi trùng ngày."""
         if not self.auth:
@@ -252,6 +258,13 @@ class MyFapOther:
         if self.api_version != "v1":
             raise ApiError("GetStudentRate chưa được hỗ trợ trong adapter API v2.")
         return _authenticated_get(self.session, self.auth, "GetStudentRate", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
+    def get_feedbacks(self):
+        """Đọc danh sách feedback student; chỉ có trên proxy v2, item schema chưa kiểm chứng positive."""
+        if self.api_version != "v2":
+            raise ApiError("GetStudentFeedbacks chỉ có trên proxy API v2; v1 không có route tương ứng.")
+        return _authenticated_get(self.session, self.auth, "GetStudentFeedbacks", self.auth.mssv,
                                   student=True, timeout=self.timeout, api_version=self.api_version)
 
     def get_balance(self):

@@ -381,6 +381,44 @@ class V1ObservedFailureTests(unittest.TestCase):
                 self.assertEqual(self.path.read_bytes(), before)
 
 
+class FeedbackListTests(unittest.TestCase):
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    def test_feedbacks_v2_reads_exact_contract_and_preserves_envelope(self):
+        self.save_session("v2")
+        payload = {"code": 200, "data": [{"synthetic": "feedback item"}]}
+        with patch("requests.Session.request", return_value=response(payload)) as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "other", "feedbacks", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), payload)
+        request.assert_called_once()
+        self.assertEqual(request.call_args.args[0], "GET")
+        self.assertTrue(request.call_args.args[1].endswith("/GetStudentFeedbacks"))
+        self.assertEqual(request.call_args.kwargs["params"], {"CampusCode": "TEST", "rollNumber": "TEST000"})
+        self.assertNotIn("Authen", request.call_args.kwargs["params"])
+        self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "Bearer FAKE_FAP_KEY")
+        self.assertNotIn("json", request.call_args.kwargs)
+
+    def test_feedbacks_preserves_empty_list(self):
+        self.save_session("v2")
+        payload = {"code": 200, "data": []}
+        with patch("requests.Session.request", return_value=response(payload)) as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "other", "feedbacks", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout), payload)
+        request.assert_called_once()
+
+    def test_feedbacks_v1_is_rejected_before_http(self):
+        self.save_session("v1")
+        with patch("requests.Session.request") as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "other", "feedbacks", "--stdout"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("GetStudentFeedbacks", Text.from_ansi(result.stderr).plain)
+        request.assert_not_called()
+
+
 class ReadSliceAcceptanceTests(unittest.TestCase):
     """Nghiệm thu nhóm mục 1: header contract và ma trận lỗi tại seam CLI."""
 

@@ -98,7 +98,11 @@ class Phase4TransportTests(unittest.TestCase):
         self.assertIn("GetWeekByDate", v2.READ_OPERATIONS)
         self.assertIn("GetCourseAttendance", v2.READ_OPERATIONS)
         self.assertNotIn("getCourseAttendance", v2.READ_OPERATIONS)
-        for operation in ("GetVersion", "GetStudentFeedbackForm", "AddRate", "UpdateTokedevices"):
+        # GetVersion mở theo contract POST bootstrap đã probe 24/10/2026;
+        # GetStudentFeedbacks mở theo envelope live cùng ngày, item schema chưa positive.
+        self.assertIn("GetVersion", v2.BOOTSTRAP_OPERATIONS)
+        self.assertIn("GetStudentFeedbacks", v2.READ_OPERATIONS)
+        for operation in ("GetStudentFeedbackForm", "AddRate", "UpdateTokedevices"):
             self.assertNotIn(operation, v2.SUPPORTED_OPERATIONS)
 
     def test_invalid_read_queries_are_rejected_before_http_without_echo(self):

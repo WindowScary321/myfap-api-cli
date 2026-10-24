@@ -209,7 +209,7 @@ def version():
 
 @app.command()
 def doctor(
-    online: bool = typer.Option(False, "--online", help="Gọi bootstrap GetApiActive v2; không xác thực session"),
+    online: bool = typer.Option(False, "--online", help="Gọi bootstrap GetApiActive/GetVersion v2; không xác thực session"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In JSON chẩn đoán ra stdout")
 ):
@@ -700,6 +700,22 @@ def other_feedback(
     except Exception as e:
         err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
+
+@other_app.command("feedbacks")
+def other_feedbacks(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy danh sách feedback student (chỉ API v2); item schema chưa kiểm chứng positive."""
+    auth = require_auth("GetStudentFeedbacks")
+    other_client = MyFapOther(auth)
+    try:
+        data = other_client.get_feedbacks()
+        save_output(data, "Feedbacks.json", output, stdout)
+    except Exception as e:
+        err_console.print(f"[red]Lỗi lấy danh sách feedback: {e}[/red]")
+        raise typer.Exit(code=1)
+
 
 @other_app.command("profile")
 def other_profile(

@@ -36,12 +36,16 @@ def get_diagnostics(*, api_version=None, campus=None, timeout=None, online=False
         client = MyFapEssential(api_version="v2", timeout=timeout)
         try:
             payload = client.get_api_active()
+            if not isinstance(payload.get("data"), bool):
+                raise ApiPayloadError("Response GetApiActive phải chứa data boolean.")
+            version_payload = client.get_version()
         finally:
             client.session.close()
-        if not isinstance(payload.get("data"), bool):
-            raise ApiPayloadError("Response GetApiActive phải chứa data boolean.")
+        version = version_payload.get("data")
+        if not isinstance(version, str) or not version.strip():
+            raise ApiPayloadError("Response GetVersion phải chứa data chuỗi không rỗng.")
         report["online_probe"] = {
             "requested": True, "operation": "GetApiActive", "bootstrap_campus": "HN",
-            "api_active": payload["data"], "scope": "proxy_bootstrap_only",
+            "api_active": payload["data"], "backend_version": version, "scope": "proxy_bootstrap_only",
         }
     return report
