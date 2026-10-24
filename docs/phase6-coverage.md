@@ -13,16 +13,18 @@ URL dữ liệu v1 là `https://api.fpt.edu.vn/fap/api/MyFAP/<operation>`; v2 l�
 | `other subjects --semester` | `GetSubjectBySemester` | Có / Có | Query `Semester` chữ hoa; signer v1 là semester; không có option vẫn `GetSubjets`, không lookup kỳ | Fixture hai version; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
 | `news --search --type` | `SearchNews` | Có / Có | `type`, `keysearch`; signer v1 là type; search rỗng bị chặn | Fixture Unicode/reserved characters; live v2/HN 200/200 |
 | `transcript` | `AcademicTranscript` | Có / Có | Không lookup kỳ; giữ JSON, không formatter nghiệp vụ | Fixture; live v2/HN 200/200 với bound key, data string |
-| `training --semester` | `GetDiemphongtrao` | Có / Có | Query `semester`; thiếu option dùng resolver | Fixture; live v2/HN 200/200 với bound key, list rỗng |
+| `other training --semester` | `GetDiemphongtrao` | Có / Có | Query `semester`; thiếu option dùng resolver | Fixture; live v2/HN 200/200 với bound key, list rỗng |
 | `marks --summary` | `GetSemesterMark` | Có / Có | Không có query kỳ; v1 `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 có query Authen mới sau refresh | Fixture parser/refresh; live v2/HN 200/200 với envelope data list |
 | `info photo` | `RetriveImage` | Có / Có | Chỉ JSON, bảo toàn chuỗi opaque kể cả HTML entity; không tải URL hoặc decode ảnh | Live v2/HN 200/200, data string; định dạng ảnh chưa xác minh |
-| `rating list` | `GetStudentRate` | Có / Không | V1 đọc, ký bằng roll number; v2 stub bị chặn trước load session/HTTP | Fixture và live v1/APHL 200/200, danh sách rỗng |
+| `other rating list` | `GetStudentRate` | Có / Không | V1 đọc, ký bằng roll number; v2 stub bị chặn trước load session/HTTP | Fixture và live v1/APHL 200/200, danh sách rỗng |
 | `doctor --stdout` | Không gọi HTTP | Local | Chỉ explicit/default, không đọc/khóa/refresh session, không in config path/identity/token | Test CLI và chạy local thật |
 | `doctor --api-version v2 --online` | `GetApiActive` | Không / POST bootstrap | URL proxy; query/body rỗng, bootstrap campus HN; không xác nhận session/campus tài khoản | Fixture và live bootstrap v2 200/200; không kiểm tài khoản |
 
 `marks --summary` từ chối `--semester`, `--courseid`, `--pretty` trước auth. `myfap version` vẫn chỉ đọc package version. Doctor không tự lấy version/campus từ session: điều này được ghi rõ trong report để giữ local mode không có tác dụng phụ.
 
 Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus trả success. Kết quả live v1/APHL có các lỗi 404/201 được giữ nguyên ở phần cuối; không đổi thành unsupported hoặc dữ liệu rỗng.
+
+**Namespace hiện tại:** training và nhóm rating nằm trong `other`: `myfap other training`, `myfap other rating list`. Không giữ alias ở root. Các lượt live lịch sử bên dưới chạy trước khi đổi namespace nên giữ nguyên nhãn command cũ; endpoint/callback và capability không đổi. Lượt đổi namespace chỉ kiểm CLI/help/HTTP giả, không chạy lại login/FAP. Focused FORCE_COLOR=1 đạt 17/17; full Windows Python 3.9 và 3.11 mỗi bản 394 test, 390 đạt/4 skip, exit 0. Help mới được kiểm cả UTF-8/cp1252 ở group lồng ba cấp; option tại leaf vẫn override root/group.
 
 ## Policy và phần chưa xác minh
 

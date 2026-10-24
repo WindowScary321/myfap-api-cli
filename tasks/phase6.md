@@ -30,7 +30,7 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 ## 2. Transcript, training và marks summary
 
 - [x] **`transcript` → `AcademicTranscript`:** hỗ trợ theo contract cả v1/v2, không lookup kỳ; chưa thêm formatter nghiệp vụ khi schema data chưa được xác minh.
-- [x] **`training --semester` → `GetDiemphongtrao`:** query `semester` chữ thường, dùng resolver khi thiếu kỳ; giữ bound credential phù hợp.
+- [x] **`other training --semester` → `GetDiemphongtrao`:** query `semester` chữ thường, dùng resolver khi thiếu kỳ; giữ bound credential phù hợp.
 - [x] **`marks --summary` → `GetSemesterMark`:** không lookup kỳ hoặc thêm query semester. V1 dùng đúng `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 giữ query `Authen` mới sau refresh.
 - [ ] Từ chối tổ hợp summary với `--courseid`/`--pretty`; nếu `--semester` không áp dụng thì báo lỗi, không âm thầm bỏ qua.
 - [ ] Reader riêng cho summary kiểm HTTP/App Check/expiry trước khi đọc raw array/envelope/text. Chỉ parse dạng đã có bằng chứng, có giới hạn; malformed/unknown phải báo payload error, không cắt tùy tiện giữa dấu ngoặc rồi trả success.
@@ -57,8 +57,8 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 
 Bằng chứng đã biết, phần còn thiếu và cách thu thập không lộ PII được liệt kê tại [phase6-write-gates.md](../docs/phase6-write-gates.md). Không dùng body/query tùy ý để thay cho schema; caller code 200 của AddRate đã biết nhưng ack nghiệp vụ/positive item chưa được xác minh.
 
-- [x] **Rating list:** `rating list` student/v1 có code và fixture envelope/query; chưa suy kiểu ID/schema item hoặc xác nhận live. V2 là stub nên unsupported trước load session/HTTP, không gọi v1 ngầm hoặc trả `[]` giả.
-- [ ] **`rating submit --input`:** chốt input/ack bằng bằng chứng đủ tin cậy trước khi mở. `AddRate` là POST; v1 checksum dùng **rateid**, v2 giữ query `Authen` và body `{}`. Dải rating 1–5 có nguồn caller; không tự đặt type ID/comment bounds của backend.
+- [x] **Rating list:** `other rating list` student/v1 có code và fixture envelope/query; lượt live trước đổi namespace trả list rỗng, chưa suy kiểu ID/schema item hoặc positive schema. V2 là stub nên unsupported trước load session/HTTP, không gọi v1 ngầm hoặc trả `[]` giả.
+- [ ] **`other rating submit --input` (dự kiến, chưa mở):** chốt input/ack bằng bằng chứng đủ tin cậy trước khi mở. `AddRate` là POST; v1 checksum dùng **rateid**, v2 giữ query `Authen` và body `{}`. Dải rating 1–5 có nguồn caller; không tự đặt type ID/comment bounds của backend.
 - [ ] **`push register --token-file`:** chốt contract student; `UpdateTokedevices` là **GET ghi**, v1 ký bằng **email**. Token chỉ đọc từ regular file có giới hạn, kiểm encoding/newline và symlink/reparse/path swap; không token trên argv/preview/log/error. Campus/identity lấy từ session đã bind.
 - [ ] Đường ghi tách khỏi read retry, không thêm AddRate/push vào read allowlist để cấp credential. Trình tự: validate → capability → preview không bí mật → confirmation/`--yes` → auth → một lần gửi. `--yes` không bỏ validation.
 - [ ] Test invalid input/cancel/noninteractive thiếu xác nhận gây zero auth/network; 401/App Check/timeout/5xx hoặc unknown outcome không replay.

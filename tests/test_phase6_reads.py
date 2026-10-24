@@ -272,7 +272,7 @@ class TrainingCommandTests(unittest.TestCase):
                         return response({"code": 200, "data": [{"semesterName": "Fall2026", "startDate": "2026-09-01"}]})
                     return response(payload)
                 with patch("requests.Session.request", side_effect=reply) as request:
-                    result = self.runner.invoke(app, ["--config", str(self.path), "training", "--stdout"])
+                    result = self.runner.invoke(app, ["--config", str(self.path), "other", "training", "--stdout"])
                 self.assertEqual(result.exit_code, 0, result.output)
                 self.assertEqual(json.loads(result.stdout), payload)
                 self.assertEqual([call.args[1].rsplit('/', 1)[-1] for call in request.call_args_list],
@@ -332,7 +332,7 @@ class RatingListTests(unittest.TestCase):
         payload = {"code": 200, "data": [{"synthetic": "rating item"}]}
         with patch("requests.Session.request", return_value=response(payload)) as request, \
              patch("myfap.api.create_checksum", return_value="SYNTHETIC_RATE_LIST") as checksum:
-            result = self.runner.invoke(app, ["rating", "list", "--config", str(self.path), "--stdout"])
+            result = self.runner.invoke(app, ["other", "rating", "list", "--config", str(self.path), "--stdout"])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(json.loads(result.stdout), payload)
         request.assert_called_once()
@@ -345,7 +345,7 @@ class RatingListTests(unittest.TestCase):
     def test_rating_list_v2_stub_is_rejected_before_session_load_or_http(self):
         self.save_session("v2")
         with patch("myfap.auth.MyFapAuth.load_session") as load, patch("requests.Session.request") as request:
-            result = self.runner.invoke(app, ["--config", str(self.path), "rating", "list", "--stdout"])
+            result = self.runner.invoke(app, ["--config", str(self.path), "other", "rating", "list", "--stdout"])
         self.assertEqual(result.exit_code, 1)
         self.assertEqual(result.stdout, "")
         self.assertIn("GetStudentRate", result.stderr)
@@ -363,7 +363,7 @@ class V1ObservedFailureTests(unittest.TestCase):
             (["courses", "--semester", "FAKE_TERM"], "GetCourseOfSemester", 404, None, "HTTP 404"),
             (["marks", "--summary"], "GetSemesterMark", 404, None, "HTTP 404"),
             (["news", "--search", "synthetic"], "SearchNews", 200, {"code": 201, "data": None}, "201"),
-            (["training", "--semester", "FAKE_TERM"], "GetDiemphongtrao", 200, {"code": 201, "data": None}, "201"),
+            (["other", "training", "--semester", "FAKE_TERM"], "GetDiemphongtrao", 200, {"code": 201, "data": None}, "201"),
         ):
             with self.subTest(operation=operation):
                 self.save_session("v1")
@@ -379,6 +379,44 @@ class V1ObservedFailureTests(unittest.TestCase):
                 self.assertTrue(request.call_args.args[1].endswith('/' + operation))
                 refresh.assert_not_called()
                 self.assertEqual(self.path.read_bytes(), before)
+
+
+class OtherCommandLayoutTests(unittest.TestCase):
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    def test_training_and_rating_inherit_options_at_nested_leaf(self):
+        self.save_session("v1")
+        for command, operation in (
+            (["other", "--api-version", "v2", "training", "--semester", "FAKE_TERM"], "GetDiemphongtrao"),
+            (["other", "--api-version", "v2", "rating", "--api-version", "v2", "list"], "GetStudentRate"),
+        ):
+            with self.subTest(operation=operation), patch("requests.Session.request", return_value=response({"code": 200, "data": []})) as request:
+                result = self.runner.invoke(app, ["--api-version", "v2", *command,
+                    "--config", str(self.path), "--api-version", "v1", "--timeout", "31", "--stdout"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(json.loads(result.stdout), {"code": 200, "data": []})
+                request.assert_called_once()
+                self.assertTrue(request.call_args.args[1].endswith('/' + operation))
+                self.assertEqual(urlsplit(request.call_args.args[1]).netloc, "api.fpt.edu.vn")
+                self.assertEqual(request.call_args.kwargs["timeout"], 31)
+
+    def test_new_help_paths_work_and_old_root_commands_are_absent_without_auth(self):
+        with patch("myfap.cli.get_auth") as auth, patch("requests.Session.request") as request:
+            for command in (["other"], ["other", "training"], ["other", "rating"], ["other", "rating", "list"]):
+                with self.subTest(command=command):
+                    result = self.runner.invoke(app, [*command, "--help"])
+                    self.assertEqual(result.exit_code, 0, result.output)
+            result = self.runner.invoke(app, ["other", "--help"])
+            text = Text.from_ansi(result.stdout).plain
+            self.assertIn("training", text)
+            self.assertIn("rating", text)
+            for command in (["training"], ["rating", "list"]):
+                with self.subTest(old_command=command):
+                    result = self.runner.invoke(app, [*command, "--help"])
+                    self.assertEqual(result.exit_code, 2)
+            auth.assert_not_called()
+            request.assert_not_called()
 
 
 if __name__ == "__main__":

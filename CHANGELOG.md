@@ -4,6 +4,8 @@
 
 ### API và dữ liệu
 
+- Chuyển training và nhóm rating vào `other`: dùng `myfap other training` và `myfap other rating list`, không giữ command root cũ. Endpoint, policy retry và capability từng version không đổi.
+
 - Giữ API v1 làm mặc định. API v2 chỉ được chọn bằng `--api-version v2` hoặc binding của session; không tự chuyển version khi gặp lỗi.
 - Bổ sung adapter v2 cho các lệnh đọc hiện có: kỳ học, lịch học/lịch tuần, điểm, lịch thi, điểm danh, đơn từ, news, thông tin sinh viên/campus, học phí, môn học, thông báo và kiểm tra feedback/profile. Survey tiếp tục dùng dịch vụ và chữ ký riêng.
 - Coi ID kỳ học là opaque, chọn kỳ mới nhất theo `startDate` và giữ thứ tự server khi ngày trùng nhau. Query dùng đúng tên trường theo từng operation.

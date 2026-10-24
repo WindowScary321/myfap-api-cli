@@ -91,7 +91,7 @@ other_app = typer.Typer(help="Các chức năng phụ trợ khác (survey, feedb
 app.add_typer(other_app, name="other")
 
 rating_app = typer.Typer(help="Đánh giá dịch vụ; list hiện chỉ hỗ trợ API v1")
-app.add_typer(rating_app, name="rating")
+other_app.add_typer(rating_app, name="rating")
 
 state = {
     "campus": None,
@@ -362,7 +362,7 @@ def transcript(
         raise typer.Exit(code=1)
 
 
-@app.command()
+@other_app.command("training")
 def training(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
