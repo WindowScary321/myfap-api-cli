@@ -2,7 +2,7 @@
 
 ## Giới thiệu
 
-Đây là cli tương tác giống hoàn toàn với APP MYFAP trên điện thoại. Bạn có thể xem lịch học, lịch thi, điểm số (sự thất vọng của gia đình), thông tin cá nhân, v.v. 1 cách thuận tiện, không bị gò bó trong giao diện app. <br>
+CLI tương tác với các API myFAP để xem lịch học, lịch thi, điểm và thông tin sinh viên. Phạm vi hỗ trợ phụ thuộc API version, campus và capability từng endpoint; CLI chưa thay thế đầy đủ mọi chức năng của app. Xem [mapping command/endpoint](./docs/command-endpoints.md) và [coverage Phase 6](./docs/phase6-coverage.md) để biết phần đã triển khai, đã kiểm thử và còn chưa xác minh. <br>
 - Lưu ý: repo này được thực hiện cùng với sự hỗ trợ của AI.
 
 ## Tính năng chính
@@ -47,6 +47,26 @@
   ```
   myfap schedule
   ```
+
+## Command mở rộng trên nhánh phát triển
+
+Các command sau đang review trong Phase 6, **chưa phát hành lên PyPI**:
+
+```sh
+myfap courses --semester Fall2026 --stdout
+myfap other subjects --semester Fall2026 --stdout
+myfap other balance --stdout
+myfap news --search "lịch thi" --type 1 --stdout
+myfap transcript --stdout
+myfap other training --semester Fall2026 --stdout
+myfap marks --summary --stdout
+myfap info photo --stdout
+myfap other rating list --api-version v1 --stdout
+myfap doctor --stdout
+myfap doctor --api-version v2 --online --stdout
+```
+
+`marks --summary` không nhận kỳ học/courseid/pretty. Photo chỉ xuất JSON, không tự tải hoặc giải mã ảnh. Doctor mặc định không đọc session hoặc gọi mạng; `--online` chỉ probe bootstrap proxy v2, không xác nhận tài khoản đã đăng nhập. `other rating list` chỉ hỗ trợ student/v1; v2 là stub và bị chặn. Khác với các lệnh đọc này, rating submit/push/feedback submit còn có gate riêng và chưa được mở.
 
 ## Thông tin thêm
 - [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 hỗ trợ các command đọc hiện có trong Phase 4.

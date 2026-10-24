@@ -30,3 +30,37 @@ Khi có điều kiện kiểm chứng, dùng session tạm, ghi rõ API version/
 Theo dõi triển khai, kết quả kiểm tra và gate dịch vụ còn mở tại [phase5.md](phase5.md). [Runbook phát hành](../docs/releasing.md) mô tả kiểm tag/version/artifact, Trusted Publishing, retry và TestPyPI; [CHANGELOG.md](../CHANGELOG.md) giữ release notes cùng known issues.
 
 Chuyển Phase 5 không tự đóng ba lỗi live v1, không xác nhận positive fee/survey và không cho phép tạo/push tag hoặc publish. Maintainer phải duyệt phạm vi hỗ trợ và các gate phát hành trước khi thực hiện.
+
+## Mở rộng command và endpoint Phase 6
+
+Theo quyết định ngày 23/10/2026, **chưa tag/publish cho đến sau khi hoàn thiện và nghiệm thu phạm vi Phase 6**. PR #9 đã merge tại `75fc7b4aa33a13b9b39eab898f61e2e693f4baf9`; đó là pipeline chuẩn bị, không phải release. Giữ baseline `0.2.0`, v1 mặc định/v2 opt-in.
+
+Checklist, tiêu chí và gate bằng chứng nằm tại [phase6.md](phase6.md). Các mục sau chỉ được đánh dấu khi có kết quả tương ứng:
+
+- [ ] Hoàn thiện các lát cắt đọc: courses, subjects theo kỳ, balance và news search, giữ hành vi command cũ.
+- [ ] Hoàn thiện transcript/training và marks summary sau khi chốt các ngoại lệ credential/response; không đoán query hoặc schema.
+- [ ] Bổ sung photo JSON và doctor an toàn; không tự fetch/decode ảnh hoặc refresh session khi chẩn đoán local.
+- [ ] Chốt rating/push/feedback theo gate schema/capability; không mở write hoặc ghi live khi chưa đủ bằng chứng/xác nhận.
+- [ ] Kiểm regression, artifact, CI và live đọc riêng; giữ nguyên mọi skip/failure/unverified và TODO v1/positive fee/survey ở trên.
+- [ ] Cập nhật Draft PR Phase 6; mỗi commit push có comment ngay sau commit, không tự merge/tag/publish.
+- [ ] Maintainer duyệt phạm vi Phase 6 và các gate dịch vụ Phase 5 trước khi phát hành thật.
+
+### Lỗi live v1 mới ngày 24/10/2026
+
+Các command đã chạy thật trên v1/APHL sau login mới; chi tiết tại [coverage Phase 6](../docs/phase6-coverage.md#live-đọc-v1aphl-ngày-24102026). Không dùng kết quả v2 hoặc fixture để đóng các mục này:
+
+- [ ] Xác định nguyên nhân GetCourseOfSemester HTTP 404; request hiện giữ casing/signing theo caller v1.
+- [ ] Xác định nguyên nhân GetSemesterMark HTTP 404; không tự thêm checksum/kỳ hoặc đổi route để thử.
+- [ ] Xác định nguyên nhân SearchNews HTTP 200/body 201, data null; không coi là hết phiên hoặc empty hợp lệ.
+- [ ] Xác định nguyên nhân GetDiemphongtrao HTTP 200/body 201, data null; không bỏ lỗi hoặc fallback v2.
+
+Cùng lượt, subjects/balance/rating list đọc được và student sau refresh đạt 200/200. Transcript rỗng, photo null và rating list rỗng không xác nhận positive schema hoặc ID hợp lệ cho submit. Session/lock/thư mục tạm đã dọn; chỉ metadata được ghi, không raw response/identity/credential.
+
+## Thao tác ghi rating/push/feedback vẫn chưa mở
+
+Theo đánh giá của người dùng ngày 24/10/2026, **tài khoản hiện tại không thể xác minh** các thao tác ghi này: rating list v1 trả danh sách rỗng (không có rateid/item để đối chiếu `AddRate`), không có feedback đang mở để thu form/ack. Không cố tình thử ghi để tạo dữ liệu, không coi đây là route lỗi và không mở generic submit.
+
+- [ ] Khi có tài khoản hoặc dữ liệu phù hợp (rating đang mở, feedback đang mở), thu thập input schema và ack nghiệp vụ của `AddRate` (v1 checksum `rateid`, v2 query `Authen`, body `{}`) và các form feedback theo [phase6-write-gates.md](../docs/phase6-write-gates.md) trước khi mở command.
+- [ ] `push register --token-file` cần contract student đã chốt và xác nhận riêng của người dùng trước khi live ghi; token thiết bị chỉ đọc từ regular file, không đưa vào argv/preview/log/error.
+
+Các gate và trình tự validate → capability → preview → confirmation → auth vẫn áp dụng như [phase6.md](phase6.md) mục 4–5; việc chưa xác minh được không tự đóng cũng không nới gate.

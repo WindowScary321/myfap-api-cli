@@ -33,7 +33,8 @@ READ_OPERATIONS = AUTHENTICATED_READ_OPERATIONS | {"GetAllActiveCampus", "GetWee
 
 
 def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_found=False,
-         auth=None, operation=None, params_factory=None, api_version="v1", response_api_version=None):
+         auth=None, operation=None, params_factory=None, api_version="v1", response_api_version=None,
+         preserve_data=False, response_reader=None):
     current_params = params
     retried = False
     while True:
@@ -44,7 +45,9 @@ def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_foun
         except requests.RequestException:
             raise ApiError("Không kết nối được API. Hãy thử lại sau.") from None
         try:
-            return clean_json(read_response(response, allow_survey_not_found=allow_survey_not_found, api_version=response_api_version or api_version, operation=operation))
+            payload = response_reader(response) if response_reader else read_response(
+                response, allow_survey_not_found=allow_survey_not_found, api_version=response_api_version or api_version, operation=operation)
+            return payload if preserve_data else clean_json(payload)
         except ApiSessionExpiredError:
             if retried or operation not in READ_OPERATIONS or auth is None or "Authen" not in params or params_factory is None:
                 raise
@@ -55,7 +58,7 @@ def _get(session, url, params, *, timeout=DEFAULT_TIMEOUT, allow_survey_not_foun
             current_params = params_factory()
 
 
-def _v2_request(session, auth, operation, *, timeout, campus=None, params=None):
+def _v2_request(session, auth, operation, *, timeout, campus=None, params=None, preserve_data=False, response_reader=None):
     from . import v2
 
     retried = False
@@ -66,7 +69,8 @@ def _v2_request(session, auth, operation, *, timeout, campus=None, params=None):
                               campus=campus or getattr(auth, "campus", None),
                               params=params, timeout=timeout)
         try:
-            return clean_json(read_response(response, api_version="v2", operation=operation))
+            payload = response_reader(response) if response_reader else read_response(response, api_version="v2", operation=operation)
+            return payload if preserve_data else clean_json(payload)
         except ApiSessionExpiredError:
             if retried or operation not in v2.READ_OPERATIONS or auth is None:
                 raise
@@ -103,20 +107,25 @@ def _ensure_bound(auth, *, campus=None, api_version=None):
         hook(campus=campus or auth.campus, api_version=version, account_type=getattr(auth, "account_type", None))
 
 
-def _authenticated_get(session, auth, operation, identifier, *, timeout, campus=None, student=False, params=None, api_version=None):
+def _authenticated_get(session, auth, operation, identifier, *, timeout, campus=None, student=False, params=None, api_version=None, preserve_data=False):
     version = _resolve_api_version(auth, api_version)
     if version == "v2":
         from .v2 import OPERATION_ALIASES
 
         operation = OPERATION_ALIASES.get(operation, operation)
         query = {"rollNumber": auth.mssv, **(params or {})} if student else params
-        return _v2_request(session, auth, operation, timeout=timeout, campus=campus, params=query)
+        return _v2_request(session, auth, operation, timeout=timeout, campus=campus, params=query, preserve_data=preserve_data)
 
     def build_params():
         return {**_auth_params(auth, identifier, campus=campus, student=student), **(params or {})}
 
     return _get(session, f"{FAP_HOST}/{operation}", build_params(), timeout=timeout,
-                auth=auth, operation=operation, params_factory=build_params)
+                auth=auth, operation=operation, params_factory=build_params, preserve_data=preserve_data)
+
+
+def _validate_semester(semester):
+    if not isinstance(semester, str) or not semester.strip() or any(ord(character) < 32 for character in semester):
+        raise ApiError("Kỳ học phải là chuỗi không rỗng, không chứa ký tự điều khiển.")
 
 
 def _semester_start(semester):
@@ -162,6 +171,12 @@ class MyFapEssential:
             raise ApiError("GetApiActive chưa được hỗ trợ trên API v1. Hãy chọn --api-version v2.")
         return _v2_request(self.session, self.auth, "GetApiActive", timeout=self.timeout)
 
+    def get_version(self):
+        """Đọc version backend qua bootstrap GetVersion; route v1 đã trả 404."""
+        if self.api_version != "v2":
+            raise ApiError("GetVersion chỉ hỗ trợ bootstrap API v2; route v1 đã ngừng phản hồi. Hãy chọn --api-version v2.")
+        return _v2_request(self.session, self.auth, "GetVersion", timeout=self.timeout)
+
     def get_semesters(self, campus: str = None):
         """Lấy kỳ học theo startDate mới nhất; giữ thứ tự server khi trùng ngày."""
         if not self.auth:
@@ -187,12 +202,17 @@ class MyFapEssential:
         except ValueError:
             raise ApiPayloadError("Số tuần trong response API không hợp lệ.") from None
 
-    def get_news(self, news_type: int = 1):
-        """Lấy 10 thông báo gần nhất."""
+    def get_news(self, news_type: int = 1, search=None):
+        """Lấy tin gần nhất hoặc tìm kiếm, ký v1 bằng type."""
         if not self.auth:
             raise ApiError("Không tìm thấy session xác thực.")
-        return _authenticated_get(self.session, self.auth, "GetTop10News", str(news_type),
-                                  params={"type": news_type}, timeout=self.timeout, api_version=self.api_version)
+        if search is not None and (not isinstance(search, str) or not search.strip()):
+            raise ApiError("Nội dung tìm kiếm không được rỗng.")
+        params = {"type": news_type}
+        if search is not None:
+            params["keysearch"] = search
+        return _authenticated_get(self.session, self.auth, "GetTop10News" if search is None else "SearchNews", str(news_type),
+                                  params=params, timeout=self.timeout, api_version=self.api_version)
 
 
 class MyFapOther:
@@ -233,9 +253,32 @@ class MyFapOther:
         return _authenticated_get(self.session, self.auth, "GeFeeByRoll", self.auth.mssv,
                                   student=True, timeout=self.timeout, api_version=self.api_version)
 
-    def get_subjects(self):
-        """Lấy danh sách môn học."""
-        return _authenticated_get(self.session, self.auth, "GetSubjets", MAGIC_ID,
+    def get_ratings(self):
+        """Đọc danh sách rating v1; không suy implementation cho stub v2."""
+        if self.api_version != "v1":
+            raise ApiError("GetStudentRate chưa được hỗ trợ trong adapter API v2.")
+        return _authenticated_get(self.session, self.auth, "GetStudentRate", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
+    def get_feedbacks(self):
+        """Đọc danh sách feedback student; chỉ có trên proxy v2, item schema chưa kiểm chứng positive."""
+        if self.api_version != "v2":
+            raise ApiError("GetStudentFeedbacks chỉ có trên proxy API v2; v1 không có route tương ứng.")
+        return _authenticated_get(self.session, self.auth, "GetStudentFeedbacks", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
+    def get_balance(self):
+        """Lấy số dư, bảo toàn payload thay vì tự suy diễn thông tin tài chính."""
+        return _authenticated_get(self.session, self.auth, "GetBalance", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
+    def get_subjects(self, semester=None):
+        """Giữ GetSubjets mặc định; môn theo kỳ ký v1 bằng semester."""
+        if semester is not None:
+            _validate_semester(semester)
+        operation = "GetSubjets" if semester is None else "GetSubjectBySemester"
+        return _authenticated_get(self.session, self.auth, operation, MAGIC_ID if semester is None else semester,
+                                  params=None if semester is None else {"Semester": semester},
                                   timeout=max(self.timeout, 30.0), api_version=self.api_version)
 
 
@@ -252,10 +295,35 @@ class MyFapClient:
         return _authenticated_get(self.session, self.auth, "GetActivityStudent", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
 
+    def get_courses(self, semester: str):
+        """Lấy khóa học theo kỳ, giữ đúng query semester chữ thường."""
+        _validate_semester(semester)
+        return _authenticated_get(self.session, self.auth, "GetCourseOfSemester", self.auth.mssv,
+                                  student=True, params={"semester": semester}, timeout=self.timeout, api_version=self.api_version)
+
     def get_marks(self, semester: str):
         """Lấy bảng điểm theo kỳ."""
         return _authenticated_get(self.session, self.auth, "GetStudentMark", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
+
+    def get_mark_summary(self):
+        """GetSemesterMark không có query kỳ; v1 cũng không có checksum."""
+        from .summary import read_semester_marks_response
+
+        def reader(response):
+            return read_semester_marks_response(response, api_version=self.api_version)
+
+        if self.api_version == "v2":
+            return _v2_request(self.session, self.auth, "GetSemesterMark", timeout=self.timeout,
+                               params={"rollNumber": self.auth.mssv}, preserve_data=True, response_reader=reader)
+
+        def build_params():
+            _ensure_bound(self.auth, api_version="v1")
+            return {"CampusCode": self.auth.campus, "rollNumber": self.auth.mssv, "Authen": self.auth.authen_key}
+
+        return _get(self.session, f"{FAP_HOST}/GetSemesterMark", build_params(), timeout=self.timeout,
+                    auth=self.auth, operation="GetSemesterMark", params_factory=build_params,
+                    preserve_data=True, response_reader=reader)
 
     def get_mark_by_course(self, course_id: str):
         """Lấy điểm chi tiết của môn học, gồm dữ liệu HTML."""
@@ -285,6 +353,22 @@ class MyFapClient:
     def get_applications(self):
         """Lấy danh sách đơn đã gửi."""
         return _authenticated_get(self.session, self.auth, "GetApplication", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version)
+
+    def get_training(self, semester: str):
+        """Lấy điểm phong trào theo kỳ, không tự tính tổng hoặc đổi schema."""
+        _validate_semester(semester)
+        return _authenticated_get(self.session, self.auth, "GetDiemphongtrao", self.auth.mssv,
+                                  student=True, params={"semester": semester}, timeout=self.timeout, api_version=self.api_version)
+
+    def get_photo(self):
+        """Giữ nguyên representation ảnh; không fetch URL hoặc decode Base64."""
+        return _authenticated_get(self.session, self.auth, "RetriveImage", self.auth.mssv,
+                                  student=True, timeout=self.timeout, api_version=self.api_version, preserve_data=True)
+
+    def get_transcript(self):
+        """Lấy transcript bằng credential đã bind; không suy schema nghiệp vụ."""
+        return _authenticated_get(self.session, self.auth, "AcademicTranscript", self.auth.mssv,
                                   student=True, timeout=self.timeout, api_version=self.api_version)
 
     def get_student_info(self):

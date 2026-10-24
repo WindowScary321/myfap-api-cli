@@ -37,9 +37,9 @@ class ApiAppCheckError(ApiError):
 
 AUTHENTICATED_READ_OPERATIONS = frozenset({
     "GetSemester", "GetTop10News", "CheckOpenFeedBack", "CheckUpdateProfile",
-    "GetNotificationByRoll", "GeFeeByRoll", "GetSubjets",
-    "GetActivityStudent",
-    "GetStudentMark",
+    "GetNotificationByRoll", "GeFeeByRoll", "GetSubjets", "GetBalance",
+    "GetActivityStudent", "GetCourseOfSemester", "GetSubjectBySemester", "SearchNews", "AcademicTranscript", "GetDiemphongtrao", "RetriveImage",
+    "GetStudentMark", "GetSemesterMark", "GetStudentRate",
     "GetMarkByCourse", "GetScheduleExam",
     "GetStudentAttendances",
     "GetActivityStudentByWeek",

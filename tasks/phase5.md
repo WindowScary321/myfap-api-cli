@@ -2,7 +2,9 @@
 
 Nhánh `feat/phase5-release-automation` bắt đầu từ `origin/main` tại `06d98e115bb63a244d793236f81d7b62f63a5dc7`, sau khi PR #8 đã merge. Package giữ `0.2.0`, Python >=3.9, v1 mặc định và v2 opt-in.
 
-Phạm vi phase là chuẩn bị release notes, gate tag/version/artifact, Trusted Publishing, post-publish smoke và GitHub Release; thêm endpoint mới thuộc Phase 6 theo kế hoạch workspace. Người dùng đã xác nhận commit và push **nhánh tính năng** sau kiểm tra. Nhánh đang được theo dõi trong [Draft PR #9](https://github.com/WindowScary321/myfap-api-cli/pull/9). Tạo/push tag, upload và thay đổi cấu hình dịch vụ cần maintainer cho phép riêng; chưa tạo tag, publish hoặc GitHub Release.
+Phạm vi phase là chuẩn bị release notes, gate tag/version/artifact, Trusted Publishing, post-publish smoke và GitHub Release; thêm endpoint mới thuộc Phase 6. [PR #9](https://github.com/WindowScary321/myfap-api-cli/pull/9) đã merge vào `main` tại `75fc7b4aa33a13b9b39eab898f61e2e693f4baf9`.
+
+**Quyết định ngày 23/10/2026:** hoãn tag/publish đến sau khi hoàn thiện và nghiệm thu phạm vi [Phase 6](phase6.md). Phase 5 hiện là pipeline đã chuẩn bị, không phải bản đã phát hành. Giữ `0.2.0`, v1 mặc định/v2 opt-in; chưa tạo tag, publish PyPI/TestPyPI hoặc GitHub Release. Nghiệm thu dịch vụ, tạo/push tag, upload và thay đổi cấu hình vẫn cần maintainer cho phép riêng.
 
 Mapping command → method → endpoint → URL → capability được hợp nhất tại [command-endpoints.md](../docs/command-endpoints.md), kèm danh sách route còn chưa tích hợp. Không dùng trạng thái triển khai pipeline hoặc live command cốt lõi để tuyên bố đã thêm toàn bộ endpoint.
 
@@ -15,7 +17,7 @@ Hai commit mã nguồn đã kiểm: `671ca5f06b63ce4ae826732fb4f1a3a64c252f62` (
 - [ ] Giữ positive fee/survey là TODO hoãn chờ dữ liệu phù hợp; schema live có dữ liệu chưa kiểm chứng. Quyết định hoãn ngày 19/10/2026 cho phép chuyển Phase 5, không chứng minh backend đạt.
 - [ ] Giữ giới hạn ICS: reader độc lập đã kiểm; import vào ứng dụng lịch thật chưa kiểm chứng.
 
-Các finding v1 và positive case nằm trong [TODO](todo.md) và [coverage Phase 4](../docs/phase4-coverage.md). Phase 6 không chặn `0.2.0`.
+Các finding v1 và positive case nằm trong [TODO](todo.md) và [coverage Phase 4](../docs/phase4-coverage.md). Theo quyết định ngày 23/10/2026, nghiệm thu phạm vi Phase 6 diễn ra trước khi phát hành bằng pipeline này; việc hoãn positive fee/survey trước đó vẫn được giữ, không chuyển thành bằng chứng schema đã đạt.
 
 ## Gate kỹ thuật
 

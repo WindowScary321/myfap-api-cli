@@ -2,11 +2,15 @@
 
 Tài liệu này hợp nhất mapping command → operation → method/URL → capability → bằng chứng. Mapping đối chiếu code tại commit `bc8a7ee3131093432de427e1954743ee34618f45`; bảng không bổ sung endpoint hoặc command mới. V1 vẫn mặc định, v2 opt-in qua `--api-version v2` hoặc binding session.
 
+## Bổ sung Phase 6 đang review
+
+Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
+
 ## Phạm vi theo kế hoạch
 
 - **Phase 4:** phủ command đọc hiện có, lập coverage và kiểm chứng live. Xem [coverage Phase 4](phase4-coverage.md).
 - **Phase 5:** chuẩn bị và nghiệm thu pipeline phát hành. Có code và CI xanh chưa đồng nghĩa đã publish `0.2.0`; xem [checklist Phase 5](../tasks/phase5.md).
-- **Phase 6:** thêm các chức năng/API mới. Không tự mở route chỉ vì có tên trong APK; cần contract, capability, fixture và kiểm chứng riêng.
+- **Phase 6:** thêm các chức năng/API mới, nghiệm thu trước khi tạo tag/publish theo quyết định ngày 23/10/2026. Không tự mở route chỉ vì có tên trong APK; cần contract, capability, fixture và kiểm chứng riêng.
 
 Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md` của workspace phân tích. Hai file kế hoạch nằm ngoài repository CLI; không cần đóng gói chúng vào artifact.
 
@@ -23,7 +27,7 @@ Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md
 | Command/caller | Operation | Method v1 / v2 | URL v1 | URL v2 | Capability và bằng chứng |
 |---|---|---|---|---|---|
 | `campuses` | `GetAllActiveCampus` | GET / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/GetAllActiveCampus` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetAllActiveCampus` | Public/bootstrap; fixture hai version, live v2/HN 200/200 |
-| `login`, handshake của `refresh`/auth | `AuthenticationByFeId` | GET / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/AuthenticationByFeId` | `https://fap-proxy.fpt.edu.vn/MyFAP/AuthenticationByFeId` | Student/handshake; binding campus/version; live v2/HN 200/200 |
+| `login`, handshake của `refresh`/auth | `AuthenticationByFeId` | POST / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/AuthenticationByFeId` | `https://fap-proxy.fpt.edu.vn/MyFAP/AuthenticationByFeId` | Student/handshake; binding campus/version; live v2/HN 200/200 |
 | `semesters`, resolver kỳ | `GetSemester` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetSemester` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetSemester` | Student; fixture và live v1/v2; lượt mới v2/HN 200/200 |
 | `schedule`, `schedule --ics` | `GetActivityStudent` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetActivityStudent` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetActivityStudent` | Student/read; live JSON/ICS v2/HN đạt |
 | Resolver tuần của `week-timetable` | `GetWeekByDate` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetWeekByDate` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetWeekByDate` | Read/helper; live v2/HN 200/200, data integer |
@@ -40,12 +44,15 @@ Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md
 | `other fee` | `GeFeeByRoll` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GeFeeByRoll` | `https://fap-proxy.fpt.edu.vn/MyFAP/GeFeeByRoll` | V2/HN live 200/200, data không rỗng; chưa đối chiếu schema nghiệp vụ. V1/APHL HTTP 404 ngày 19/10 |
 | `other subjects` | `GetSubjets` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetSubjets` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetSubjets` | Student/read; live v2/HN 200/200; timeout tối thiểu 30 giây |
 | `other feedback` | `CheckOpenFeedBack` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/CheckOpenFeedBack` | `https://fap-proxy.fpt.edu.vn/MyFAP/CheckOpenFeedBack` | Chỉ kiểm tra/read, không submit feedback; live v2/HN 200/200, data boolean |
+| `other feedbacks` | `GetStudentFeedbacks` | Không hỗ trợ / GET | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetStudentFeedbacks` | Phase 6 mở rộng, v2-only; query `CampusCode`, `rollNumber`; live 200/200 list rỗng, item schema chưa positive |
 | `other profile` | `CheckUpdateProfile` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/CheckUpdateProfile` | `https://fap-proxy.fpt.edu.vn/MyFAP/CheckUpdateProfile` | Chỉ kiểm tra/read, không cập nhật hồ sơ; live v2/HN 200/200, data boolean |
 | `other notification` | `GetNotificationByRoll` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetNotificationByRoll` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetNotificationByRoll` | V2/HN live 200/200; v1/APHL vẫn lỗi 200/201 ngày 19/10 |
 | `other survey` ở cả hai API version | `GetRequiredSurvey` | GET / GET | `https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey` | `https://survey.fpt.edu.vn/API/myFAP/GetRequiredSurvey` | Dịch vụ riêng, signer riêng; live HTTP 200/body 404, không phải positive survey |
-| Chỉ Python API `MyFapEssential.get_api_active()`; chưa có command CLI | `GetApiActive` | Không hỗ trợ / POST | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetApiActive` | Public/bootstrap diagnostic v2; fixture, chưa gọi trong lượt live mới; không auto-switch/fallback |
+| `doctor --api-version v2 --online` | `GetApiActive`, `GetVersion` | Không hỗ trợ / POST bootstrap | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetApiActive`, `https://fap-proxy.fpt.edu.vn/MyFAP/GetVersion` | Phase 6 mở rộng: probe `api_active` boolean và `backend_version` chuỗi ngắn; GET với GetVersion bị 405, POST body `{}` đạt 200; không xác nhận session/campus tài khoản |
 
 `version` và `--help` không cần API. `logout` chỉ xóa session local, không phải request logout FEID/FAP. Các command export JSON/ICS/pretty dùng cùng endpoint dữ liệu, không tạo route mới.
+
+**Hiệu chỉnh method handshake CLI:** `myfap/auth.py` dùng POST JSON token và Bearer cho cả v1/v2; live v1/APHL ngày 24/10 cũng quan sát POST thành công. GET/query là caller legacy trong APK, không phải method CLI hiện tại. Bảng này mô tả CLI; không coi nó là hợp đồng request byte-for-byte của app.
 
 ### OAuth ngoài API nghiệp vụ
 
@@ -74,9 +81,9 @@ Không chạy lại v1 trong lượt này. Kết quả v2 không đóng ba findi
 | Transcript / marks summary | `AcademicTranscript`, `GetSemesterMark` | Phase 6; transcript có ở cả v1/v2, chưa tích hợp CLI |
 | Courses / subjects theo kỳ / training | `GetCourseOfSemester`, `GetSubjectBySemester`, `GetDiemphongtrao` | Phase 6; phải giữ đúng case từng query |
 | Balance / tìm news / ảnh | `GetBalance`, `SearchNews`, `RetriveImage` | Phase 6; chưa có command tương ứng |
-| Doctor / kiểm version backend | `GetApiActive`, `GetVersion` | `GetApiActive` đã có Python method v2 nhưng chưa có CLI; `GetVersion` chưa hỗ trợ |
+| Doctor / kiểm version backend | `GetApiActive`, `GetVersion` | Đã mở cho `doctor --online` (24/10/2026): `GetApiActive` + `GetVersion` POST bootstrap; GET với GetVersion bị 405, route v1 404 |
 | Rating / push | `GetStudentRate`, `AddRate`, `UpdateTokedevices`, `UpdateTokenDonor` | Chưa mở CLI; phân biệt stub v2 và GET ghi; cần schema, xác nhận và không retry ghi |
-| Feedback đầy đủ | `GetStudentFeedbacks`, `GetStudentFeedbackForm`, `SubmitStudentFeedback` | Không đồng nhất với `other feedback`; schema submit/capability chưa đầy đủ |
+| Feedback đầy đủ | `GetStudentFeedbacks`, `GetStudentFeedbackForm`, `SubmitStudentFeedback` | `GetStudentFeedbacks` đã mở `other feedbacks` v2-only (envelope live, item chưa positive); Form chờ feedbackId thật, Submit vẫn gate |
 | Google/donor/employee, FEID server-code exchange | Các flow tương ứng trong inventory | TODO riêng; không suy hỗ trợ chỉ từ route có trong APK |
 
 Inventory và method từng route proxy nằm trong [ma trận v2](v2-contracts.md#ma-trận-route-v2). Thêm các endpoint này vào Phase 5 sẽ là thay đổi phạm vi cần thống nhất lại; smoke command hiện có không chứng minh chúng đã được triển khai.
