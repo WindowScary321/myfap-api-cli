@@ -18,13 +18,19 @@ OPERATION_ALIASES = {"getCourseAttendance": "GetCourseAttendance"}
 _READ_QUERY_FIELDS = {
     "GetSemester": (),
     "GetTop10News": ("type",),
+    "SearchNews": ("type", "keysearch"),
     "CheckOpenFeedBack": ("rollNumber",),
     "CheckUpdateProfile": ("rollNumber",),
     "GetNotificationByRoll": ("rollNumber",),
     "GeFeeByRoll": ("rollNumber",),
+    "GetBalance": ("rollNumber",),
     "GetSubjets": (),
+    "GetSubjectBySemester": ("Semester",),
     "GetActivityStudent": ("rollNumber", "Semester"),
     "GetStudentMark": ("rollNumber", "Semester"),
+    "GetSemesterMark": ("rollNumber",),
+    "GetCourseOfSemester": ("rollNumber", "semester"),
+    "GetDiemphongtrao": ("rollNumber", "semester"),
     "GetMarkByCourse": ("rollNumber", "CourseId"),
     "GetScheduleExam": ("rollNumber", "Semester"),
     "GetStudentAttendances": ("rollNumber", "Semester"),
@@ -32,10 +38,12 @@ _READ_QUERY_FIELDS = {
     "GetCourseAttendance": ("rollNumber", "Semester", "SubjectCode", "ClassName"),
     "GetApplication": ("rollNumber",),
     "GetStudentById": ("rollNumber",),
+    "AcademicTranscript": ("rollNumber",),
+    "RetriveImage": ("rollNumber",),
     "GetCampusInfo": ("rollNumber",),
     "GetWeekByDate": ("date",),
 }
-_AUTHEN_QUERY_OPERATIONS = frozenset({"CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll"})
+_AUTHEN_QUERY_OPERATIONS = frozenset({"CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll", "GetSemesterMark"})
 READ_OPERATIONS = frozenset(_READ_QUERY_FIELDS)
 SUPPORTED_OPERATIONS = BOOTSTRAP_OPERATIONS | READ_OPERATIONS | {"AuthenticationByFeId"}
 
