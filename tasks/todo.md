@@ -55,3 +55,12 @@ Các command đã chạy thật trên v1/APHL sau login mới; chi tiết tại 
 - [ ] Xác định nguyên nhân GetDiemphongtrao HTTP 200/body 201, data null; không bỏ lỗi hoặc fallback v2.
 
 Cùng lượt, subjects/balance/rating list đọc được và student sau refresh đạt 200/200. Transcript rỗng, photo null và rating list rỗng không xác nhận positive schema hoặc ID hợp lệ cho submit. Session/lock/thư mục tạm đã dọn; chỉ metadata được ghi, không raw response/identity/credential.
+
+## Thao tác ghi rating/push/feedback vẫn chưa mở
+
+Theo đánh giá của người dùng ngày 24/10/2026, **tài khoản hiện tại không thể xác minh** các thao tác ghi này: rating list v1 trả danh sách rỗng (không có rateid/item để đối chiếu `AddRate`), không có feedback đang mở để thu form/ack. Không cố tình thử ghi để tạo dữ liệu, không coi đây là route lỗi và không mở generic submit.
+
+- [ ] Khi có tài khoản hoặc dữ liệu phù hợp (rating đang mở, feedback đang mở), thu thập input schema và ack nghiệp vụ của `AddRate` (v1 checksum `rateid`, v2 query `Authen`, body `{}`) và các form feedback theo [phase6-write-gates.md](../docs/phase6-write-gates.md) trước khi mở command.
+- [ ] `push register --token-file` cần contract student đã chốt và xác nhận riêng của người dùng trước khi live ghi; token thiết bị chỉ đọc từ regular file, không đưa vào argv/preview/log/error.
+
+Các gate và trình tự validate → capability → preview → confirmation → auth vẫn áp dụng như [phase6.md](phase6.md) mục 4–5; việc chưa xác minh được không tự đóng cũng không nới gate.
