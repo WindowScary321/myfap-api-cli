@@ -8,19 +8,21 @@ URL dữ liệu v1 là `https://api.fpt.edu.vn/fap/api/MyFAP/<operation>`; v2 l�
 
 | Command | Operation | v1 / v2 | Điểm contract quan trọng | Bằng chứng hiện tại |
 |---|---|---|---|---|
-| `other balance` | `GetBalance` | Có / Có | Ký v1 bằng roll number; không lookup kỳ; không suy ra currency/nợ/invoice | Fixture hai version; live v2/HN 200/200, v1 chưa live |
-| `courses --semester` | `GetCourseOfSemester` | Có / Có | Query `semester` chữ thường; thiếu option dùng resolver `startDate` | Fixture explicit/latest; live v2/HN 200/200, v1 chưa live |
-| `other subjects --semester` | `GetSubjectBySemester` | Có / Có | Query `Semester` chữ hoa; signer v1 là semester; không có option vẫn `GetSubjets`, không lookup kỳ | Fixture hai version; live v2/HN 200/200, v1 chưa live |
+| `other balance` | `GetBalance` | Có / Có | Ký v1 bằng roll number; không lookup kỳ; không suy ra currency/nợ/invoice | Fixture hai version; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
+| `courses --semester` | `GetCourseOfSemester` | Có / Có | Query `semester` chữ thường; thiếu option dùng resolver `startDate` | Fixture explicit/latest; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
+| `other subjects --semester` | `GetSubjectBySemester` | Có / Có | Query `Semester` chữ hoa; signer v1 là semester; không có option vẫn `GetSubjets`, không lookup kỳ | Fixture hai version; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
 | `news --search --type` | `SearchNews` | Có / Có | `type`, `keysearch`; signer v1 là type; search rỗng bị chặn | Fixture Unicode/reserved characters; live v2/HN 200/200 |
 | `transcript` | `AcademicTranscript` | Có / Có | Không lookup kỳ; giữ JSON, không formatter nghiệp vụ | Fixture; live v2/HN 200/200 với bound key, data string |
 | `training --semester` | `GetDiemphongtrao` | Có / Có | Query `semester`; thiếu option dùng resolver | Fixture; live v2/HN 200/200 với bound key, list rỗng |
 | `marks --summary` | `GetSemesterMark` | Có / Có | Không có query kỳ; v1 `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 có query Authen mới sau refresh | Fixture parser/refresh; live v2/HN 200/200 với envelope data list |
 | `info photo` | `RetriveImage` | Có / Có | Chỉ JSON, bảo toàn chuỗi opaque kể cả HTML entity; không tải URL hoặc decode ảnh | Live v2/HN 200/200, data string; định dạng ảnh chưa xác minh |
-| `rating list` | `GetStudentRate` | Có / Không | V1 đọc, ký bằng roll number; v2 stub bị chặn trước load session/HTTP | Fixture CLI/HTTP, chưa live |
+| `rating list` | `GetStudentRate` | Có / Không | V1 đọc, ký bằng roll number; v2 stub bị chặn trước load session/HTTP | Fixture và live v1/APHL 200/200, danh sách rỗng |
 | `doctor --stdout` | Không gọi HTTP | Local | Chỉ explicit/default, không đọc/khóa/refresh session, không in config path/identity/token | Test CLI và chạy local thật |
 | `doctor --api-version v2 --online` | `GetApiActive` | Không / POST bootstrap | URL proxy; query/body rỗng, bootstrap campus HN; không xác nhận session/campus tài khoản | Fixture và live bootstrap v2 200/200; không kiểm tài khoản |
 
 `marks --summary` từ chối `--semester`, `--courseid`, `--pretty` trước auth. `myfap version` vẫn chỉ đọc package version. Doctor không tự lấy version/campus từ session: điều này được ghi rõ trong report để giữ local mode không có tác dụng phụ.
+
+Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus trả success. Kết quả live v1/APHL có các lỗi 404/201 được giữ nguyên ở phần cuối; không đổi thành unsupported hoặc dữ liệu rỗng.
 
 ## Policy và phần chưa xác minh
 
@@ -60,8 +62,33 @@ Sau khi người dùng xác nhận mở login mới, chạy code tại `0e0c01c8
 | `info photo` JSON | 200 / 200 | Data string không rỗng; không đọc/in nội dung ảnh, không chứng minh URL/Base64 |
 | `logout` | Không HTTP | Session/lock và thư mục tạm đã dọn |
 
-Không thay request/response hoặc dùng capture credential. Không chạy rating list v1, rating submit, push hoặc feedback ghi trong lượt này. Các command mới trên **v1 vẫn chưa live**, rating list v1 mới có fixture, và schema/ack thao tác ghi còn gate.
+Không thay request/response hoặc dùng capture credential. Không chạy v1 hoặc thao tác ghi trong lượt v2 này; kết quả v1 độc lập ở phần sau. Schema/ack thao tác ghi còn gate.
 
 CI của đúng commit `0e0c01c` đã đạt [11/11 job](https://github.com/WindowScary321/myfap-api-cli/actions/runs/40064917612), gồm source và artifact smoke Ubuntu/Windows × Python 3.9/3.11. Đây không phải publish/release.
 
 Kết quả full suite và review không thay cho live ở version/campus khác. Các skip/failure/unknown trong [coverage Phase 4](phase4-coverage.md) và TODO positive fee/survey vẫn giữ nguyên. Chỉ metadata allowlist được lưu; payload và biến nhạy cảm không vào GitHub.
+
+## Live đọc v1/APHL ngày 24/10/2026
+
+Người dùng xác nhận mở browser/context mới, session tạm riêng trên code `ca09b1106ddacca96145a36df0b0668bf15ae52f`. **14 lần command: 10 exit 0, 4 exit 1; harness exit 1**, không sửa response hoặc fallback version. Observer giữ 14 request thuộc 12 operation; một GetSemester chuẩn bị input subjects nằm ngoài observer. Không đưa raw response/query có giá trị hoặc identity vào báo cáo.
+
+| Command/nhóm | HTTP / body | Exit | Kết quả đã lọc |
+|---|---|---:|---|
+| Doctor local | Không HTTP | 0 | JSON hợp lệ, không load session |
+| Login, refresh và student sau refresh | 200 / 200 | 0 | Handshake POST thành công, đọc đối chứng sau refresh đạt |
+| `courses` | 404 / không code FAP | 1 | GetSemester trước đó 200/200; chưa xác định nguyên nhân 404 của GetCourseOfSemester |
+| Subjects theo kỳ | 200 / 200 | 0 | List không rỗng; input kỳ lấy từ API thật |
+| Balance | 200 / 200 | 0 | String không rỗng; không suy giá trị hoặc trạng thái nợ |
+| News search | 200 / 201 | 1 | Data null; chưa có bằng chứng expiry rõ hoặc empty hợp lệ |
+| Transcript | 200 / 200 | 0 | String rỗng; chưa xác minh positive schema |
+| Training | 200 / 201 | 1 | Data null; chưa rõ nguyên nhân |
+| Marks summary | 404 / không code FAP | 1 | Chưa biết nguyên nhân; không thử format XML vì HTTP đã lỗi |
+| Photo JSON | 200 / 200 | 0 | Data null hợp lệ, không ghi nhận có ảnh |
+| Rating list | 200 / 200 | 0 | List rỗng từ endpoint v1 thật, không phải stub v2; chưa có item schema/ID để kiểm submit |
+| Logout | Không HTTP | 0 | Session/lock và thư mục tạm đã dọn |
+
+Đối chiếu code với caller APK: courses/training giữ `semester` chữ thường và signer roll; search ký bằng type; summary v1 `CampusCode`, rollNumber, Authen, không checksum. Chưa tìm được sai lệch request được xác nhận để sửa client. HTTP 404 không tự chứng minh route unsupported trên mọi campus; code 201 không tự chứng minh hết phiên. Các request đọc khác trong cùng lượt vẫn thành công; không biến bốn lỗi thành `[]`, không tự refresh vì 201 không rõ và không gọi v2 ngầm.
+
+Khảo sát caller bổ sung: training dùng **semesterName** tại `module_1303.js:114–117,288–302` và `module_1300.js:108–110,222–229`; không có căn cứ đổi thành termID. Với courses, chỉ thấy facade forward (`549_AlertMaintain.js:262–265`), chưa có UI caller chứng minh semesterName hay termID ở v1. Search UI (`module_1291.js:251–263,345–358`) còn có trim/lower và bước XML entity encoding với receiver phục dựng chưa rõ; CLI hiện truyền search text qua params. Input live tổng quát đã trim/lower, chưa xác nhận đây là nguyên nhân 201 hoặc có căn cứ sửa contract từ decompile. Không dùng các bất định này để tự thử ID/alias khác hay double URL-encode.
+
+Regression tổng hợp `V1ObservedFailureTests` giữ bốn trạng thái 404/201 là lỗi CLI với stdout rỗng, một request, không refresh/fallback và không đổi session. Đây là test policy bằng mã/shape đã lọc, không phải bằng chứng sửa backend hoặc dữ liệu thật làm fixture. Theo dõi nguyên nhân tại [TODO](../tasks/todo.md). Rating submit/push/feedback ghi vẫn chưa mở; Phase 6 chưa hoàn tất.

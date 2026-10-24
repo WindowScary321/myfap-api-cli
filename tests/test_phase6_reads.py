@@ -353,5 +353,33 @@ class RatingListTests(unittest.TestCase):
         request.assert_not_called()
 
 
+class V1ObservedFailureTests(unittest.TestCase):
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    def test_http_404_and_unexplained_201_remain_failures_without_refresh_or_fallback(self):
+        # Only status/shape from live; every input and session here is synthetic.
+        for command, operation, status, payload, message in (
+            (["courses", "--semester", "FAKE_TERM"], "GetCourseOfSemester", 404, None, "HTTP 404"),
+            (["marks", "--summary"], "GetSemesterMark", 404, None, "HTTP 404"),
+            (["news", "--search", "synthetic"], "SearchNews", 200, {"code": 201, "data": None}, "201"),
+            (["training", "--semester", "FAKE_TERM"], "GetDiemphongtrao", 200, {"code": 201, "data": None}, "201"),
+        ):
+            with self.subTest(operation=operation):
+                self.save_session("v1")
+                before = self.path.read_bytes()
+                with patch("requests.Session.request", return_value=response(payload, status)) as request, \
+                     patch("myfap.auth.MyFapAuth.refresh_session") as refresh:
+                    result = self.runner.invoke(app, ["--config", str(self.path), *command, "--stdout"])
+                self.assertEqual(result.exit_code, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(message, Text.from_ansi(result.stderr).plain)
+                request.assert_called_once()
+                self.assertEqual(urlsplit(request.call_args.args[1]).netloc, "api.fpt.edu.vn")
+                self.assertTrue(request.call_args.args[1].endswith('/' + operation))
+                refresh.assert_not_called()
+                self.assertEqual(self.path.read_bytes(), before)
+
+
 if __name__ == "__main__":
     unittest.main()

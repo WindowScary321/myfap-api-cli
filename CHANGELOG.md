@@ -28,6 +28,7 @@
 
 - Báo cáo Phase 4 ghi nhận các luồng đọc v2 trên HN, gồm login/refresh và JSON/ICS; đây không phải bằng chứng cho mọi campus, tài khoản hoặc route.
 - **V1/APHL:** `news` và `other notification` vẫn trả HTTP 200/body 201 với `data: null`; `other fee` vẫn trả HTTP 404 trong lượt chạy lại ngày 19/10/2026. Request đã được đối chiếu với app, nhưng nguyên nhân chưa được xác định. CLI giữ lỗi, không coi là dữ liệu rỗng, hết phiên hoặc route ngừng hỗ trợ trên mọi campus.
+- **Phase 6 v1/APHL, ngày 24/10/2026:** courses và marks summary trả HTTP 404; news search/training trả HTTP 200/body 201, data null. CLI giữ lỗi và không fallback; nguyên nhân chưa rõ. V2/HN đã đọc được các command tương ứng, không thay thế kiểm chứng v1.
 - **Fee/survey positive:** theo quyết định ngày 19/10/2026, chờ dữ liệu nghiệp vụ phù hợp và không chặn chuyển sang Phase 5. Schema live có dữ liệu vẫn **chưa kiểm chứng**; fee HTTP/body 200 hoặc survey not-found không đủ để đóng các mục này.
 - ICS đã được đọc bằng reader độc lập `icalendar`; chưa xác nhận import vào Google Calendar/Outlook. Reader `ics` hiện có giới hạn recursion với lịch lớn.
 - Phase 6 đang bổ sung transcript, balance, courses/training, subjects theo kỳ, tìm news, ảnh JSON, marks summary và doctor trước khi phát hành; xem coverage Phase 6. Các capability mới có fixture nhưng chưa nghiệm thu live. Rating list student/v1 đã có code/fixture; v2 stub bị chặn. Feedback đầy đủ và thao tác ghi vẫn còn gate contract/schema, không được coi là đã hỗ trợ.

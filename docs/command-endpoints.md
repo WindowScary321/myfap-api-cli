@@ -27,7 +27,7 @@ Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md
 | Command/caller | Operation | Method v1 / v2 | URL v1 | URL v2 | Capability và bằng chứng |
 |---|---|---|---|---|---|
 | `campuses` | `GetAllActiveCampus` | GET / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/GetAllActiveCampus` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetAllActiveCampus` | Public/bootstrap; fixture hai version, live v2/HN 200/200 |
-| `login`, handshake của `refresh`/auth | `AuthenticationByFeId` | GET / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/AuthenticationByFeId` | `https://fap-proxy.fpt.edu.vn/MyFAP/AuthenticationByFeId` | Student/handshake; binding campus/version; live v2/HN 200/200 |
+| `login`, handshake của `refresh`/auth | `AuthenticationByFeId` | POST / POST | `https://api.fpt.edu.vn/fap/api/MyFAP/AuthenticationByFeId` | `https://fap-proxy.fpt.edu.vn/MyFAP/AuthenticationByFeId` | Student/handshake; binding campus/version; live v2/HN 200/200 |
 | `semesters`, resolver kỳ | `GetSemester` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetSemester` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetSemester` | Student; fixture và live v1/v2; lượt mới v2/HN 200/200 |
 | `schedule`, `schedule --ics` | `GetActivityStudent` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetActivityStudent` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetActivityStudent` | Student/read; live JSON/ICS v2/HN đạt |
 | Resolver tuần của `week-timetable` | `GetWeekByDate` | GET / GET | `https://api.fpt.edu.vn/fap/api/MyFAP/GetWeekByDate` | `https://fap-proxy.fpt.edu.vn/MyFAP/GetWeekByDate` | Read/helper; live v2/HN 200/200, data integer |
@@ -50,6 +50,8 @@ Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md
 | Chỉ Python API `MyFapEssential.get_api_active()`; chưa có command CLI | `GetApiActive` | Không hỗ trợ / POST | — | `https://fap-proxy.fpt.edu.vn/MyFAP/GetApiActive` | Public/bootstrap diagnostic v2; fixture, chưa gọi trong lượt live mới; không auto-switch/fallback |
 
 `version` và `--help` không cần API. `logout` chỉ xóa session local, không phải request logout FEID/FAP. Các command export JSON/ICS/pretty dùng cùng endpoint dữ liệu, không tạo route mới.
+
+**Hiệu chỉnh method handshake CLI:** `myfap/auth.py` dùng POST JSON token và Bearer cho cả v1/v2; live v1/APHL ngày 24/10 cũng quan sát POST thành công. GET/query là caller legacy trong APK, không phải method CLI hiện tại. Bảng này mô tả CLI; không coi nó là hợp đồng request byte-for-byte của app.
 
 ### OAuth ngoài API nghiệp vụ
 

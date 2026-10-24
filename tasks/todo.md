@@ -44,3 +44,14 @@ Checklist, tiêu chí và gate bằng chứng nằm tại [phase6.md](phase6.md)
 - [ ] Kiểm regression, artifact, CI và live đọc riêng; giữ nguyên mọi skip/failure/unverified và TODO v1/positive fee/survey ở trên.
 - [ ] Cập nhật Draft PR Phase 6; mỗi commit push có comment ngay sau commit, không tự merge/tag/publish.
 - [ ] Maintainer duyệt phạm vi Phase 6 và các gate dịch vụ Phase 5 trước khi phát hành thật.
+
+### Lỗi live v1 mới ngày 24/10/2026
+
+Các command đã chạy thật trên v1/APHL sau login mới; chi tiết tại [coverage Phase 6](../docs/phase6-coverage.md#live-đọc-v1aphl-ngày-24102026). Không dùng kết quả v2 hoặc fixture để đóng các mục này:
+
+- [ ] Xác định nguyên nhân GetCourseOfSemester HTTP 404; request hiện giữ casing/signing theo caller v1.
+- [ ] Xác định nguyên nhân GetSemesterMark HTTP 404; không tự thêm checksum/kỳ hoặc đổi route để thử.
+- [ ] Xác định nguyên nhân SearchNews HTTP 200/body 201, data null; không coi là hết phiên hoặc empty hợp lệ.
+- [ ] Xác định nguyên nhân GetDiemphongtrao HTTP 200/body 201, data null; không bỏ lỗi hoặc fallback v2.
+
+Cùng lượt, subjects/balance/rating list đọc được và student sau refresh đạt 200/200. Transcript rỗng, photo null và rating list rỗng không xác nhận positive schema hoặc ID hợp lệ cho submit. Session/lock/thư mục tạm đã dọn; chỉ metadata được ghi, không raw response/identity/credential.
