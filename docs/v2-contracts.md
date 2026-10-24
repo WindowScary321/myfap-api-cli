@@ -38,17 +38,17 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `AuthenticationByFeId` | `POST` | supported | FEID token trong body và Bearer header |
 | `AuthenticationByFeIdCode` | `POST` | unsupported | Nhánh code exchange của app đang tắt |
 | `GetStudentById` | `GET` | supported | Query `CampusCode`, `rollNumber` |
-| `RetriveImage` | `GET` | unsupported | Query `CampusCode`, `rollNumber` |
+| `RetriveImage` | `GET` | supported | Phase 6: photo JSON opaque; không fetch/decode ảnh |
 | `CheckUpdateProfile` | `GET` | supported | Vẫn giữ query `Authen` theo app |
 | `GetSemester` | `GET` | supported | Query rỗng |
 | `GetSubjets` | `GET` | supported | Query `CampusCode` |
-| `GetSubjectBySemester` | `GET` | unsupported | Query `CampusCode`, `Semester` |
-| `GetCourseOfSemester` | `GET` | unsupported | Query `CampusCode`, `semester`, `rollNumber` |
+| `GetSubjectBySemester` | `GET` | supported | Phase 6: query `CampusCode`, `Semester`; không rollNumber |
+| `GetCourseOfSemester` | `GET` | supported | Phase 6: query `CampusCode`, `semester`, `rollNumber` |
 | `GetStudentMark` | `GET` | supported | Query `CampusCode`, `rollNumber`, `Semester` |
-| `GetSemesterMark` | `GET` | unsupported | Query có `Authen` |
+| `GetSemesterMark` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`, `Authen`; không query kỳ, reader riêng |
 | `GetMarkByCourse` | `GET` | supported | Query `CampusCode`, `CourseId`, `rollNumber` |
-| `AcademicTranscript` | `GET` | unsupported | Query `CampusCode`, `rollNumber` |
-| `GetDiemphongtrao` | `GET` | unsupported | Query `CampusCode`, `rollNumber`, `semester` |
+| `AcademicTranscript` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`; policy bound key, live chưa xác minh |
+| `GetDiemphongtrao` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`, `semester`; policy bound key |
 | `GetActivityStudent` | `GET` | supported | Query `CampusCode`, `rollNumber`, `Semester` |
 | `GetActivityStudentByWeek` | `GET` | supported | Query thêm `week`, `year` |
 | `GetScheduleExam` | `GET` | supported | Query `CampusCode`, `rollNumber`, `Semester` |
@@ -56,9 +56,9 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetStudentAttendances` | `GET` | supported | Query `CampusCode`, `Semester`, `rollNumber` |
 | `GetCourseAttendance` | `GET` | supported | V2 đổi chữ hoa; query có `SubjectCode`, `ClassName` |
 | `GeFeeByRoll` | `GET` | supported | Query `CampusCode`, `rollNumber` |
-| `GetBalance` | `GET` | unsupported | Query `CampusCode`, `rollNumber` |
+| `GetBalance` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`; giữ payload, không diễn giải nợ |
 | `GetTop10News` | `GET` | supported | Query `CampusCode`, `type` |
-| `SearchNews` | `GET` | unsupported | Query `CampusCode`, `type`, `keysearch` |
+| `SearchNews` | `GET` | supported | Phase 6: query `CampusCode`, `type`, `keysearch` |
 | `GetApplication` | `GET` | supported | Vẫn giữ query `Authen` theo app |
 | `CheckOpenFeedBack` | `GET` | supported | Vẫn giữ query `Authen` theo app |
 | `AddRate` | `POST` | unsupported | Vẫn giữ query `Authen` theo app |
@@ -78,9 +78,9 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetConnect` | Không có | stub | APK chỉ nối lại một đối tượng kết nối đã có |
 | `GetLoginDonor` | Không có | stub | APK trả trạng thái tạm, chưa có contract login donor |
 
-Ma trận hiện có 21 operation được hỗ trợ: 18 operation đọc, 2 bootstrap và 1 handshake. `GetApiActive` có API method chẩn đoán, chưa có command CLI riêng. Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
+Sau nhóm đọc Phase 6, ma trận có 29 operation được hỗ trợ trong code: 26 operation đọc, 2 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
-Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai bốn route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack` và `GetNotificationByRoll`; ba route còn lại vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
+Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai năm route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack`, `GetNotificationByRoll` và `GetSemesterMark`; `AddRate`/`GetNotificationByDonor` vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
 
 ## Giới hạn hiện tại
 
