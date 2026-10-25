@@ -164,7 +164,9 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 
     out_path = Path(output_dir) if output_dir else Path.cwd()
     out_path.mkdir(parents=True, exist_ok=True)
-    file_path = out_path / default_filename
+    # Tên file có thể nhúng dữ liệu server (tên kỳ); thay ký tự đường dẫn để không thoát thư mục xuất.
+    safe_filename = default_filename.replace("\\", "_").replace("/", "_").replace("\x00", "_")
+    file_path = out_path / safe_filename
 
     try:
         with open(file_path, "w", encoding="utf-8", newline="" if is_text else None) as f:

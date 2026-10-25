@@ -71,6 +71,15 @@ class MarksParserTests(unittest.TestCase):
 
         self.assertEqual(parse_marks_html(html), [{"category": "Final", "item": "FE", "value": "7.3"}])
 
+    def test_garbage_rowspan_does_not_crash_and_keeps_own_row(self):
+        for rowspan in ("2.0", "abc", ""):
+            with self.subTest(rowspan=rowspan):
+                html = ("<table><tr><th>Item</th><th>Weight</th><th>Value</th></tr>"
+                        f"<tr><td rowspan='{rowspan}'>Quiz</td><td>Q1</td><td>10%</td><td>8</td></tr>"
+                        "<tr><td>Q2</td><td>20%</td><td>7</td></tr></table>")
+                rows = parse_marks_html(html)
+                self.assertEqual(rows[0], {"category": "Quiz", "item": "Q1", "weight": "10%", "value": "8"})
+
 
 class TranscriptHtmlTests(unittest.TestCase):
     MAIN_HEADERS = ["No", "Term", "Semester", "Subject Code", "prerequisite",
@@ -204,6 +213,44 @@ class ScheduleParserTests(unittest.TestCase):
             "Group: Demo group", "Session: 1", "Lecturer: Demo lecturer",
             "Room: Demo room", "Meet URL: https://example.invalid/meet",
         ]))
+
+    def test_boolean_is_online_still_marks_online_title(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["isOnline"] = True
+
+        event = next(iter(Calendar(convert_schedule_to_ics(data)).events))
+
+        self.assertEqual(event.name, "TEST101 (Online)")
+
+    def test_overnight_slot_wraps_end_to_next_day(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["slotTime"] = "(23:30-0:50)"
+
+        event = next(iter(Calendar(convert_schedule_to_ics(data)).events))
+
+        # 23:30 và 0:50 (hôm sau) giờ Việt Nam = 16:30 và 17:50 UTC cùng ngày 15/10.
+        self.assertEqual(event.begin.datetime, datetime(2026, 10, 15, 16, 30, tzinfo=timezone.utc))
+        self.assertEqual(event.end.datetime, datetime(2026, 10, 15, 17, 50, tzinfo=timezone.utc))
+        self.assertEqual((event.end.datetime - event.begin.datetime).total_seconds(), 80 * 60)
+
+    def test_slot_without_separator_raises_clear_message(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["slotTime"] = "7:30"
+
+        with self.assertRaises(ValueError) as caught:
+            convert_schedule_to_ics(data)
+        self.assertIn("slotTime", str(caught.exception))
+        self.assertIn("7:30-9:50", str(caught.exception))
+
+
+class SaveOutputSanitizationTests(unittest.TestCase):
+    def test_server_influenced_filename_stays_inside_output_dir(self):
+        with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
+            save_output({"code": 200, "data": []}, "BangDiem_x/../../evil.json", temporary, False)
+            files = sorted(path.name for path in Path(temporary).iterdir())
+            self.assertEqual(files, ["BangDiem_x_.._.._evil.json"])
+            content = json.loads((Path(temporary) / files[0]).read_text(encoding="utf-8"))
+        self.assertEqual(content, {"code": 200, "data": []})
 
     def test_empty_schedule_returns_valid_empty_calendar(self):
         data = json.loads((FIXTURES / "schedule_empty.json").read_text(encoding="utf-8"))

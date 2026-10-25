@@ -1,5 +1,13 @@
 from bs4 import BeautifulSoup
 
+def _rowspan_rows(value):
+    # rowspan rác từ server (VD "2.0", rỗng) coi như 1 để không crash parser.
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return 1
+
+
 def parse_marks_html(html_str: str):
     """Phân tích chuỗi HTML bảng điểm thành danh sách các đối tượng JSON (dict)"""
     soup = BeautifulSoup(html_str, 'html.parser')
@@ -29,7 +37,7 @@ def parse_marks_html(html_str: str):
         # Nhận diện dòng có category mới (td đầu tiên có rowspan)
         if len(tds) >= 3 and tds[0].has_attr('rowspan'):
             current_category = td_texts[0]
-            category_rows_remaining = max(0, int(tds[0]['rowspan']) - 1)
+            category_rows_remaining = _rowspan_rows(tds[0]['rowspan']) - 1
             data_tds = td_texts[1:]
         elif len(tds) >= 2 and tds[0].has_attr('colspan') and current_category:
             # Giữ cấu trúc output của dòng tổng kết hiện có.
@@ -101,7 +109,7 @@ def parse_transcript_html(html_str: str):
     return tables
 
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import pytz
 from ics import Calendar, Event
 
@@ -124,18 +132,25 @@ def convert_schedule_to_ics(data: dict) -> str:
         
         # Parse time: "(7:30-9:50)" -> "7:30", "9:50"
         time_str = session["slotTime"].strip().strip("()").strip()
-        start_time_str, end_time_str = (part.strip() for part in time_str.split("-", 1))
-        
+        try:
+            start_time_str, end_time_str = (part.strip() for part in time_str.split("-", 1))
+        except ValueError:
+            raise ValueError("slotTime phải có dạng (giờ bắt đầu-giờ kết thúc), ví dụ (7:30-9:50).") from None
+
         # Parse full datetime
         start_dt = tz.localize(datetime.strptime(f"{date_str} {start_time_str}", "%m/%d/%Y %H:%M"))
         end_dt = tz.localize(datetime.strptime(f"{date_str} {end_time_str}", "%m/%d/%Y %H:%M"))
+        # Slot kết thúc trước giờ bắt đầu nghĩa là vượt nửa đêm: kết thúc sang ngày hôm sau.
+        if end_dt <= start_dt:
+            end_dt += timedelta(days=1)
         
         # Create event
         e = Event(created=datetime.now(timezone.utc))
         
         # Title
         title = session['subjectCode']
-        if session.get("isOnline") == "True":
+        is_online = session.get("isOnline")
+        if is_online is True or is_online == "True":
             title += " (Online)"
         e.name = title
         
