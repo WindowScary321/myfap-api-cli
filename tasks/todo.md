@@ -77,7 +77,7 @@ Các gate và trình tự validate → capability → preview → confirmation �
 
 Lượt review lượt hai trên toàn bộ diff PR #10 theo 4 trục (query/credential/parser/write safety): query contract, credential và write safety sạch; parser có bốn finding, đều không phải lỗ hổng bảo mật (CLI chạy bởi chính người dùng trên máy họ). Maintainer quyết định sửa trước khi tag `0.2.0` hay phát hành với known issues:
 
-- [ ] `parse_marks_html` crash khi `rowspan` không phải số nguyên (`myfap/parsers.py` — `int(tds[0]['rowspan'])` với giá trị như `2.0`/rỗng); sửa nhỏ: bọc an toàn, giá trị rác coi như 1.
-- [ ] ICS: `isOnline` dạng boolean làm mất nhãn "(Online)" (`parsers.py`); slot vượt nửa đêm (VD `23:30-0:50`) và `slotTime` không có dấu gạch gây lỗi thông báo khó hiểu.
-- [ ] `save_output` dựng tên file từ dữ liệu server (tên kỳ tự chọn) và input user chưa sanitize ký tự đường dẫn; có thể thoát thư mục `--output` nếu giá trị chứa `..`. Sửa nhỏ: sanitize thành phần tên file hoặc kiểm tra path chuẩn hoá nằm trong thư mục xuất.
-- [ ] (low) Chưa có test cho nhánh `transcript --pretty` khi data không phải HTML (giữ nguyên chuỗi).
+- [x] `parse_marks_html` crash khi `rowspan` không phải số nguyên (`myfap/parsers.py`) — **đã sửa 24/10/2026**: giá trị rác coi như 1, kèm test regression.
+- [x] ICS: `isOnline` boolean mất nhãn "(Online)"; slot vượt nửa đêm và `slotTime` không dấu gạch — **đã sửa 24/10/2026**: nhận boolean, slot kết thúc sang ngày hôm sau, lỗi `slotTime` có thông báo rõ; kèm test.
+- [x] `save_output` sanitize tên file xuất — **đã sửa 24/10/2026**: thay `/`, `\` và NUL bằng `_`, file luôn nằm trong thư mục `--output`; kèm test.
+- [x] (low) Test nhánh `transcript --pretty` khi data không phải HTML — **đã có**: test CLI seam phủ cả nhánh giữ nguyên chuỗi gốc.
