@@ -56,11 +56,19 @@ Các command đã chạy thật trên v1/APHL sau login mới; chi tiết tại 
 
 Cùng lượt, subjects/balance/rating list đọc được và student sau refresh đạt 200/200. Transcript rỗng, photo null và rating list rỗng không xác nhận positive schema hoặc ID hợp lệ cho submit. Session/lock/thư mục tạm đã dọn; chỉ metadata được ghi, không raw response/identity/credential.
 
-## Thao tác ghi rating/push/feedback vẫn chưa mở
+## Mục 4–5 Phase 6 khó thực hiện với tài khoản hiện tại
 
-Theo đánh giá của người dùng ngày 24/10/2026, **tài khoản hiện tại không thể xác minh** các thao tác ghi này: rating list v1 trả danh sách rỗng (không có rateid/item để đối chiếu `AddRate`), không có feedback đang mở để thu form/ack. Không cố tình thử ghi để tạo dữ liệu, không coi đây là route lỗi và không mở generic submit.
+Theo đánh giá của maintainer ngày 24/10/2026, **các mục 4 (rating/push) và 5 (feedback đầy đủ) của [phase6.md](phase6.md) không thể thực hiện hoặc xác minh bằng tài khoản hiện tại**:
 
-- [ ] Khi có tài khoản hoặc dữ liệu phù hợp (rating đang mở, feedback đang mở), thu thập input schema và ack nghiệp vụ của `AddRate` (v1 checksum `rateid`, v2 query `Authen`, body `{}`) và các form feedback theo [phase6-write-gates.md](../docs/phase6-write-gates.md) trước khi mở command.
+- **Rating submit (`AddRate`)**: rating list v1 trả danh sách rỗng — không có rateid/positive item để đối chiếu input schema và ack.
+- **Push register (`UpdateTokedevices`)**: thao tác ghi thiết bị; cần contract student đã chốt và xác nhận riêng trước khi live ghi.
+- **`GetStudentFeedbackForm`**: `other feedbacks` trả list rỗng — không có feedbackId thật; không đoán ID theo quy tắc plan.
+- **`SubmitStudentFeedback`**: cần feedback đang mở để có form/ack hợp lệ.
+- **Donor/employee và login thay thế** (`GetNotificationByDonor`, `GetTokenWithEmp`, `UpdateTokenDonor`, Google/username/FeIdCode): đã ghi out of scope tại [phân tích khoảng trống endpoint](../docs/endpoint-gap-analysis.md), không dự định triển khai trong Phase 6.
+
+Hệ quả khi chốt phạm vi Phase 6 và phát hành `0.2.0`: các mục này giữ trạng thái **gate/unsupported**, không đánh dấu hoàn tất và không mở generic submit; maintainer duyệt phát hành với known issues này. Khi có tài khoản hoặc dữ liệu phù hợp:
+
+- [ ] Thu thập input schema và ack của `AddRate` (v1 checksum `rateid`, v2 query `Authen`, body `{}`) và các form feedback theo [phase6-write-gates.md](../docs/phase6-write-gates.md) trước khi mở command.
 - [ ] `push register --token-file` cần contract student đã chốt và xác nhận riêng của người dùng trước khi live ghi; token thiết bị chỉ đọc từ regular file, không đưa vào argv/preview/log/error.
 
-Các gate và trình tự validate → capability → preview → confirmation → auth vẫn áp dụng như [phase6.md](phase6.md) mục 4–5; việc chưa xác minh được không tự đóng cũng không nới gate.
+Các gate và trình tự validate → capability → preview → confirmation → auth vẫn áp dụng; không cố tình thử ghi để tạo dữ liệu, không coi list rỗng là route lỗi, và việc chưa xác minh được không tự đóng cũng không nới gate.
