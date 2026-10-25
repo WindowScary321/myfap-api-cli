@@ -72,3 +72,12 @@ Hệ quả khi chốt phạm vi Phase 6 và phát hành `0.2.0`: các mục này
 - [ ] `push register --token-file` cần contract student đã chốt và xác nhận riêng của người dùng trước khi live ghi; token thiết bị chỉ đọc từ regular file, không đưa vào argv/preview/log/error.
 
 Các gate và trình tự validate → capability → preview → confirmation → auth vẫn áp dụng; không cố tình thử ghi để tạo dữ liệu, không coi list rỗng là route lỗi, và việc chưa xác minh được không tự đóng cũng không nới gate.
+
+## Finding robustness từ review Phase 6 (24/10/2026)
+
+Lượt review lượt hai trên toàn bộ diff PR #10 theo 4 trục (query/credential/parser/write safety): query contract, credential và write safety sạch; parser có bốn finding, đều không phải lỗ hổng bảo mật (CLI chạy bởi chính người dùng trên máy họ). Maintainer quyết định sửa trước khi tag `0.2.0` hay phát hành với known issues:
+
+- [ ] `parse_marks_html` crash khi `rowspan` không phải số nguyên (`myfap/parsers.py` — `int(tds[0]['rowspan'])` với giá trị như `2.0`/rỗng); sửa nhỏ: bọc an toàn, giá trị rác coi như 1.
+- [ ] ICS: `isOnline` dạng boolean làm mất nhãn "(Online)" (`parsers.py`); slot vượt nửa đêm (VD `23:30-0:50`) và `slotTime` không có dấu gạch gây lỗi thông báo khó hiểu.
+- [ ] `save_output` dựng tên file từ dữ liệu server (tên kỳ tự chọn) và input user chưa sanitize ký tự đường dẫn; có thể thoát thư mục `--output` nếu giá trị chứa `..`. Sửa nhỏ: sanitize thành phần tên file hoặc kiểm tra path chuẩn hoá nằm trong thư mục xuất.
+- [ ] (low) Chưa có test cho nhánh `transcript --pretty` khi data không phải HTML (giữ nguyên chuỗi).
