@@ -72,6 +72,61 @@ class MarksParserTests(unittest.TestCase):
         self.assertEqual(parse_marks_html(html), [{"category": "Final", "item": "FE", "value": "7.3"}])
 
 
+class TranscriptHtmlTests(unittest.TestCase):
+    MAIN_HEADERS = ["No", "Term", "Semester", "Subject Code", "prerequisite",
+                    "Replaced Subject", "Subject Name", "Credit", "Grade", "Status"]
+    EXTRA_HEADERS = ["No", "Semester", "SubjectCode", "SubjectName", "Credit", "Grade", "Status"]
+
+    @staticmethod
+    def fixture():
+        main = (
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("1", "202", "Fall2026", "PRO192", "", "", "Object Oriented Programming", "3", "8.5", "Passed")) + "</tr>"
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("2", "202", "Fall2026", "MAL202", "PRO192", "", "Linear Algebra", "3", "", "Not Passed")) + "</tr>"
+        )
+        extra = (
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("1", "Spring2027", "SSG103", "Soft Skill", "2", "7.0", "Passed")) + "</tr>"
+        )
+        def header(names):
+            return "<tr>" + "".join(f"<th>{n}</th>" for n in names) + "</tr>"
+        return (
+            "<TABLE class='table table-hover'><tbody>" + header(TranscriptHtmlTests.MAIN_HEADERS) + main + "</tbody></TABLE>"
+            "<TABLE class='table table-hover'><tbody>" + header(TranscriptHtmlTests.EXTRA_HEADERS) + extra + "</tbody></TABLE>"
+        )
+
+    def setUp(self):
+        from myfap.parsers import parse_transcript_html
+        self.parse = parse_transcript_html
+
+    def test_each_table_keeps_own_headers_and_keyed_rows(self):
+        tables = self.parse(self.fixture())
+        self.assertEqual([table["headers"] for table in tables], [self.MAIN_HEADERS, self.EXTRA_HEADERS])
+        self.assertEqual(tables[0]["rows"][0], {
+            "No": "1", "Term": "202", "Semester": "Fall2026", "Subject Code": "PRO192",
+            "prerequisite": "", "Replaced Subject": "", "Subject Name": "Object Oriented Programming",
+            "Credit": "3", "Grade": "8.5", "Status": "Passed",
+        })
+        self.assertEqual(len(tables[0]["rows"]), 2)
+        self.assertEqual(tables[1]["rows"][0]["SubjectName"], "Soft Skill")
+        self.assertEqual(len(tables[1]["rows"]), 1)
+
+    def test_html_entities_are_decoded_and_extra_cells_get_stable_keys(self):
+        tables = self.parse("<table><tr><th>A</th><th>B</th></tr>"
+                            "<tr><td>Số&nbsp;1</td><td>x</td><td>thừa</td></tr></table>")
+        self.assertEqual(tables[0]["rows"][0], {"A": "Số 1", "B": "x", "Column3": "thừa"})
+
+    def test_input_without_table_returns_empty_list(self):
+        self.assertEqual(self.parse("<div>PRIVATE [not a table]</div>"), [])
+        self.assertEqual(self.parse(""), [])
+
+    def test_data_rows_before_header_are_ignored(self):
+        tables = self.parse("<table><tr><td>1</td></tr><tr><th>Only</th></tr><tr><td>ok</td></tr></table>")
+        self.assertEqual(tables[0]["headers"], ["Only"])
+        self.assertEqual(tables[0]["rows"], [{"Only": "ok"}])
+
+
 class ScheduleParserTests(unittest.TestCase):
     def test_saved_ics_keeps_line_endings_for_independent_reader(self):
         data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))

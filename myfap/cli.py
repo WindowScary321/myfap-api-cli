@@ -15,7 +15,7 @@ from typer.core import TyperGroup
 
 from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
-from .parsers import parse_marks_html, convert_schedule_to_ics
+from .parsers import parse_marks_html, parse_transcript_html, convert_schedule_to_ics
 from .config import resolve_timeout
 from importlib import metadata
 
@@ -349,6 +349,7 @@ def schedule(
 
 @app.command()
 def transcript(
+    pretty: bool = typer.Option(False, "--pretty", "-p", help="Phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
@@ -356,7 +357,11 @@ def transcript(
     auth = require_auth("AcademicTranscript")
     try:
         data = MyFapClient(auth).get_transcript()
-        save_output(data, "Transcript.json", output, stdout)
+        filename = "Transcript.json"
+        if pretty and isinstance(data, dict) and isinstance(data.get('data'), str) and '<table' in data['data'].lower():
+            data['data'] = parse_transcript_html(data['data'])
+            filename = "Transcript_prettier.json"
+        save_output(data, filename, output, stdout)
     except Exception as error:
         err_console.print(f"[red]Lỗi lấy transcript: {error}[/red]")
         raise typer.Exit(code=1)

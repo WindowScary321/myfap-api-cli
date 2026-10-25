@@ -73,6 +73,34 @@ def parse_marks_html(html_str: str):
 
     return result
 
+def parse_transcript_html(html_str: str):
+    """Phân tích chuỗi HTML bảng điểm toàn khóa: mỗi bảng giữ header riêng và hàng dữ liệu keyed theo header."""
+    def cell_text(node):
+        # &nbsp; giải mã thành \xa0; chuẩn hoá thành space thường để JSON sạch.
+        return node.get_text().replace('\xa0', ' ').strip()
+
+    soup = BeautifulSoup(html_str, 'html.parser')
+    tables = []
+    for table in soup.find_all('table'):
+        headers = []
+        rows = []
+        for tr in table.find_all('tr'):
+            if tr.find('th'):
+                headers = [cell_text(th) for th in tr.find_all('th')]
+                continue
+            tds = tr.find_all('td')
+            if not tds or not headers:
+                continue
+            row = {}
+            for index, td in enumerate(tds):
+                key = headers[index] if index < len(headers) else f"Column{index + 1}"
+                row[key] = cell_text(td)
+            rows.append(row)
+        if headers or rows:
+            tables.append({"headers": headers, "rows": rows})
+    return tables
+
+
 from datetime import datetime, timezone
 import pytz
 from ics import Calendar, Event

@@ -258,6 +258,28 @@ class TranscriptCommandTests(unittest.TestCase):
                     self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "Bearer FAKE_FAP_KEY")
 
 
+    def test_transcript_pretty_parses_html_and_default_keeps_raw_string(self):
+        from tests.test_parsers import TranscriptHtmlTests
+
+        html = TranscriptHtmlTests.fixture()
+        for options, expect_parsed in (([], False), (["--pretty"], True)):
+            with self.subTest(options=options):
+                self.save_session("v2")
+                payload = {"code": 200, "data": html}
+                with patch("requests.Session.request", return_value=response(payload)) as request:
+                    result = self.runner.invoke(app, ["--config", str(self.path), "transcript", *options, "--stdout"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                data = json.loads(result.stdout)["data"]
+                if expect_parsed:
+                    self.assertEqual([table["headers"] for table in data],
+                                     [TranscriptHtmlTests.MAIN_HEADERS, TranscriptHtmlTests.EXTRA_HEADERS])
+                    self.assertEqual(data[0]["rows"][0]["Subject Code"], "PRO192")
+                else:
+                    self.assertEqual(data, html)
+                request.assert_called_once()
+                self.assertTrue(request.call_args.args[1].endswith("/AcademicTranscript"))
+
+
 class TrainingCommandTests(unittest.TestCase):
     setUp = BalanceCommandTests.setUp
     save_session = BalanceCommandTests.save_session

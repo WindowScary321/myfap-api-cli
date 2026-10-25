@@ -5,6 +5,7 @@
 ### API và dữ liệu
 
 - Thêm `myfap other feedbacks` đọc danh sách feedback student qua `GetStudentFeedbacks`, chỉ có trên proxy API v2; envelope đã kiểm chứng live nhưng item schema chưa có positive (danh sách rỗng trên tài khoản kiểm chứng).
+- `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc: mỗi bảng giữ header riêng (bảng chính 10 cột `No`…`Status`, bảng phụ 7 cột) và hàng dữ liệu keyed theo header, chuẩn hoá `&nbsp;`; không dùng `--pretty` vẫn giữ chuỗi HTML nguyên bản theo contract.
 - `doctor --api-version v2 --online` báo thêm `backend_version` qua `GetVersion` POST bootstrap; GET bị proxy từ chối 405 và route v1 đã 404. `myfap version` vẫn chỉ đọc package version offline.
 - Thêm [phân tích khoảng trống endpoint](docs/endpoint-gap-analysis.md) đối chiếu 82 route của APK với adapter: CLI phủ toàn bộ operation đọc student; donor/employee, login thay thế và OTA được ghi rõ out of scope.
 - Chuyển training và nhóm rating vào `other`: dùng `myfap other training` và `myfap other rating list`, không giữ command root cũ. Endpoint, policy retry và capability từng version không đổi.
