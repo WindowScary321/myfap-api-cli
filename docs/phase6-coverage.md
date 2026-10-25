@@ -132,3 +132,18 @@ Kết luận: proxy v2 hiện tại chỉ chấp nhận cặp `Authorization: Be
 - **`doctor --api-version v2 --online` thêm `GetVersion`**: probe chạy sau khi `GetApiActive` hợp lệ, report có `backend_version`. Contract: GET bị 405, POST body `{}` bootstrap đạt 200 với data chuỗi ngắn, route v1 404. Test hiện có cập nhật (2 probe cho lượt online) và test mới chặn version không phải chuỗi; một lỗi thứ tự thật bị test bắt (probe version chạy trước khi validate active) đã sửa.
 
 Full suite sau hai feature: 403 test, 399 đạt/4 skip, exit 0 trên Windows Python 3.11; kiểm CLI thật với session cá nhân: `other feedbacks` exit 0 (200, list rỗng), `doctor --online` exit 0 (`api_active` true, `backend_version` chuỗi 3 ký tự).
+
+## Quét toàn bộ lệnh đọc bằng session/browser mới (24/10/2026)
+
+Đóng checkpoint nhóm đọc: login FEID mới bằng browser context mới với session tạm riêng (hai lượt — lượt chính cho bộ quét, lượt phụ cho lệnh bảng), chạy toàn bộ command đọc trên v2/HN, raw chỉ xử lý cục bộ trên máy cá nhân và xóa sau khi trích metadata; parameter (`CourseId`, `SubjectCode`/`ClassName`) trích từ response trong thư mục tạm, không in giá trị. Cả hai session đã logout.
+
+| Phân loại | Command (HTTP/body code, dạng data) |
+|---|---|
+| Success có dữ liệu | info student 200/list(1); info campus 200/list(1); photo 200/str ngắn không rỗng (lần đầu có chuỗi); courses 200/list(5) — resolver kỳ tự chạy; schedule 200/list(64); schedule --ics vcalendar chuẩn CRLF; week-timetable 200/list(6); marks --summary 200/list(32); exams 200/list(6); attendance 200/list(5); **attendance detail 200/list(1) — positive đầu tiên (param trích từ courses)**; news 200/list(10); **news --search 200/list(50)**; notification 200/list(49); fee 200/list(1) không rỗng — **không đóng positive fee, schema nghiệp vụ chưa đối chiếu**; balance 200/str ngắn; subjects 200/list lớn; transcript 200/str ~10,5 KB; doctor local/online exit 0 |
+| Success, data rỗng | marks 200/list(0); marks --courseid 200/str(0) (CourseId thật trích từ courses; chuỗi rỗng, chưa phải positive nội dung); applications 200/list(0); other training 200/list(0); other feedbacks 200/list(0) |
+| Theo contract đặc thù | other survey HTTP 200/body 404 exit 0 (not-found cho phép); other feedback/profile 200/data boolean |
+| Không áp dụng trên v2 | other rating list exit 1 — v1-only, chặn trước HTTP đúng thiết kế |
+| Lệnh bảng | semesters exit 0, bảng UTF-8 ~29 dòng kỳ (lượt phụ, login riêng) |
+| Ghi chú harness | Lượt chính bị lỗi harness ở `semesters --stdout` (lệnh bảng không có option này → exit 2, không phải lỗi CLI; chạy lại đúng cú pháp ở lượt phụ). `other subjects --semester` không lặp lại trong lượt này vì cùng lỗi; bằng chứng lượt 24/10 trước (200/200, input kỳ từ API thật) vẫn đứng |
+
+Không đóng các mục cấm: positive fee/survey giữ mở (dữ liệu chưa đối chiếu nghiệp vụ), các finding v1 giữ nguyên — không dùng kết quả v2 để đóng. Transcript HTML và các formatter nghiệp vụ tiếp tục nhãn chưa kiểm chứng.
