@@ -15,7 +15,7 @@ from typer.core import TyperGroup
 
 from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
-from .parsers import parse_marks_html, convert_schedule_to_ics
+from .parsers import parse_marks_html, parse_transcript_html, convert_schedule_to_ics, convert_exams_to_ics
 from .config import resolve_timeout
 from importlib import metadata
 
@@ -90,6 +90,9 @@ app.add_typer(info_app, name="info")
 other_app = typer.Typer(help="Các chức năng phụ trợ khác (survey, feedback, fee...)")
 app.add_typer(other_app, name="other")
 
+rating_app = typer.Typer(help="Đánh giá dịch vụ; list hiện chỉ hỗ trợ API v1")
+other_app.add_typer(rating_app, name="rating")
+
 state = {
     "campus": None,
     "config": None,
@@ -161,7 +164,9 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
 
     out_path = Path(output_dir) if output_dir else Path.cwd()
     out_path.mkdir(parents=True, exist_ok=True)
-    file_path = out_path / default_filename
+    # Tên file có thể nhúng dữ liệu server (tên kỳ); thay ký tự đường dẫn để không thoát thư mục xuất.
+    safe_filename = default_filename.replace("\\", "_").replace("/", "_").replace("\x00", "_")
+    file_path = out_path / safe_filename
 
     try:
         with open(file_path, "w", encoding="utf-8", newline="" if is_text else None) as f:
@@ -203,6 +208,23 @@ def version():
     except metadata.PackageNotFoundError:
         ver = "unknown (not installed via pip)"
     console.print(f"MyFap API CLI version: [bold cyan]{ver}[/bold cyan]")
+
+@app.command()
+def doctor(
+    online: bool = typer.Option(False, "--online", help="Gọi bootstrap GetApiActive/GetVersion v2; không xác thực session"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In JSON chẩn đoán ra stdout")
+):
+    """Chẩn đoán cấu hình explicit/default; không đọc hoặc làm mới session."""
+    from .diagnostics import get_diagnostics
+    try:
+        report = get_diagnostics(api_version=state["api_version"], campus=state["campus"],
+                                 timeout=state["timeout"], online=online)
+        save_output(report, "Doctor.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi chẩn đoán: {error}[/red]")
+        raise typer.Exit(code=1)
+
 
 @app.command()
 def login(
@@ -328,14 +350,86 @@ def schedule(
         raise typer.Exit(code=1)
 
 @app.command()
+def transcript(
+    pretty: bool = typer.Option(False, "--pretty", "-p", help="Phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy bảng điểm toàn khóa theo contract API đã chọn."""
+    auth = require_auth("AcademicTranscript")
+    try:
+        data = MyFapClient(auth).get_transcript()
+        filename = "Transcript.json"
+        if pretty and isinstance(data, dict) and isinstance(data.get('data'), str) and '<table' in data['data'].lower():
+            data['data'] = parse_transcript_html(data['data'])
+            filename = "Transcript_prettier.json"
+        save_output(data, filename, output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy transcript: {error}[/red]")
+        raise typer.Exit(code=1)
+
+
+@other_app.command("training")
+def training(
+    semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy điểm phong trào theo kỳ."""
+    if semester is not None and not semester.strip():
+        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    auth = require_auth("GetDiemphongtrao")
+    client = MyFapClient(auth)
+    sem = resolve_semester(auth, semester)
+    try:
+        data = client.get_training(sem)
+        save_output(data, "Training.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy điểm phong trào: {error}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def courses(
+    semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy danh sách khóa học theo kỳ."""
+    if semester is not None and not semester.strip():
+        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    auth = require_auth("GetCourseOfSemester")
+    client = MyFapClient(auth)
+    sem = resolve_semester(auth, semester)
+    try:
+        data = client.get_courses(sem)
+        save_output(data, "Courses.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy khóa học: {error}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def marks(
+    summary: bool = typer.Option(False, "--summary", help="Tổng kết; không nhận kỳ học hoặc courseid"),
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
     courseid: Optional[str] = typer.Option(None, "--courseid", "-cid", help="Mã môn học"),
     pretty: bool = typer.Option(False, "--pretty", "-p", help="Làm đẹp bảng điểm (chỉ áp dụng khi dùng -cid)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
-    """Xem bảng điểm"""
+    """Xem bảng điểm theo kỳ, chi tiết môn hoặc tổng kết."""
+    if summary:
+        if semester is not None or courseid is not None or pretty:
+            raise typer.BadParameter("--summary không dùng cùng --semester, --courseid hoặc --pretty.")
+        auth = require_auth("GetSemesterMark")
+        try:
+            data = MyFapClient(auth).get_mark_summary()
+            save_output(data, "MarkSummary.json", output, stdout)
+        except Exception as error:
+            err_console.print(f"[red]Lỗi lấy tổng kết: {error}[/red]")
+            raise typer.Exit(code=1)
+        return
     if pretty and not courseid:
         err_console.print("[red]Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)[/red]")
         raise typer.Exit(code=1)
@@ -373,6 +467,8 @@ def marks(
 @app.command()
 def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
+    ics: bool = typer.Option(False, "--ics", help="Xuất lịch thi ra định dạng iCalendar (.ics)"),
+    full: bool = typer.Option(False, "--full", help="Kèm toàn bộ thông tin phụ khi xuất ICS (phòng thi, ghi chú, mã slot/UUID, điểm danh...)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
@@ -380,12 +476,17 @@ def exams(
     auth = require_auth("GetScheduleExam")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
-            
+
     try:
         with err_console.status("[bold green]Đang tải lịch thi..."):
             data = client.get_exams(sem)
-        filename = f"LichThi_{sem}.json"
-        save_output(data, filename, output, stdout)
+        if ics:
+            ics_content = convert_exams_to_ics(data, full=full)
+            filename = f"LichThi_{sem}.ics"
+            save_output(ics_content, filename, output, stdout, is_text=True)
+        else:
+            filename = f"LichThi_{sem}.json"
+            save_output(data, filename, output, stdout)
     except Exception as e:
         err_console.print(f"[red]Lỗi lấy lịch thi: {e}[/red]")
         raise typer.Exit(code=1)
@@ -495,16 +596,20 @@ def applications(
 
 @app.command()
 def news(
+    search: Optional[str] = typer.Option(None, "--search", help="Tìm tin theo nội dung"),
+    news_type: int = typer.Option(1, "--type", "-t", min=1, help="Loại thông báo"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
-    """Xem 10 thông báo gần nhất"""
-    auth = require_auth("GetTop10News")
+    """Xem tin gần nhất hoặc tìm kiếm thông báo."""
+    if search is not None and not search.strip():
+        raise typer.BadParameter("Nội dung tìm kiếm không được rỗng.", param_hint="--search")
+    auth = require_auth("GetTop10News" if search is None else "SearchNews")
     other = MyFapEssential(auth)
     
     try:
         with err_console.status("[bold green]Đang tải thông báo..."):
-            data = other.get_news()
+            data = other.get_news(news_type) if search is None else other.get_news(news_type, search=search)
         filename = f"ThongBao.json"
         save_output(data, filename, output, stdout)
     except Exception as e:
@@ -528,6 +633,21 @@ def info_student(
         err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
+@info_app.command("photo")
+def info_photo(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file JSON"),
+    stdout: bool = typer.Option(False, "--stdout", help="In JSON; không tự giải mã hoặc tải ảnh")
+):
+    """Lấy representation ảnh dưới dạng JSON, không tự mở ảnh."""
+    auth = require_auth("RetriveImage")
+    try:
+        data = MyFapClient(auth).get_photo()
+        save_output(data, "Photo.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy ảnh: {error}[/red]")
+        raise typer.Exit(code=1)
+
+
 @info_app.command("campus")
 def info_campus(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
@@ -542,6 +662,21 @@ def info_campus(
         save_output(data, filename, output, stdout)
     except Exception as e:
         err_console.print(f"[red]Lỗi: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@rating_app.command("list")
+def rating_list(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In JSON danh sách; không gửi đánh giá")
+):
+    """Lấy danh sách đánh giá student/v1; v2 stub bị chặn trước HTTP."""
+    auth = require_auth("GetStudentRate")
+    try:
+        data = MyFapOther(auth).get_ratings()
+        save_output(data, "RatingList.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy danh sách đánh giá: {error}[/red]")
         raise typer.Exit(code=1)
 
 
@@ -579,6 +714,22 @@ def other_feedback(
     except Exception as e:
         err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
+
+@other_app.command("feedbacks")
+def other_feedbacks(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy danh sách feedback student (chỉ API v2); item schema chưa kiểm chứng positive."""
+    auth = require_auth("GetStudentFeedbacks")
+    other_client = MyFapOther(auth)
+    try:
+        data = other_client.get_feedbacks()
+        save_output(data, "Feedbacks.json", output, stdout)
+    except Exception as e:
+        err_console.print(f"[red]Lỗi lấy danh sách feedback: {e}[/red]")
+        raise typer.Exit(code=1)
+
 
 @other_app.command("profile")
 def other_profile(
@@ -628,17 +779,36 @@ def other_fee(
         err_console.print(f"[red]Lỗi: {e}[/red]")
         raise typer.Exit(code=1)
 
-@other_app.command("subjects")
-def other_subjects(
+@other_app.command("balance")
+def other_balance(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
-    """Lấy danh sách tất cả môn học"""
-    auth = require_auth("GetSubjets")
+    """Lấy số dư tài khoản; không diễn giải thành trạng thái nợ học phí."""
+    auth = require_auth("GetBalance")
+    other_client = MyFapOther(auth)
+    try:
+        data = other_client.get_balance()
+        save_output(data, "Balance.json", output, stdout)
+    except Exception as error:
+        err_console.print(f"[red]Lỗi lấy số dư: {error}[/red]")
+        raise typer.Exit(code=1)
+
+
+@other_app.command("subjects")
+def other_subjects(
+    semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Chỉ lấy môn của kỳ được chỉ định"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
+    stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
+):
+    """Lấy tất cả môn học hoặc các môn của một kỳ chỉ định."""
+    if semester is not None and not semester.strip():
+        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    auth = require_auth("GetSubjets" if semester is None else "GetSubjectBySemester")
     other_client = MyFapOther(auth)
     try:
         with err_console.status("[bold green]Đang tải danh sách tất cả môn học..."):
-            data = other_client.get_subjects()
+            data = other_client.get_subjects() if semester is None else other_client.get_subjects(semester)
         filename = f"Subjects.json"
         save_output(data, filename, output, stdout)
     except Exception as e:

@@ -71,6 +71,70 @@ class MarksParserTests(unittest.TestCase):
 
         self.assertEqual(parse_marks_html(html), [{"category": "Final", "item": "FE", "value": "7.3"}])
 
+    def test_garbage_rowspan_does_not_crash_and_keeps_own_row(self):
+        for rowspan in ("2.0", "abc", ""):
+            with self.subTest(rowspan=rowspan):
+                html = ("<table><tr><th>Item</th><th>Weight</th><th>Value</th></tr>"
+                        f"<tr><td rowspan='{rowspan}'>Quiz</td><td>Q1</td><td>10%</td><td>8</td></tr>"
+                        "<tr><td>Q2</td><td>20%</td><td>7</td></tr></table>")
+                rows = parse_marks_html(html)
+                self.assertEqual(rows[0], {"category": "Quiz", "item": "Q1", "weight": "10%", "value": "8"})
+
+
+class TranscriptHtmlTests(unittest.TestCase):
+    MAIN_HEADERS = ["No", "Term", "Semester", "Subject Code", "prerequisite",
+                    "Replaced Subject", "Subject Name", "Credit", "Grade", "Status"]
+    EXTRA_HEADERS = ["No", "Semester", "SubjectCode", "SubjectName", "Credit", "Grade", "Status"]
+
+    @staticmethod
+    def fixture():
+        main = (
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("1", "202", "Fall2026", "PRO192", "", "", "Object Oriented Programming", "3", "8.5", "Passed")) + "</tr>"
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("2", "202", "Fall2026", "MAL202", "PRO192", "", "Linear Algebra", "3", "", "Not Passed")) + "</tr>"
+        )
+        extra = (
+            "<tr>" + "".join(f"<td>{v}</td>" for v in
+                ("1", "Spring2027", "SSG103", "Soft Skill", "2", "7.0", "Passed")) + "</tr>"
+        )
+        def header(names):
+            return "<tr>" + "".join(f"<th>{n}</th>" for n in names) + "</tr>"
+        return (
+            "<TABLE class='table table-hover'><tbody>" + header(TranscriptHtmlTests.MAIN_HEADERS) + main + "</tbody></TABLE>"
+            "<TABLE class='table table-hover'><tbody>" + header(TranscriptHtmlTests.EXTRA_HEADERS) + extra + "</tbody></TABLE>"
+        )
+
+    def setUp(self):
+        from myfap.parsers import parse_transcript_html
+        self.parse = parse_transcript_html
+
+    def test_each_table_keeps_own_headers_and_keyed_rows(self):
+        tables = self.parse(self.fixture())
+        self.assertEqual([table["headers"] for table in tables], [self.MAIN_HEADERS, self.EXTRA_HEADERS])
+        self.assertEqual(tables[0]["rows"][0], {
+            "No": "1", "Term": "202", "Semester": "Fall2026", "Subject Code": "PRO192",
+            "prerequisite": "", "Replaced Subject": "", "Subject Name": "Object Oriented Programming",
+            "Credit": "3", "Grade": "8.5", "Status": "Passed",
+        })
+        self.assertEqual(len(tables[0]["rows"]), 2)
+        self.assertEqual(tables[1]["rows"][0]["SubjectName"], "Soft Skill")
+        self.assertEqual(len(tables[1]["rows"]), 1)
+
+    def test_html_entities_are_decoded_and_extra_cells_get_stable_keys(self):
+        tables = self.parse("<table><tr><th>A</th><th>B</th></tr>"
+                            "<tr><td>Số&nbsp;1</td><td>x</td><td>thừa</td></tr></table>")
+        self.assertEqual(tables[0]["rows"][0], {"A": "Số 1", "B": "x", "Column3": "thừa"})
+
+    def test_input_without_table_returns_empty_list(self):
+        self.assertEqual(self.parse("<div>PRIVATE [not a table]</div>"), [])
+        self.assertEqual(self.parse(""), [])
+
+    def test_data_rows_before_header_are_ignored(self):
+        tables = self.parse("<table><tr><td>1</td></tr><tr><th>Only</th></tr><tr><td>ok</td></tr></table>")
+        self.assertEqual(tables[0]["headers"], ["Only"])
+        self.assertEqual(tables[0]["rows"], [{"Only": "ok"}])
+
 
 class ScheduleParserTests(unittest.TestCase):
     def test_saved_ics_keeps_line_endings_for_independent_reader(self):
@@ -149,6 +213,136 @@ class ScheduleParserTests(unittest.TestCase):
             "Group: Demo group", "Session: 1", "Lecturer: Demo lecturer",
             "Room: Demo room", "Meet URL: https://example.invalid/meet",
         ]))
+
+    def test_boolean_is_online_still_marks_online_title(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["isOnline"] = True
+
+        event = next(iter(Calendar(convert_schedule_to_ics(data)).events))
+
+        self.assertEqual(event.name, "TEST101 (Online)")
+
+    def test_overnight_slot_wraps_end_to_next_day(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["slotTime"] = "(23:30-0:50)"
+
+        event = next(iter(Calendar(convert_schedule_to_ics(data)).events))
+
+        # 23:30 và 0:50 (hôm sau) giờ Việt Nam = 16:30 và 17:50 UTC cùng ngày 15/10.
+        self.assertEqual(event.begin.datetime, datetime(2026, 10, 15, 16, 30, tzinfo=timezone.utc))
+        self.assertEqual(event.end.datetime, datetime(2026, 10, 15, 17, 50, tzinfo=timezone.utc))
+        self.assertEqual((event.end.datetime - event.begin.datetime).total_seconds(), 80 * 60)
+
+    def test_slot_without_separator_raises_clear_message(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0]["slotTime"] = "7:30"
+
+        with self.assertRaises(ValueError) as caught:
+            convert_schedule_to_ics(data)
+        self.assertIn("slotTime", str(caught.exception))
+        self.assertIn("7:30-9:50", str(caught.exception))
+
+
+class ExamsParserTests(unittest.TestCase):
+    @staticmethod
+    def fixture_data(**overrides):
+        row = {
+            "subjectCode": "TEST101", "realSubject": "TEST101", "subjectName": "Môn thử nghiệm",
+            "date": "2026-10-20T00:00:00", "slot": "Synthetic slot text (7h30-9h50)", "time": "7h30-9h50",
+            "note": "", "roomNo": "SY-101", "dateofPublication": "2026-10-01T00:00:00",
+            "kythi": "FE", "note_Attendance": "", "isGraduated": False,
+        }
+        row.update(overrides)
+        return {"code": "200", "data": [row]}
+
+    def setUp(self):
+        from myfap.parsers import convert_exams_to_ics
+        self.convert = convert_exams_to_ics
+
+    def test_valid_exams_build_calendar_with_uid_dtstamp_and_vietnam_time(self):
+        content = self.convert(self.fixture_data()).encode("utf-8")
+        calendar = IndependentCalendar.from_ical(content)
+        events = calendar.walk("VEVENT")
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(str(event["SUMMARY"]), "TEST101 (FE)")
+        self.assertEqual(event.decoded("DTSTART"), datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc))
+        self.assertEqual(event.decoded("DTEND"), datetime(2026, 10, 20, 2, 50, tzinfo=timezone.utc))
+        properties = [name for name, _ in event.property_items()]
+        self.assertEqual(properties.count("UID"), 1)
+        self.assertEqual(properties.count("DTSTAMP"), 1)
+        self.assertRegex(event["DTSTAMP"].to_ical().decode("ascii"), r"^\d{8}T\d{6}Z$")
+        self.assertIn("Môn thử nghiệm".encode("utf-8"), content)
+        self.assertIn(b"\r\n", content)
+        self.assertNotIn(b"\r\r\n", content)
+
+    def test_default_ics_includes_room_and_publication_and_hides_slot_uuid(self):
+        content = self.convert(self.fixture_data(slot="42409f01-4993-4a0b-9302-2ccf5", roomNo="BE-201")).encode("utf-8")
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        desc = str(event.get("DESCRIPTION"))
+        self.assertIn("Môn: Môn thử nghiệm", desc)
+        self.assertIn("Phòng: BE-201", desc)
+        self.assertIn("Ngày công bố: 2026-10-01", desc)
+        self.assertNotIn("42409f01", desc)
+        self.assertNotIn("Mã slot", desc)
+        self.assertEqual(str(event.get("LOCATION")), "BE-201")
+
+    def test_full_ics_includes_all_secondary_fields(self):
+        content = self.convert(self.fixture_data(
+            slot="42409f01-4993-4a0b-9302-2ccf5", roomNo="BE-201",
+            note="Mang thẻ SV", note_Attendance="Có mặt", isGraduated=True
+        ), full=True).encode("utf-8")
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        desc = str(event.get("DESCRIPTION"))
+        self.assertIn("Môn: Môn thử nghiệm", desc)
+        self.assertIn("Ngày công bố: 2026-10-01", desc)
+        self.assertIn("Phòng: BE-201", desc)
+        self.assertIn("Mã slot: 42409f01-4993-4a0b-9302-2ccf5", desc)
+        self.assertIn("Ghi chú: Mang thẻ SV", desc)
+        self.assertIn("Ghi chú điểm danh: Có mặt", desc)
+        self.assertIn("Đã tốt nghiệp: Có", desc)
+        self.assertEqual(str(event.get("LOCATION")), "BE-201")
+
+    def test_time_with_spaces_and_parentheses_is_accepted(self):
+        for time in ("7h30 - 9h50", "(7h30-9h50)", " ( 7h30-9h50 ) "):
+            with self.subTest(time=time):
+                content = self.convert(self.fixture_data(time=time))
+                event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+                self.assertEqual(event.decoded("DTSTART"), datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc))
+
+    def test_overnight_exam_wraps_end_to_next_day(self):
+        content = self.convert(self.fixture_data(time="23h30-0h50"))
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        self.assertEqual((event.decoded("DTEND") - event.decoded("DTSTART")).total_seconds(), 80 * 60)
+
+    def test_invalid_root_or_rows_are_rejected_with_clear_errors(self):
+        cases = (
+            (None, "Invalid JSON format"),
+            ({}, "Invalid JSON format"),
+            ({"data": None}, "Invalid JSON format"),
+            ({"data": [None]}, "date, time"),
+            ({"data": [{}]}, "date, time"),
+            (self.fixture_data(subjectCode=" "), "date, time"),
+            (self.fixture_data(date="20/10/2026T00:00:00"), "date"),
+            (self.fixture_data(time="7:30-9:50"), "time"),
+            (self.fixture_data(time="7h30"), "time"),
+            (self.fixture_data(time="7h99-9h50"), "time"),
+        )
+        for data, message in cases:
+            with self.subTest(data=data, message=message):
+                with self.assertRaises(ValueError) as caught:
+                    self.convert(data)
+                self.assertIn(message, str(caught.exception))
+
+
+class SaveOutputSanitizationTests(unittest.TestCase):
+    def test_server_influenced_filename_stays_inside_output_dir(self):
+        with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
+            save_output({"code": 200, "data": []}, "BangDiem_x/../../evil.json", temporary, False)
+            files = sorted(path.name for path in Path(temporary).iterdir())
+            self.assertEqual(files, ["BangDiem_x_.._.._evil.json"])
+            content = json.loads((Path(temporary) / files[0]).read_text(encoding="utf-8"))
+        self.assertEqual(content, {"code": 200, "data": []})
 
     def test_empty_schedule_returns_valid_empty_calendar(self):
         data = json.loads((FIXTURES / "schedule_empty.json").read_text(encoding="utf-8"))

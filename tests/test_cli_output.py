@@ -106,7 +106,8 @@ from myfap.cli import app
 with patch("myfap.cli.get_auth", side_effect=AssertionError("help must not load auth")), patch("requests.Session.request", side_effect=AssertionError("help must not call HTTP")):
     app()
 """
-        for command in ([], ["info"], ["info", "student"], ["other", "survey"], ["schedule"]):
+        for command in ([], ["info"], ["info", "student"], ["other", "survey"], ["schedule"],
+                        ["other", "training"], ["other", "rating"], ["other", "rating", "list"]):
             for encoding, utf8 in (("cp1252:strict", "0"), ("utf-8", "1")):
                 with self.subTest(command=command, encoding=encoding):
                     result = subprocess.run(

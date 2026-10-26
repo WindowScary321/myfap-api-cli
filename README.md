@@ -2,7 +2,7 @@
 
 ## Giới thiệu
 
-Đây là cli tương tác giống hoàn toàn với APP MYFAP trên điện thoại. Bạn có thể xem lịch học, lịch thi, điểm số (sự thất vọng của gia đình), thông tin cá nhân, v.v. 1 cách thuận tiện, không bị gò bó trong giao diện app. <br>
+CLI tương tác với các API myFAP để xem lịch học, lịch thi, điểm và thông tin sinh viên. Phạm vi hỗ trợ phụ thuộc API version, campus và capability từng endpoint; CLI chưa thay thế đầy đủ mọi chức năng của app. Xem [mapping command/endpoint](./docs/command-endpoints.md) và [coverage Phase 6](./docs/phase6-coverage.md) để biết phần đã triển khai, đã kiểm thử và còn chưa xác minh. <br>
 - Lưu ý: repo này được thực hiện cùng với sự hỗ trợ của AI.
 
 ## Tính năng chính
@@ -48,6 +48,28 @@
   myfap schedule
   ```
 
+## Command mở rộng trên nhánh phát triển
+
+Các command sau đang review trong Phase 6, **chưa phát hành lên PyPI**:
+
+```sh
+myfap courses --semester Fall2026 --stdout
+myfap other subjects --semester Fall2026 --stdout
+myfap other balance --stdout
+myfap news --search "lịch thi" --type 1 --stdout
+myfap transcript --stdout
+myfap transcript --pretty --stdout
+myfap other training --semester Fall2026 --stdout
+myfap marks --summary --stdout
+myfap info photo --stdout
+myfap other feedbacks --stdout
+myfap other rating list --api-version v1 --stdout
+myfap doctor --stdout
+myfap doctor --api-version v2 --online --stdout
+```
+
+`marks --summary` không nhận kỳ học/courseid/pretty. `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc theo header từng bảng; không có `--pretty` giữ nguyên chuỗi gốc. Photo chỉ xuất JSON, không tự tải hoặc giải mã ảnh. Doctor mặc định không đọc session hoặc gọi mạng; `--online` chỉ probe bootstrap proxy v2 (`GetApiActive` và `backend_version` qua `GetVersion`), không xác nhận tài khoản đã đăng nhập. `other feedbacks` chỉ có trên API v2. `other rating list` chỉ hỗ trợ student/v1; v2 là stub và bị chặn. Khác với các lệnh đọc này, rating submit/push/feedback submit còn có gate riêng và chưa được mở.
+
 ## Thông tin thêm
 - [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 hỗ trợ các command đọc hiện có trong Phase 4.
 - [Các ví dụ sử dụng](./docs/Example.md)
@@ -84,8 +106,9 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 |-d, --date \<YYYY-MM-DD\>|Chỉ định ngày chính xác, chỉ có ở command ``week-timetable``|
 |-sc, --subjectcode <mã môn>|Chọn môn học,  chỉ có ở command ``attendance``|
 |-cn, --classname <mã lớp>|Chọn lớp học, chỉ có ở command ``attendance``|
-|--ics|Convert Sang **ICS**, dễ dàng import lịch học vào Google Calendar hoặc các dịch vụ tương tự, chỉ có ở command ``schedule``)|
-|-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, chỉ có ở command ``marks``)|
+|--ics|Convert Sang **ICS**, dễ dàng import lịch vào Google Calendar hoặc các dịch vụ tương tự, áp dụng cho command ``schedule`` (lịch học) và ``exams`` (lịch thi))|
+|--full|Kèm toàn bộ thông tin phụ khi xuất ICS ở command ``exams`` (ghi chú, mã slot/UUID, điểm danh...); mặc định xuất các thông tin quan trọng (môn, phòng thi, ngày công bố)|
+|-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, có ở command ``marks`` (chi tiết môn) và ``transcript`` (toàn khóa))|
 |--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
 |--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|
 |-f, --force|Buộc đăng nhập lại, bỏ qua file ``session.json``, chỉ có ở command ``login``|

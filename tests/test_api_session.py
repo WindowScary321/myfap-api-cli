@@ -11,25 +11,41 @@ from tests.test_api import response
 AUTHENTICATED_READ_CASES = (
     (api.MyFapEssential, "get_semesters", (), "GetSemester"),
     (api.MyFapEssential, "get_news", (), "GetTop10News"),
+    (api.MyFapEssential, "get_news", (1, "synthetic"), "SearchNews"),
     (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack"),
     (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile"),
     (api.MyFapOther, "get_notification", (), "GetNotificationByRoll"),
     (api.MyFapOther, "get_fee", (), "GeFeeByRoll"),
+    (api.MyFapOther, "get_balance", (), "GetBalance"),
+    (api.MyFapOther, "get_ratings", (), "GetStudentRate"),
     (api.MyFapOther, "get_subjects", (), "GetSubjets"),
+    (api.MyFapOther, "get_subjects", ("Fall2026",), "GetSubjectBySemester"),
     (api.MyFapClient, "get_schedule", ("Fall2026",), "GetActivityStudent"),
     (api.MyFapClient, "get_marks", ("Fall2026",), "GetStudentMark"),
+    (api.MyFapClient, "get_courses", ("Fall2026",), "GetCourseOfSemester"),
     (api.MyFapClient, "get_mark_by_course", ("123",), "GetMarkByCourse"),
     (api.MyFapClient, "get_exams", ("Fall2026",), "GetScheduleExam"),
     (api.MyFapClient, "get_schedule_by_week", (42, "Fall2026", 2026), "GetActivityStudentByWeek"),
     (api.MyFapClient, "get_attendances", ("Fall2026",), "GetStudentAttendances"),
     (api.MyFapClient, "get_course_attendance", ("Fall2026", "TEST101", "DEMO01"), "getCourseAttendance"),
     (api.MyFapClient, "get_applications", (), "GetApplication"),
+    (api.MyFapClient, "get_transcript", (), "AcademicTranscript"),
+    (api.MyFapClient, "get_photo", (), "RetriveImage"),
+    (api.MyFapClient, "get_training", ("Fall2026",), "GetDiemphongtrao"),
     (api.MyFapClient, "get_student_info", (), "GetStudentById"),
     (api.MyFapClient, "get_campus_info", (), "GetCampusInfo"),
 )
 
 
 class ApiErrorPolicyTests(unittest.TestCase):
+    def test_balance_v1_expiry_is_recognized_only_for_exact_token_invalid(self):
+        with self.assertRaises(api.ApiSessionExpiredError):
+            api.read_response(response({"code": 201, "message": "Token invalid", "data": None}),
+                              api_version="v1", operation="GetBalance")
+        with self.assertRaises(api.ApiOperationError):
+            api.read_response(response({"code": 201, "data": None}),
+                              api_version="v1", operation="GetBalance")
+
     def test_authenticated_v1_reads_recognize_201_token_invalid_with_actual_http_status(self):
         for _, _, _, operation in AUTHENTICATED_READ_CASES:
             for code in (201, "201"):
@@ -39,7 +55,7 @@ class ApiErrorPolicyTests(unittest.TestCase):
                     self.assertEqual(caught.exception.status_code, 200)
 
     def test_other_v1_body_201_and_401_are_operation_errors_even_with_expiry_message(self):
-        for operation in ("GetAllActiveCampus", "GetWeekByDate", "AuthenticationByFeId", "GetRequiredSurvey", "AddRate", "GetBalance", "UnknownOperation"):
+        for operation in ("GetAllActiveCampus", "GetWeekByDate", "AuthenticationByFeId", "GetRequiredSurvey", "AddRate", "UnknownOperation"):
             for code in (201, "201", 401, "401"):
                 with self.subTest(operation=operation, code=code):
                     with self.assertRaises(api.ApiOperationError) as caught:
