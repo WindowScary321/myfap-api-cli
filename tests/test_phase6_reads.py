@@ -441,6 +441,35 @@ class FeedbackListTests(unittest.TestCase):
         request.assert_not_called()
 
 
+class ExamsIcsCommandTests(unittest.TestCase):
+    setUp = BalanceCommandTests.setUp
+    save_session = BalanceCommandTests.save_session
+
+    ROW = {"subjectCode": "TEST101", "realSubject": "TEST101", "subjectName": "Môn thử nghiệm",
+           "date": "2026-10-20T00:00:00", "slot": "Synthetic slot (7h30-9h50)", "time": "7h30-9h50",
+           "note": "", "roomNo": "SY-101", "dateofPublication": "2026-10-01T00:00:00",
+           "kythi": "FE", "note_Attendance": "", "isGraduated": False}
+
+    def test_exams_ics_outputs_calendar_and_plain_keeps_json(self):
+        payload = {"code": 200, "data": [dict(self.ROW)]}
+        for options, expect_ics in (([], False), (["--ics"], True)):
+            with self.subTest(options=options):
+                self.save_session("v2")
+                with patch("requests.Session.request", return_value=response(payload)) as request:
+                    result = self.runner.invoke(app, ["--config", str(self.path), "exams", "--semester", "FAKE_TERM", *options, "--stdout"])
+                self.assertEqual(result.exit_code, 0, result.output)
+                if expect_ics:
+                    self.assertTrue(result.stdout.startswith("BEGIN:VCALENDAR"))
+                    self.assertIn("BEGIN:VEVENT", result.stdout)
+                    self.assertIn("TEST101 (FE)", result.stdout)
+                else:
+                    self.assertEqual(json.loads(result.stdout), payload)
+                request.assert_called_once()
+                self.assertTrue(request.call_args.args[1].endswith("/GetScheduleExam"))
+                query = request.call_args.kwargs["params"]
+                self.assertEqual(query.get("Semester"), "FAKE_TERM")
+
+
 class ReadSliceAcceptanceTests(unittest.TestCase):
     """Nghiệm thu nhóm mục 1: header contract và ma trận lỗi tại seam CLI."""
 

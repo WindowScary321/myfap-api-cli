@@ -15,7 +15,7 @@ from typer.core import TyperGroup
 
 from .auth import MyFapAuth, SessionBindingError
 from .api import MyFapClient, MyFapEssential, MyFapOther
-from .parsers import parse_marks_html, parse_transcript_html, convert_schedule_to_ics
+from .parsers import parse_marks_html, parse_transcript_html, convert_schedule_to_ics, convert_exams_to_ics
 from .config import resolve_timeout
 from importlib import metadata
 
@@ -467,6 +467,7 @@ def marks(
 @app.command()
 def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
+    ics: bool = typer.Option(False, "--ics", help="Xuất lịch thi ra định dạng iCalendar (.ics)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
@@ -474,12 +475,17 @@ def exams(
     auth = require_auth("GetScheduleExam")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
-            
+
     try:
         with err_console.status("[bold green]Đang tải lịch thi..."):
             data = client.get_exams(sem)
-        filename = f"LichThi_{sem}.json"
-        save_output(data, filename, output, stdout)
+        if ics:
+            ics_content = convert_exams_to_ics(data)
+            filename = f"LichThi_{sem}.ics"
+            save_output(ics_content, filename, output, stdout, is_text=True)
+        else:
+            filename = f"LichThi_{sem}.json"
+            save_output(data, filename, output, stdout)
     except Exception as e:
         err_console.print(f"[red]Lỗi lấy lịch thi: {e}[/red]")
         raise typer.Exit(code=1)

@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+import re
 
 def _rowspan_rows(value):
     # rowspan rác từ server (VD "2.0", rỗng) coi như 1 để không crash parser.
@@ -107,6 +108,58 @@ def parse_transcript_html(html_str: str):
         if headers or rows:
             tables.append({"headers": headers, "rows": rows})
     return tables
+
+
+def convert_exams_to_ics(data: dict) -> str:
+    """Chuyển dữ liệu lịch thi JSON thành chuỗi ICS"""
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise ValueError("Invalid JSON format")
+
+    c = Calendar()
+    tz = pytz.timezone("Asia/Ho_Chi_Minh")
+
+    for exam in data["data"]:
+        if (not isinstance(exam, dict)
+                or any(not isinstance(exam.get(field), str) or not exam[field].strip()
+                       for field in ("date", "time", "subjectCode"))):
+            raise ValueError("Invalid exam: date, time and subjectCode are required")
+        try:
+            day = datetime.strptime(exam["date"].split("T")[0].strip(), "%Y-%m-%d")
+            normalized = exam["time"].strip().strip("()").replace(" ", "")
+            match = re.fullmatch(r"(\d{1,2})h(\d{2})-(\d{1,2})h(\d{2})", normalized)
+            if match is None:
+                raise ValueError
+            start_dt = tz.localize(datetime.strptime(
+                f"{day:%Y-%m-%d} {match.group(1)}:{match.group(2)}", "%Y-%m-%d %H:%M"))
+            end_dt = tz.localize(datetime.strptime(
+                f"{day:%Y-%m-%d} {match.group(3)}:{match.group(4)}", "%Y-%m-%d %H:%M"))
+        except ValueError:
+            raise ValueError(
+                "Invalid exam: date hoặc time không hợp lệ (date dạng YYYY-MM-DD, time dạng 7h30-9h50).") from None
+        # Kỳ thi kết thúc trước giờ bắt đầu nghĩa là vượt nửa đêm: kết thúc sang ngày hôm sau.
+        if end_dt <= start_dt:
+            end_dt += timedelta(days=1)
+
+        e = Event(created=datetime.now(timezone.utc))
+        title = exam["subjectCode"]
+        kythi = exam.get("kythi")
+        if isinstance(kythi, str) and kythi.strip():
+            title += f" ({kythi.strip()})"
+        e.name = title
+        e.begin = start_dt
+        e.end = end_dt
+        e.location = exam.get("roomNo") or ""
+        desc = []
+        for label, field in (("Môn", "subjectName"), ("Phòng", "roomNo"), ("Slot", "slot"), ("Ghi chú", "note")):
+            value = exam.get(field)
+            if isinstance(value, str) and value.strip():
+                desc.append(f"{label}: {value.strip()}")
+        e.description = "\n".join(desc)
+
+        c.events.add(e)
+
+    # Trả về chuỗi ICS
+    return "".join(c.serialize_iter())
 
 
 from datetime import datetime, timedelta, timezone

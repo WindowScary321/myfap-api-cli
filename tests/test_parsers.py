@@ -243,6 +243,71 @@ class ScheduleParserTests(unittest.TestCase):
         self.assertIn("7:30-9:50", str(caught.exception))
 
 
+class ExamsParserTests(unittest.TestCase):
+    @staticmethod
+    def fixture_data(**overrides):
+        row = {
+            "subjectCode": "TEST101", "realSubject": "TEST101", "subjectName": "Môn thử nghiệm",
+            "date": "2026-10-20T00:00:00", "slot": "Synthetic slot text (7h30-9h50)", "time": "7h30-9h50",
+            "note": "", "roomNo": "SY-101", "dateofPublication": "2026-10-01T00:00:00",
+            "kythi": "FE", "note_Attendance": "", "isGraduated": False,
+        }
+        row.update(overrides)
+        return {"code": "200", "data": [row]}
+
+    def setUp(self):
+        from myfap.parsers import convert_exams_to_ics
+        self.convert = convert_exams_to_ics
+
+    def test_valid_exams_build_calendar_with_uid_dtstamp_and_vietnam_time(self):
+        content = self.convert(self.fixture_data()).encode("utf-8")
+        calendar = IndependentCalendar.from_ical(content)
+        events = calendar.walk("VEVENT")
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(str(event["SUMMARY"]), "TEST101 (FE)")
+        self.assertEqual(event.decoded("DTSTART"), datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc))
+        self.assertEqual(event.decoded("DTEND"), datetime(2026, 10, 20, 2, 50, tzinfo=timezone.utc))
+        properties = [name for name, _ in event.property_items()]
+        self.assertEqual(properties.count("UID"), 1)
+        self.assertEqual(properties.count("DTSTAMP"), 1)
+        self.assertRegex(event["DTSTAMP"].to_ical().decode("ascii"), r"^\d{8}T\d{6}Z$")
+        self.assertIn("Môn thử nghiệm".encode("utf-8"), content)
+        self.assertIn(b"\r\n", content)
+        self.assertNotIn(b"\r\r\n", content)
+
+    def test_time_with_spaces_and_parentheses_is_accepted(self):
+        for time in ("7h30 - 9h50", "(7h30-9h50)", " ( 7h30-9h50 ) "):
+            with self.subTest(time=time):
+                content = self.convert(self.fixture_data(time=time))
+                event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+                self.assertEqual(event.decoded("DTSTART"), datetime(2026, 10, 20, 0, 30, tzinfo=timezone.utc))
+
+    def test_overnight_exam_wraps_end_to_next_day(self):
+        content = self.convert(self.fixture_data(time="23h30-0h50"))
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        self.assertEqual((event.decoded("DTEND") - event.decoded("DTSTART")).total_seconds(), 80 * 60)
+
+    def test_invalid_root_or_rows_are_rejected_with_clear_errors(self):
+        cases = (
+            (None, "Invalid JSON format"),
+            ({}, "Invalid JSON format"),
+            ({"data": None}, "Invalid JSON format"),
+            ({"data": [None]}, "date, time"),
+            ({"data": [{}]}, "date, time"),
+            (self.fixture_data(subjectCode=" "), "date, time"),
+            (self.fixture_data(date="20/10/2026T00:00:00"), "date"),
+            (self.fixture_data(time="7:30-9:50"), "time"),
+            (self.fixture_data(time="7h30"), "time"),
+            (self.fixture_data(time="7h99-9h50"), "time"),
+        )
+        for data, message in cases:
+            with self.subTest(data=data, message=message):
+                with self.assertRaises(ValueError) as caught:
+                    self.convert(data)
+                self.assertIn(message, str(caught.exception))
+
+
 class SaveOutputSanitizationTests(unittest.TestCase):
     def test_server_influenced_filename_stays_inside_output_dir(self):
         with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
