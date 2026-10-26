@@ -11,7 +11,7 @@ Xem [release notes](../CHANGELOG.md), [checklist Phase 5](../tasks/phase5.md) v�
 - Chấp nhận phạm vi và known issues trong mục `0.2.0` của `CHANGELOG.md`.
 - Ba finding v1 vẫn được ghi đúng: news/notification HTTP 200/body 201, fee HTTP 404 trên APHL; nguyên nhân chưa biết. Không gọi chúng là đã sửa, empty hợp lệ hoặc unsupported trên mọi campus.
 - Positive fee/survey được hoãn theo quyết định ngày 19/10/2026; schema live có dữ liệu vẫn chưa kiểm chứng. Việc hoãn không chặn chuyển Phase 5 nhưng không phải bằng chứng backend đạt.
-- Reader độc lập đã kiểm ICS; import vào ứng dụng lịch thật còn chưa kiểm chứng. Phase 6 không thuộc release gate `0.2.0`.
+- Reader độc lập đã kiểm ICS (lịch học `schedule --ics` và lịch thi `exams --ics`); import vào ứng dụng lịch thật đã kiểm chứng. Theo quyết định ngày 23/10/2026, phát hành `v0.2.0` sau khi hoàn thiện và nghiệm thu phạm vi Phase 6 (toàn bộ read student v1+v2, doctor, transcript --pretty, exams --ics; các thao tác ghi mục 4–5 giữ gate do thiếu dữ liệu tài khoản).
 
 Việc yêu cầu tiếp tục Phase 5 không tự cho phép publish, tạo GitHub Release hoặc chấp nhận mọi giới hạn hỗ trợ. Ghi quyết định duyệt phạm vi trong PR chuẩn bị release trước khi tag; duyệt environment là gate cuối, không thay thế quyết định đó.
 

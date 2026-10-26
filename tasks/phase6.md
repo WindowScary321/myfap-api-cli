@@ -57,6 +57,8 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 
 Bằng chứng đã biết, phần còn thiếu và cách thu thập không lộ PII được liệt kê tại [phase6-write-gates.md](../docs/phase6-write-gates.md). Không dùng body/query tùy ý để thay cho schema; caller code 200 của AddRate đã biết nhưng ack nghiệp vụ/positive item chưa được xác minh.
 
+*Ghi chú phạm vi (24/10/2026):* Năm (5) hộp việc bên dưới liên quan đến thao tác ghi (`AddRate`, `UpdateTokedevices`, tách luồng retry, test invalid/cancel không replay, và xác nhận live ghi) tiếp tục **giữ trạng thái gate/unsupported có chủ đích** do tài khoản kiểm chứng hiện tại trả danh sách rating rỗng, không thể xác minh schema/ack thực tế. Tuyệt đối không đánh dấu tick khi chưa có bằng chứng và không diễn giải thành "mọi hộp việc đã hoàn tất".
+
 - [x] **Rating list:** `other rating list` student/v1 có code và fixture envelope/query; lượt live trước đổi namespace trả list rỗng, chưa suy kiểu ID/schema item hoặc positive schema. V2 là stub nên unsupported trước load session/HTTP, không gọi v1 ngầm hoặc trả `[]` giả.
 - [ ] **`other rating submit --input` (dự kiến, chưa mở):** chốt input/ack bằng bằng chứng đủ tin cậy trước khi mở. `AddRate` là POST; v1 checksum dùng **rateid**, v2 giữ query `Authen` và body `{}`. Dải rating 1–5 có nguồn caller; không tự đặt type ID/comment bounds của backend.
 - [ ] **`push register --token-file`:** chốt contract student; `UpdateTokedevices` là **GET ghi**, v1 ký bằng **email**. Token chỉ đọc từ regular file có giới hạn, kiểm encoding/newline và symlink/reparse/path swap; không token trên argv/preview/log/error. Campus/identity lấy từ session đã bind.
@@ -65,6 +67,8 @@ Bằng chứng đã biết, phần còn thiếu và cách thu thập không lộ
 - [ ] Live ghi chỉ thực hiện sau xác nhận riêng của người dùng; nếu chưa đủ schema/ack thì capability vẫn đóng và ghi TODO, không mở generic submit.
 
 ## 5. Feedback và flow còn thiếu bằng chứng
+
+*Ghi chú phạm vi (24/10/2026):* Ba (3) hộp việc bên dưới (`CheckOpenFeedBack`, `SubmitStudentFeedback`/donor/employee/FEID-server-code, và rà soát blocker trước chốt) tiếp tục **giữ trạng thái gate/unsupported có chủ đích**. `GetStudentFeedbacks` đã mở đọc list, nhưng do danh sách trả về rỗng nên `GetStudentFeedbackForm` và `SubmitStudentFeedback` không có `feedbackId` và form schema thực tế; giữ nguyên gate, không đoán ID hoặc tick khi chưa có schema live.
 
 - [ ] Giữ `other feedback` là `CheckOpenFeedBack`; không đổi nghĩa thành list/form/submit.
 - [x] `GetStudentFeedbacks` mở `other feedbacks` (24/10/2026) sau khi có envelope live 200/list rỗng và bytecode xác nhận query `{CampusCode, rollNumber}` không `Authen`; item schema giữ nhãn chưa positive. `GetStudentFeedbackForm` vẫn gate chờ feedbackId thật; không suy kiểu item/ID/câu hỏi từ tên route.

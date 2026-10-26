@@ -37,12 +37,17 @@ Theo quyết định ngày 23/10/2026, **chưa tag/publish cho đến sau khi ho
 
 Checklist, tiêu chí và gate bằng chứng nằm tại [phase6.md](phase6.md). Các mục sau chỉ được đánh dấu khi có kết quả tương ứng:
 
-- [ ] Hoàn thiện các lát cắt đọc: courses, subjects theo kỳ, balance và news search, giữ hành vi command cũ.
-- [ ] Hoàn thiện transcript/training và marks summary sau khi chốt các ngoại lệ credential/response; không đoán query hoặc schema.
-- [ ] Bổ sung photo JSON và doctor an toàn; không tự fetch/decode ảnh hoặc refresh session khi chẩn đoán local.
-- [ ] Chốt rating/push/feedback theo gate schema/capability; không mở write hoặc ghi live khi chưa đủ bằng chứng/xác nhận.
-- [ ] Kiểm regression, artifact, CI và live đọc riêng; giữ nguyên mọi skip/failure/unverified và TODO v1/positive fee/survey ở trên.
-- [ ] Cập nhật Draft PR Phase 6; mỗi commit push có comment ngay sau commit, không tự merge/tag/publish.
+- [x] Hoàn thiện các lát cắt đọc: courses, subjects theo kỳ, balance và news search, giữ hành vi command cũ (nghiệm thu 24/10/2026).
+- [x] Hoàn thiện transcript/training và marks summary sau khi chốt các ngoại lệ credential/response; không đoán query hoặc schema (nghiệm thu 24/10/2026, bổ sung `transcript --pretty`).
+- [x] Bổ sung photo JSON và doctor an toàn; không tự fetch/decode ảnh hoặc refresh session khi chẩn đoán local (nghiệm thu 24/10/2026, mở `doctor --online` với `GetVersion`).
+- [ ] Chốt rating/push/feedback theo gate schema/capability; không mở write hoặc ghi live khi chưa đủ bằng chứng/xác nhận. (Tám (8) hộp việc ở mục 4–5 của `phase6.md` tiếp tục **giữ gate/unsupported có chủ đích** do tài khoản kiểm chứng trả danh sách rỗng, không thể xác minh positive schema/ack).
+- [x] Bổ sung xuất lịch thi `exams --ics` (RFC 5545, CRLF, UTC UID/DTSTAMP) và cờ `--full` (hoàn tất 26/10/2026).
+- [x] Kiểm regression, artifact, CI và live đọc riêng; giữ nguyên mọi skip/failure/unverified và TODO v1/positive fee/survey ở trên (420 test đạt trên Python 3.9/3.11).
+- [x] Đồng bộ tài liệu và đóng các điểm lệch phạm vi trước merge (Pre-merge Docs Sync):
+  - [x] Khớp lại ghi chú mục 4–5 trong `tasks/phase6.md` (khẳng định 8 hộp việc giữ gate/unsupported có chủ đích, không tick khi chưa có schema live).
+  - [x] Chuẩn hóa tuyên bố trong `docs/endpoint-gap-analysis.md` (ghi nhận CLI phủ toàn bộ thao tác đọc sinh viên ngoại trừ `GetStudentFeedbackForm`).
+  - [x] Đồng bộ thứ tự phát hành trong `docs/releasing.md` (khớp quyết định phát hành sau khi nghiệm thu phạm vi Phase 6).
+- [x] Cập nhật Draft PR Phase 6; mỗi commit push có comment ngay sau commit, không tự merge/tag/publish.
 - [ ] Maintainer duyệt phạm vi Phase 6 và các gate dịch vụ Phase 5 trước khi phát hành thật.
 
 ### Lỗi live v1 mới ngày 24/10/2026
@@ -66,7 +71,7 @@ Theo đánh giá của maintainer ngày 24/10/2026, **các mục 4 (rating/push)
 - **`SubmitStudentFeedback`**: cần feedback đang mở để có form/ack hợp lệ.
 - **Donor/employee và login thay thế** (`GetNotificationByDonor`, `GetTokenWithEmp`, `UpdateTokenDonor`, Google/username/FeIdCode): đã ghi out of scope tại [phân tích khoảng trống endpoint](../docs/endpoint-gap-analysis.md), không dự định triển khai trong Phase 6.
 
-Hệ quả khi chốt phạm vi Phase 6 và phát hành `0.2.0`: các mục này giữ trạng thái **gate/unsupported**, không đánh dấu hoàn tất và không mở generic submit; maintainer duyệt phát hành với known issues này. Khi có tài khoản hoặc dữ liệu phù hợp:
+Hệ quả khi chốt phạm vi Phase 6 và phát hành `0.2.0`: Tám (8) hộp việc ở mục 4–5 trong `tasks/phase6.md` tiếp tục giữ trạng thái **gate/unsupported có chủ đích** (không tick trong `phase6.md`), không đánh dấu hoàn tất và không mở generic submit; `docs/endpoint-gap-analysis.md` đã chuẩn hóa tuyên bố phủ toàn bộ đọc sinh viên ngoại trừ `GetStudentFeedbackForm`; maintainer duyệt phát hành với known issues này. Khi có tài khoản hoặc dữ liệu phù hợp:
 
 - [ ] Thu thập input schema và ack của `AddRate` (v1 checksum `rateid`, v2 query `Authen`, body `{}`) và các form feedback theo [phase6-write-gates.md](../docs/phase6-write-gates.md) trước khi mở command.
 - [ ] `push register --token-file` cần contract student đã chốt và xác nhận riêng của người dùng trước khi live ghi; token thiết bị chỉ đọc từ regular file, không đưa vào argv/preview/log/error.

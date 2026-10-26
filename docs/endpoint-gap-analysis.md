@@ -7,7 +7,7 @@ Quy tắc riêng tư: mọi probe live dưới đây là GET/POST chỉ đọc b
 ## Kết luận tổng quan
 
 - App có 82 route: 37 v1, 40 proxy v2, 1 survey, 4 OTA, 1 HEAD connectivity.
-- CLI hỗ trợ **toàn bộ operation đọc student của cả v1 lẫn v2** (26+1 read v2 sau đợt này, 29 route v1 tương ứng), survey riêng và handshake FEID. Không có route đọc student nào của app bị bỏ sót.
+- CLI hỗ trợ **toàn bộ operation đọc student của cả v1 lẫn v2** (26+1 read v2 sau đợt này, 29 route v1 tương ứng), survey riêng và handshake FEID, **ngoại trừ** `GetStudentFeedbackForm` (tiếp tục gate có chủ đích chờ `feedbackId` thực tế từ tài khoản có feedback mở, không đoán ID). Không có route đọc student khả dụng nào khác của app bị bỏ sót.
 - Sau đợt mở rộng này, adapter v2 có **31 operation**: 27 đọc, 3 bootstrap (`GetAllActiveCampus`, `GetApiActive`, `GetVersion`) và 1 handshake.
 
 ## Nhóm A — Read student từng gate, đã đủ bằng chứng và mở trong đợt này
