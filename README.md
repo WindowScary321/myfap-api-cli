@@ -107,6 +107,7 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 |-sc, --subjectcode <mã môn>|Chọn môn học,  chỉ có ở command ``attendance``|
 |-cn, --classname <mã lớp>|Chọn lớp học, chỉ có ở command ``attendance``|
 |--ics|Convert Sang **ICS**, dễ dàng import lịch vào Google Calendar hoặc các dịch vụ tương tự, áp dụng cho command ``schedule`` (lịch học) và ``exams`` (lịch thi))|
+|--full|Kèm toàn bộ thông tin phụ khi xuất ICS ở command ``exams`` (phòng thi, ghi chú, mã slot/UUID...); mặc định chỉ xuất thông tin quan trọng|
 |-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, có ở command ``marks`` (chi tiết môn) và ``transcript`` (toàn khóa))|
 |--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
 |--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|

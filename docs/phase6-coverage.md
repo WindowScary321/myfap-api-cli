@@ -148,4 +148,4 @@ Full suite sau hai feature: 403 test, 399 đạt/4 skip, exit 0 trên Windows Py
 
 Không đóng các mục cấm: positive fee/survey giữ mở (dữ liệu chưa đối chiếu nghiệp vụ), các finding v1 giữ nguyên — không dùng kết quả v2 để đóng. Transcript HTML và các formatter nghiệp vụ tiếp tục nhãn chưa kiểm chứng.
 
-- **`myfap exams --ics`**: mở rộng xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545, mỗi sự kiện có UID/DTSTAMP UTC, giờ Việt Nam, giữ CRLF; tiêu đề gồm mã môn và kỳ thi (VD `TEST101 (FE)`). RED→GREEN qua parser converter và CLI seam; live v2/HN đạt 7 sự kiện thật trên tài khoản kiểm chứng. Mặc định không `--ics` vẫn giữ JSON nguyên bản.
+- **`myfap exams --ics` (thêm `--full`)**: mở rộng xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ VN, UID/DTSTAMP UTC, CRLF); mặc định chỉ đưa thông tin quan trọng (Môn, Ngày công bố `dateofPublication`), ẩn mã slot UUID, phòng thi và ghi chú phụ; cờ `--full` kèm toàn bộ thông tin phụ; xuất JSON mặc định bảo toàn 100% dữ liệu gốc. RED→GREEN qua parser converter và CLI seam; live v2/HN đạt 7 sự kiện thật trên tài khoản kiểm chứng. Mặc định không `--ics` vẫn giữ JSON nguyên bản.
