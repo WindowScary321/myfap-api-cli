@@ -106,7 +106,7 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 |-d, --date \<YYYY-MM-DD\>|Chỉ định ngày chính xác, chỉ có ở command ``week-timetable``|
 |-sc, --subjectcode <mã môn>|Chọn môn học,  chỉ có ở command ``attendance``|
 |-cn, --classname <mã lớp>|Chọn lớp học, chỉ có ở command ``attendance``|
-|--ics|Convert Sang **ICS**, dễ dàng import lịch học vào Google Calendar hoặc các dịch vụ tương tự, chỉ có ở command ``schedule``)|
+|--ics|Convert Sang **ICS**, dễ dàng import lịch vào Google Calendar hoặc các dịch vụ tương tự, áp dụng cho command ``schedule`` (lịch học) và ``exams`` (lịch thi))|
 |-p, --pretty|Format lại bảng điểm gốc của trường sang dạng json, có ở command ``marks`` (chi tiết môn) và ``transcript`` (toàn khóa))|
 |--output, -o <thư mục>|Thư mục xuất file thay vì thư mục hiện tại|
 |--stdout|In kết quả trực tiếp ra màn hình thay vì lưu file|
