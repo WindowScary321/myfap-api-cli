@@ -110,8 +110,13 @@ def parse_transcript_html(html_str: str):
     return tables
 
 
-def convert_exams_to_ics(data: dict) -> str:
-    """Chuyển dữ liệu lịch thi JSON thành chuỗi ICS"""
+def convert_exams_to_ics(data: dict, full: bool = False) -> str:
+    """Chuyển dữ liệu lịch thi JSON thành chuỗi ICS.
+
+    Mặc định (full=False) chỉ đưa thông tin quan trọng (Môn, Ngày công bố);
+    ẩn mã slot UUID, phòng thi, ghi chú và các trường phụ.
+    Khi full=True đưa toàn bộ thông tin phụ vào sự kiện lịch.
+    """
     if not isinstance(data, dict) or not isinstance(data.get("data"), list):
         raise ValueError("Invalid JSON format")
 
@@ -148,12 +153,35 @@ def convert_exams_to_ics(data: dict) -> str:
         e.name = title
         e.begin = start_dt
         e.end = end_dt
-        e.location = exam.get("roomNo") or ""
+
+        if full:
+            e.location = exam.get("roomNo") or ""
+            fields_to_add = (
+                ("Môn", "subjectName"),
+                ("Ngày công bố", "dateofPublication"),
+                ("Phòng", "roomNo"),
+                ("Mã slot", "slot"),
+                ("Ghi chú", "note"),
+                ("Ghi chú điểm danh", "note_Attendance"),
+                ("Đã tốt nghiệp", "isGraduated"),
+            )
+        else:
+            e.location = ""
+            fields_to_add = (
+                ("Môn", "subjectName"),
+                ("Ngày công bố", "dateofPublication"),
+            )
+
         desc = []
-        for label, field in (("Môn", "subjectName"), ("Phòng", "roomNo"), ("Slot", "slot"), ("Ghi chú", "note")):
+        for label, field in fields_to_add:
             value = exam.get(field)
-            if isinstance(value, str) and value.strip():
-                desc.append(f"{label}: {value.strip()}")
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                desc.append(f"{label}: {'Có' if value else 'Không'}")
+            elif isinstance(value, str) and value.strip():
+                clean_val = value.strip().replace("T00:00:00", "")
+                desc.append(f"{label}: {clean_val}")
         e.description = "\n".join(desc)
 
         c.events.add(e)

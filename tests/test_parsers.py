@@ -276,6 +276,32 @@ class ExamsParserTests(unittest.TestCase):
         self.assertIn(b"\r\n", content)
         self.assertNotIn(b"\r\r\n", content)
 
+    def test_default_ics_includes_publication_and_hides_slot_uuid_and_room(self):
+        content = self.convert(self.fixture_data(slot="42409f01-4993-4a0b-9302-2ccf5", roomNo="BE-201")).encode("utf-8")
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        desc = str(event.get("DESCRIPTION"))
+        self.assertIn("Môn: Môn thử nghiệm", desc)
+        self.assertIn("Ngày công bố: 2026-10-01", desc)
+        self.assertNotIn("42409f01", desc)
+        self.assertNotIn("Phòng", desc)
+        self.assertEqual(event.get("LOCATION", ""), "")
+
+    def test_full_ics_includes_all_secondary_fields(self):
+        content = self.convert(self.fixture_data(
+            slot="42409f01-4993-4a0b-9302-2ccf5", roomNo="BE-201",
+            note="Mang thẻ SV", note_Attendance="Có mặt", isGraduated=True
+        ), full=True).encode("utf-8")
+        event = IndependentCalendar.from_ical(content).walk("VEVENT")[0]
+        desc = str(event.get("DESCRIPTION"))
+        self.assertIn("Môn: Môn thử nghiệm", desc)
+        self.assertIn("Ngày công bố: 2026-10-01", desc)
+        self.assertIn("Phòng: BE-201", desc)
+        self.assertIn("Mã slot: 42409f01-4993-4a0b-9302-2ccf5", desc)
+        self.assertIn("Ghi chú: Mang thẻ SV", desc)
+        self.assertIn("Ghi chú điểm danh: Có mặt", desc)
+        self.assertIn("Đã tốt nghiệp: Có", desc)
+        self.assertEqual(str(event.get("LOCATION")), "BE-201")
+
     def test_time_with_spaces_and_parentheses_is_accepted(self):
         for time in ("7h30 - 9h50", "(7h30-9h50)", " ( 7h30-9h50 ) "):
             with self.subTest(time=time):

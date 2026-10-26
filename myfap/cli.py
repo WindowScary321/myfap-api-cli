@@ -468,6 +468,7 @@ def marks(
 def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
     ics: bool = typer.Option(False, "--ics", help="Xuất lịch thi ra định dạng iCalendar (.ics)"),
+    full: bool = typer.Option(False, "--full", help="Kèm toàn bộ thông tin phụ khi xuất ICS (phòng thi, ghi chú, mã slot/UUID, điểm danh...)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
@@ -480,7 +481,7 @@ def exams(
         with err_console.status("[bold green]Đang tải lịch thi..."):
             data = client.get_exams(sem)
         if ics:
-            ics_content = convert_exams_to_ics(data)
+            ics_content = convert_exams_to_ics(data, full=full)
             filename = f"LichThi_{sem}.ics"
             save_output(ics_content, filename, output, stdout, is_text=True)
         else:

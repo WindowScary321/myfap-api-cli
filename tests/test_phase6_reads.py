@@ -452,7 +452,12 @@ class ExamsIcsCommandTests(unittest.TestCase):
 
     def test_exams_ics_outputs_calendar_and_plain_keeps_json(self):
         payload = {"code": 200, "data": [dict(self.ROW)]}
-        for options, expect_ics in (([], False), (["--ics"], True)):
+        for options, expect_ics, expect_full in (
+            ([], False, False),
+            (["--ics"], True, False),
+            (["--ics", "--full"], True, True),
+            (["--full"], False, False),
+        ):
             with self.subTest(options=options):
                 self.save_session("v2")
                 with patch("requests.Session.request", return_value=response(payload)) as request:
@@ -462,8 +467,18 @@ class ExamsIcsCommandTests(unittest.TestCase):
                     self.assertTrue(result.stdout.startswith("BEGIN:VCALENDAR"))
                     self.assertIn("BEGIN:VEVENT", result.stdout)
                     self.assertIn("TEST101 (FE)", result.stdout)
+                    self.assertIn("Môn: Môn thử nghiệm", result.stdout)
+                    self.assertIn("Ngày công bố: 2026-10-01", result.stdout)
+                    if expect_full:
+                        self.assertIn("Mã slot: Synthetic slot", result.stdout)
+                        self.assertIn("Phòng: SY-101", result.stdout)
+                    else:
+                        self.assertNotIn("Mã slot", result.stdout)
+                        self.assertNotIn("Phòng: SY-101", result.stdout)
                 else:
                     self.assertEqual(json.loads(result.stdout), payload)
+                    # Mặc định JSON luôn bảo toàn toàn bộ thông tin gốc kể cả slot/UUID
+                    self.assertEqual(json.loads(result.stdout)["data"][0]["slot"], "Synthetic slot (7h30-9h50)")
                 request.assert_called_once()
                 self.assertTrue(request.call_args.args[1].endswith("/GetScheduleExam"))
                 query = request.call_args.kwargs["params"]
