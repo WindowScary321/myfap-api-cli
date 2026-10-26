@@ -4,7 +4,7 @@
 
 ### API và dữ liệu
 
-- Thêm tùy chọn `--ics` và `--full` cho `myfap exams`: xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ Việt Nam, UID/DTSTAMP UTC, CRLF); mặc định xuất ICS chỉ đưa thông tin quan trọng (Môn, Ngày công bố `dateofPublication`), ẩn mã slot UUID, phòng thi, ghi chú và các trường phụ; cờ `--full` kèm toàn bộ thông tin phụ vào sự kiện lịch; xuất JSON mặc định tiếp tục bảo toàn đầy đủ 100% dữ liệu gốc.
+- Thêm tùy chọn `--ics` và `--full` cho `myfap exams`: xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ Việt Nam, UID/DTSTAMP UTC, CRLF); mặc định xuất ICS đưa đầy đủ các thông tin quan trọng (Môn, Phòng thi `roomNo`, Ngày công bố `dateofPublication`), chỉ ẩn mã slot UUID, ghi chú phụ và điểm danh; cờ `--full` kèm toàn bộ thông tin phụ vào sự kiện lịch; xuất JSON mặc định tiếp tục bảo toàn đầy đủ 100% dữ liệu gốc.
 - Thêm `myfap other feedbacks` đọc danh sách feedback student qua `GetStudentFeedbacks`, chỉ có trên proxy API v2; envelope đã kiểm chứng live nhưng item schema chưa có positive (danh sách rỗng trên tài khoản kiểm chứng).
 - `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc: mỗi bảng giữ header riêng (bảng chính 10 cột `No`…`Status`, bảng phụ 7 cột) và hàng dữ liệu keyed theo header, chuẩn hoá `&nbsp;`; không dùng `--pretty` vẫn giữ chuỗi HTML nguyên bản theo contract.
 - `doctor --api-version v2 --online` báo thêm `backend_version` qua `GetVersion` POST bootstrap; GET bị proxy từ chối 405 và route v1 đã 404. `myfap version` vẫn chỉ đọc package version offline.
