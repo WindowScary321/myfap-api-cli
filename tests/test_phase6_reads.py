@@ -468,13 +468,12 @@ class ExamsIcsCommandTests(unittest.TestCase):
                     self.assertIn("BEGIN:VEVENT", result.stdout)
                     self.assertIn("TEST101 (FE)", result.stdout)
                     self.assertIn("Môn: Môn thử nghiệm", result.stdout)
+                    self.assertIn("Phòng: SY-101", result.stdout)
                     self.assertIn("Ngày công bố: 2026-10-01", result.stdout)
                     if expect_full:
                         self.assertIn("Mã slot: Synthetic slot", result.stdout)
-                        self.assertIn("Phòng: SY-101", result.stdout)
                     else:
                         self.assertNotIn("Mã slot", result.stdout)
-                        self.assertNotIn("Phòng: SY-101", result.stdout)
                 else:
                     self.assertEqual(json.loads(result.stdout), payload)
                     # Mặc định JSON luôn bảo toàn toàn bộ thông tin gốc kể cả slot/UUID

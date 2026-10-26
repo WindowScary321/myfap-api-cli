@@ -154,21 +154,22 @@ def convert_exams_to_ics(data: dict, full: bool = False) -> str:
         e.begin = start_dt
         e.end = end_dt
 
+        e.location = exam.get("roomNo") or ""
+
         if full:
-            e.location = exam.get("roomNo") or ""
             fields_to_add = (
                 ("Môn", "subjectName"),
-                ("Ngày công bố", "dateofPublication"),
                 ("Phòng", "roomNo"),
+                ("Ngày công bố", "dateofPublication"),
                 ("Mã slot", "slot"),
                 ("Ghi chú", "note"),
                 ("Ghi chú điểm danh", "note_Attendance"),
                 ("Đã tốt nghiệp", "isGraduated"),
             )
         else:
-            e.location = ""
             fields_to_add = (
                 ("Môn", "subjectName"),
+                ("Phòng", "roomNo"),
                 ("Ngày công bố", "dateofPublication"),
             )
 
