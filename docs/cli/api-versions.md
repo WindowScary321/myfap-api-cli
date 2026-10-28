@@ -1,6 +1,6 @@
 # Chọn API v1 hoặc v2
 
-[Quay lại README](../README.md) · [Đăng nhập và session](oauth-session.md)
+[Quay lại README](../../README.md) · [Đăng nhập và session](oauth-session.md)
 
 ## Chọn version
 
@@ -36,7 +36,7 @@ Nếu FEID cấp token nhưng handshake FAP bị từ chối, CLI hướng dẫn
 | `semesters` | GetSemester với query rỗng |
 | `schedule`, gồm JSON/ICS hiện có | GetActivityStudent |
 | `other survey` | Dùng dịch vụ survey riêng cho cả v1/v2; có thông báo trên stderr khi dùng v2 |
-| Các command đọc FAP khác đã có trong CLI | Đã có adapter v2 trong Phase 4; xem [bảng coverage](phase4-coverage.md) |
+| Các command đọc FAP khác đã có trong CLI | Đã có adapter v2 trong Phase 4; xem [bảng coverage](../discovery/phase4-coverage.md) |
 | Operation chưa có capability | Chặn trước khi nạp session; không fallback sang v1 |
 
 `MyFapEssential.get_api_active()` chỉ gọi khi cần chẩn đoán proxy v2. CLI không dùng kết quả này để tự chọn version hoặc campus. Ma trận method/path/query/body/header, credential và capability nằm trong [contract v2](v2-contracts.md).

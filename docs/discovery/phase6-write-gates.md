@@ -29,4 +29,4 @@ Nguồn nội bộ workspace: `analysis/modules/module_550.js:484–521`, `modul
 4. Fixture tạo lại bằng dữ liệu tổng hợp, không copy response/capture nguyên bản. Mỗi version có test exact query/body/signing identity và lỗi riêng.
 5. Khi đủ contract mới mở capability: validate input → capability → preview không bí mật → confirmation/`--yes` → auth → một lần gửi. Cancel hoặc input lỗi không load/refresh session; 401/timeout/5xx/App Check không replay mutation.
 
-Các gate là công việc còn mở, không bị bỏ khỏi scope âm thầm. Maintainer cần bổ sung bằng chứng hoặc chốt thay đổi phạm vi tường minh trước khi nghiệm thu Phase 6 và tiếp tục phát hành. Xem [checklist](../tasks/phase6.md) và [coverage](phase6-coverage.md).
+Các gate là công việc còn mở, không bị bỏ khỏi scope âm thầm. Maintainer cần bổ sung bằng chứng hoặc chốt thay đổi phạm vi tường minh trước khi nghiệm thu Phase 6 và tiếp tục phát hành. Xem [checklist](phase6.md) và [coverage](phase6-coverage.md).

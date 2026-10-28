@@ -24,7 +24,7 @@ Kiểm tra đối chứng: refresh timeout trên v1/v2 không đổi file sessio
 - [Lệnh, exit code, trạng thái session và kết quả ICS sau sửa](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-recheck-_8hm6jvn/results.json).
 - [ICS 250 sự kiện sau sửa](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-recheck-_8hm6jvn/schedule-250.ics).
 
-Các ca CLI độc lập vẫn chỉ dùng session/HTTP tổng hợp và sentinel chặn browser như mô tả ở dưới. Lượt này không gọi server thật hoặc thử nhập ICS vào ứng dụng lịch. Theo báo cáo mới của agent chính trong `docs/phase4-coverage.md`, ba lệnh v1 đã được chạy lại nhưng news/notification vẫn trả body 201 và fee vẫn HTTP 404; positive fee/survey còn mở. Đây là các giới hạn riêng, không bị đóng theo kết quả sửa bốn finding.
+Các ca CLI độc lập vẫn chỉ dùng session/HTTP tổng hợp và sentinel chặn browser như mô tả ở dưới. Lượt này không gọi server thật hoặc thử nhập ICS vào ứng dụng lịch. Theo báo cáo mới của agent chính trong `docs/discovery/phase4-coverage.md`, ba lệnh v1 đã được chạy lại nhưng news/notification vẫn trả body 201 và fee vẫn HTTP 404; positive fee/survey còn mở. Đây là các giới hạn riêng, không bị đóng theo kết quả sửa bốn finding.
 
 ## Đánh giá chuyển từ Phase 4 sang Phase 5
 
@@ -46,7 +46,7 @@ Các ca CLI độc lập vẫn chỉ dùng session/HTTP tổng hợp và sentine
 Phần việc đầu tiên của Phase 5 cần giải quyết:
 
 1. Chốt phạm vi release cho news/notification/fee v1: có bằng chứng sửa thành công, hoặc maintainer chấp nhận giới hạn cụ thể theo version/campus và ghi rõ trong release notes. Không tự đổi mặc định sang v2 hoặc fallback để che lỗi.
-2. Positive fee/survey đã được người dùng đồng ý hoãn ngày 19/10/2026 vì chưa thể kiểm chứng hiện tại. Theo dõi tại `tasks/todo.md`, giữ schema là chưa kiểm chứng và ghi rõ giới hạn trong release notes; mục này không chặn chuyển Phase 5.
+2. Positive fee/survey đã được người dùng đồng ý hoãn ngày 19/10/2026 vì chưa thể kiểm chứng hiện tại. Theo dõi tại `docs/discovery/todo.md`, giữ schema là chưa kiểm chứng và ghi rõ giới hạn trong release notes; mục này không chặn chuyển Phase 5.
 3. Thêm `CHANGELOG.md` cùng known issues và phạm vi đã chốt. File này chưa có; đây là đầu việc được giao cho Phase 5, không phải tính năng bị bỏ sót của Phase 4.
 4. Sau review/merge và quyết định phạm vi, mới tạo tag/publish theo kế hoạch. Không sử dụng workflow publish cũ như pipeline Phase 5 đã hoàn thành.
 
@@ -201,6 +201,6 @@ Các command đọc trong phạm vi Phase 4 chưa có thiếu sót tích hợp n
 - Phase 5: pipeline tag → validate → reusable CI → publish → kiểm tra sau publish → GitHub Release.
 - Phase 6: transcript, điểm tổng kết/phong trào, môn/khóa học theo kỳ, balance, ảnh, tìm news, server `GetVersion`, feedback list/form/submit, rating, push và donor/employee.
 
-Nguồn phạm vi: [`tasks/phase4.md`](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase4.md), `tasks/todo.md`, `docs/v2-contracts.md` và `../PLAN-PHASES.md`. Không đóng các mục live bằng fixture hoặc CI xanh; không coi backlog Phase 5/6 là regression của PR #8.
+Nguồn phạm vi: [`tasks/phase4.md`](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase4.md), `docs/discovery/todo.md`, `docs/cli/v2-contracts.md` và `../PLAN-PHASES.md`. Không đóng các mục live bằng fixture hoặc CI xanh; không coi backlog Phase 5/6 là regression của PR #8.
 
 Tài liệu này bàn giao kết quả kiểm chứng để sửa code. Chưa có xác nhận live trên tài khoản thật hoặc thử nhập ICS vào ứng dụng lịch.

@@ -1,6 +1,6 @@
 # Đăng nhập và quản lý session
 
-[Quay lại README](../README.md) · [Hướng dẫn phát triển](development.md)
+[Quay lại README](../../README.md) · [Hướng dẫn phát triển](development.md)
 
 ## Đăng nhập mới
 
@@ -63,6 +63,6 @@ Session là JSON chứa credential trên máy và không được mã hóa. CLI 
 
 Logout xóa session và dọn `<tên-session>.lock` khi có thể xóa an toàn. Trên Windows, handle của process khác có thể ngăn xóa sidecar; khi đó CLI giữ file khóa để bảo toàn đồng bộ. File này không chứa token và không nên xóa thủ công khi CLI đang chạy.
 
-Giữ session, file xuất dữ liệu, HAR/SAZ và biến bí mật ngoài Git. `docs/` và `tasks/` chỉ thuộc repository, không nằm trong artifact PyPI. CI dùng dữ liệu giả; đăng nhập FEID và API thật được kiểm chứng thủ công với session tạm riêng.
+Giữ session, file xuất dữ liệu, HAR/SAZ và biến bí mật ngoài Git. `docs/` chỉ thuộc repository, không nằm trong artifact PyPI. CI dùng dữ liệu giả; đăng nhập FEID và API thật được kiểm chứng thủ công với session tạm riêng.
 
 `logout` không parse nội dung session, nên vẫn dọn được file JSON hỏng. CLI chỉ xóa file thường sau khi lấy lock và kiểm tra lại đường dẫn; symlink, reparse point và thư mục đều bị từ chối.

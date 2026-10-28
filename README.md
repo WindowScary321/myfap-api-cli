@@ -122,10 +122,10 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 
 
 ## Thông tin thêm
-- [Chọn API v1 hoặc v2](./docs/api-versions.md): v2 là mặc định khi chưa có session; xem thứ tự ưu tiên và cách dùng v1
-- [Các ví dụ sử dụng](./docs/Example.md)
-- [Tạo môi trường dev bằng uv](./docs/development.md)
-- [CI và kiểm tra artifact](./docs/development.md#ci-và-kiểm-tra-artifact)
+- [Chọn API v1 hoặc v2](./docs/cli/api-versions.md): v2 là mặc định khi chưa có session; xem thứ tự ưu tiên và cách dùng v1
+- [Các ví dụ sử dụng](./docs/cli/Example.md)
+- [Tạo môi trường dev bằng uv](./docs/cli/development.md)
+- [CI và kiểm tra artifact](./docs/cli/development.md#ci-và-kiểm-tra-artifact)
 
 ## Ghi công
 - Api đã dc reverse engineered từ [myFAP android](https://play.google.com/store/apps/details?id=com.fuct): phiên bản *2.0.6*, versionCode: *31*

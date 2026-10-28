@@ -20,7 +20,7 @@ Quy tắc riêng tư: mọi probe live dưới đây là GET/POST chỉ đọc b
 
 ## Nhóm B — Thao tác ghi đang gate có chủ đích
 
-`AddRate` (rating submit, checksum `rateid` v1 / query `Authen` v2), `UpdateTokedevices` (push register, v1 ký bằng email, token chỉ đọc từ file), `SubmitStudentFeedback` (body runtime). Theo quyết định ghi tại [todo](../tasks/todo.md), tài khoản hiện tại không thể xác minh ack/schema thao tác ghi; gate và trình tự validate → preview → confirmation → auth giữ nguyên.
+`AddRate` (rating submit, checksum `rateid` v1 / query `Authen` v2), `UpdateTokedevices` (push register, v1 ký bằng email, token chỉ đọc từ file), `SubmitStudentFeedback` (body runtime). Theo quyết định ghi tại [todo](todo.md), tài khoản hiện tại không thể xác minh ack/schema thao tác ghi; gate và trình tự validate → preview → confirmation → auth giữ nguyên.
 
 ## Nhóm C — Out of scope theo thiết kế CLI
 
@@ -44,4 +44,4 @@ Thí nghiệm ngày 24/10/2026 (chi tiết tại [coverage Phase 6](phase6-cover
 
 - Positive item schema cho `GetStudentFeedbacks` và `GetStudentRate` (cả hai đang list rỗng trên tài khoản kiểm chứng).
 - `feedbackId` thật để mở `GetStudentFeedbackForm`.
-- Các finding v1 (404/201) và positive fee/survey tại [todo](../tasks/todo.md).
+- Các finding v1 (404/201) và positive fee/survey tại [todo](todo.md).
