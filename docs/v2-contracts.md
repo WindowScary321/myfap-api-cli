@@ -1,6 +1,6 @@
 # Hợp đồng transport API v2
 
-Tài liệu này ghi lại adapter v2 hiện có sau Phase 4 và phạm vi các route còn lại. V1 vẫn là mặc định. V2 chỉ được gọi khi lớp auth/API chọn rõ phiên bản; module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
+Tài liệu này ghi lại adapter v2 và phạm vi các route còn lại. CLI mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md) và quy tắc tương thích session cũ. Module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
 
 ## Transport và operation đã hỗ trợ
 

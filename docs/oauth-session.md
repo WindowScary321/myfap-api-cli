@@ -5,9 +5,9 @@
 ## Đăng nhập mới
 
 ```sh
-myfap login
-myfap login --force
-myfap --config ./local-state.json login --force
+myfap login --campus HN
+myfap login --campus HN --force
+myfap --config ./local-state.json --campus HN login --force
 ```
 
 CLI mở Chrome, Edge hoặc Firefox để đăng nhập FEID. Mỗi lần đăng nhập tạo PKCE S256, state và nonce mới, với thời gian chờ trên trình duyệt là 120 giây. Trước khi gọi FAP handshake, CLI kiểm tra callback, chữ ký RS256 qua JWKS và các claim của ID token. MSSV, email và loại tài khoản lấy từ handshake; CLI không suy ra chúng bằng cách decode access token.
@@ -23,12 +23,12 @@ Khi session cần đăng nhập lại hoặc binding cũ không được hỗ tr
 CLI chọn campus theo thứ tự: `--campus`, campus trong session, rồi `APHL` cho login v1 mới. Với v2, profile mới hoặc session lưu `APHL` cần chỉ định `--campus`. CLI kiểm tra trước khi mở trình duyệt, handshake hoặc refresh; `login` có và không có `--force` đều áp dụng quy tắc này. Session lưu mã khác `APHL` vẫn được kế thừa. Các option chung `--campus`, `--config`, `--timeout` và `--api-version` có thể đặt trước hoặc sau command, kể cả lệnh con:
 
 ```sh
-myfap --campus APHL login --force
-myfap login --campus APHL --force
+myfap --api-version v1 --campus APHL login --force
+myfap login --api-version v1 --campus APHL --force
 myfap --api-version v2 --campus HN login --force
 ```
 
-Session gắn với campus, API version và loại tài khoản. Đổi campus hoặc version cần handshake lại trước request dữ liệu; binding mới chỉ được lưu sau handshake thành công. V1 vẫn là mặc định, còn v2 chỉ gửi các operation đã nằm trong capability của adapter; route chưa hỗ trợ bị chặn trước HTTP. Xem [phạm vi API version](api-versions.md) để biết giới hạn hiện tại.
+Session gắn với campus, API version và loại tài khoản. Đổi campus hoặc version cần handshake lại trước request dữ liệu; binding mới chỉ được lưu sau handshake thành công. CLI chọn version theo `--api-version`, `MYFAP_API_VER`, session, rồi mặc định v2; session cũ thiếu trường version vẫn được hiểu là v1. V2 chỉ gửi các operation đã nằm trong capability của adapter; route chưa hỗ trợ bị chặn trước HTTP. Xem [phạm vi API version](api-versions.md) để biết giới hạn hiện tại.
 
 ## Dùng session cũ và refresh
 

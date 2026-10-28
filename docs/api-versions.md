@@ -2,21 +2,26 @@
 
 [Quay lại README](../README.md) · [Đăng nhập và session](oauth-session.md)
 
-## Dùng v2
+## Chọn version
 
-API v1 vẫn là mặc định cho session mới. Đặt `--api-version v2` trước hoặc sau command để dùng adapter v2:
+CLI chọn API theo thứ tự ưu tiên:
 
-```sh
-myfap --api-version v2 campuses
-myfap --api-version v2 --campus HN --config ./state-v2.json login --force
-myfap --api-version v2 --config ./state-v2.json semesters
-myfap --api-version v2 --config ./state-v2.json schedule --stdout
-myfap schedule --ics --api-version v2 --campus HN --config ./state-v2.json
+```text
+--api-version (option CLI)  >  MYFAP_API_VER (biến môi trường)  >  version trong session  >  v2
 ```
 
-Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại. CLI chọn version theo option, version đã lưu trong session, rồi mới đến mặc định v1. Các option chung `--api-version`, `--campus`, `--config` và `--timeout` đều dùng được trước hoặc sau command, kể cả lệnh con. Option ở lệnh con ưu tiên hơn option ở nhóm cha; nếu lặp trong cùng cấp thì lấy giá trị cuối. Session cũ thiếu trường version được hiểu là v1. Sau khi login v2 thành công, cùng file session có thể chạy lệnh mà không cần lặp option version.
+Trong mã nguồn hiện tại, **v2 là mặc định** khi chưa có option, biến môi trường hoặc session; bản đã cài từ PyPI có thể chưa bao gồm thay đổi này. Đặt `MYFAP_API_VER=v1` (hoặc dùng `--api-version v1`) để chọn v1. Nếu chuyển từ session v2, cần handshake lại và có thể phải đăng nhập lại; hãy chọn campus phù hợp hoặc dùng session riêng:
 
-Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứng v2 trả `HN` cho Cơ sở Hà Nội và không có `APHL`; handshake với `APHL` trả body 401, còn `HN` đã login thành công với tài khoản được cho phép. CLI không tự quy đổi mã campus. V1 vẫn có mặc định `APHL`; login v2 yêu cầu `--campus` nếu profile mới hoặc session cũ chỉ có `APHL`.
+```powershell
+$env:MYFAP_API_VER = "v1"; myfap semesters
+myfap --api-version v2 --campus HN --config ./state-v2.json login --force
+```
+
+Biến môi trường nhận `v1` hoặc `v2`; giá trị khác bị từ chối trước khi nạp session hoặc gọi mạng. Option CLI luôn thắng biến môi trường; biến môi trường thắng version đã lưu trong session. Session cũ **tồn tại** nhưng thiếu trường `api_version` tiếp tục được hiểu là v1 để không dùng credential v1 sang v2; chỉ khi chưa có file session mới rơi tới mặc định v2.
+
+Đổi version vẫn yêu cầu handshake lại và giữ mọi ràng buộc binding/campus như trước; CLI không tự đổi campus (không chuyển `APHL` thành `HN`) và không fallback version khi gặp lỗi. Nên dùng file session riêng khi thử v2 để giữ session v1 hiện tại. Các option chung `--api-version`, `--campus`, `--config` và `--timeout` đều dùng được trước hoặc sau command, kể cả lệnh con. Option ở lệnh con ưu tiên hơn option ở nhóm cha; nếu lặp trong cùng cấp thì lấy giá trị cuối. Sau khi login v2 thành công, cùng file session có thể chạy lệnh mà không cần lặp option version. `doctor` giữ hành vi riêng: không đọc session, chọn version theo option/biến môi trường rồi v2.
+
+Lấy mã campus bằng `campuses` của version đang dùng. Lần kiểm chứng v2 trả `HN` cho Cơ sở Hà Nội và không có `APHL`; handshake với `APHL` trả body 401, còn `HN` đã login thành công với tài khoản được cho phép. CLI không tự quy đổi mã campus. V1 vẫn có mặc định `APHL`; login v2 yêu cầu `--campus` nếu profile mới hoặc session cũ chỉ có `APHL` — kể cả khi v2 được chọn qua mặc định hoặc biến môi trường.
 
 `login --force` mở lại luồng đăng nhập nhưng vẫn kế thừa campus trong file session nếu không có `--campus`. Khi dùng v2 mà không chỉ định campus, CLI chặn `APHL` trước khi mở trình duyệt, handshake hoặc refresh, kể cả với `login` không có `--force`. Session đã lưu mã khác `APHL` vẫn được kế thừa. Với Hà Nội, chỉ định `--campus HN` như ví dụ trên; dùng `--config` riêng nếu muốn giữ session v1. Thư mục đang chạy lệnh và branch Git không quyết định campus.
 

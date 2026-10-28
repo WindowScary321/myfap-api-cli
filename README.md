@@ -31,11 +31,11 @@ CLI tương tác với các API myFAP để xem lịch học, lịch thi, điể
   myfap campuses
   ```
 
-- Login vào feid (chỉ cần làm 1 lần, mặc định chọn Hola)
+- Login vào FEID (chọn campus theo danh sách `myfap campuses`)
   ```
-  myfap login
+  myfap login --campus HN
   ```
-  Sau khi hoàn thành login, phiên đăng nhập sẽ dc lưu ở ``~/.myfap-api-cli/session.json`` <br>
+  Sau khi hoàn thành login, phiên đăng nhập sẽ được lưu ở ``~/.myfap-api-cli/session.json``. V2 là mặc định cho session mới; `HN` chỉ là ví dụ cho cơ sở Hà Nội, không phải mã mặc định tự gán. <br>
 
 - Login cho cơ sở Xavalo 
   ```
@@ -71,7 +71,7 @@ myfap doctor --api-version v2 --online --stdout
 `marks --summary` không nhận kỳ học/courseid/pretty. `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc theo header từng bảng; không có `--pretty` giữ nguyên chuỗi gốc. Photo chỉ xuất JSON, không tự tải hoặc giải mã ảnh. Doctor mặc định không đọc session hoặc gọi mạng; `--online` chỉ probe bootstrap proxy v2 (`GetApiActive` và `backend_version` qua `GetVersion`), không xác nhận tài khoản đã đăng nhập. `other feedbacks` chỉ có trên API v2. `other rating list` chỉ hỗ trợ student/v1; v2 là stub và bị chặn. Khác với các lệnh đọc này, rating submit/push/feedback submit còn có gate riêng và chưa được mở.
 
 ## Thông tin thêm
-- [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v1 vẫn mặc định; v2 hỗ trợ các command đọc hiện có trong Phase 4.
+- [Chọn API v1 hoặc v2](https://github.com/WindowScary321/myfap-api-cli/blob/main/docs/api-versions.md): v2 là mặc định khi chưa có session; xem thứ tự ưu tiên và cách dùng v1.
 - [Các ví dụ sử dụng](./docs/Example.md)
 - [Tạo môi trường dev bằng uv](./docs/development.md)
 - [CI và kiểm tra artifact](./docs/development.md#ci-và-kiểm-tra-artifact)
@@ -97,7 +97,7 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 |--help|Hiển thị bảng Commands và Options|
 |--config <đường dẫn>|Đường dẫn tới file cấu hình session tùy chỉnh (mặc định: ~/.myfap-api-cli/session.json)|
 |--timeout <giây>|Timeout HTTP; ưu tiên hơn biến `MYFAP_TIMEOUT`|
-|--api-version <v1 hoặc v2>|Chọn API; ưu tiên option, session, rồi v1. V2 hỗ trợ các command đọc hiện có trong Phase 4.|
+|--api-version <v1 hoặc v2>|Chọn API; ưu tiên option, biến môi trường `MYFAP_API_VER`, version trong session, rồi mặc định v2. Session cũ thiếu version vẫn là v1.|
 |-c, --campus <cơ sở>|Mã cơ sở; ưu tiên option rồi session. APHL chỉ mặc định cho v1; v2 cần chọn campus nếu chưa có mã phù hợp trong session.|
 |-s, --semester <kỳ học>|Tên kỳ học (VD: Summer2026)|
 |-cid, --courseid <mã môn>|Chọn mã môn, chỉ có ở command ``marks``. (VD: 82934, lấy từ bảng điểm của kỳ, ko phải mã môn như PRO192, SWE201c, ...)|

@@ -1,6 +1,6 @@
 # Command, endpoint và URL của CLI hiện tại
 
-Tài liệu này hợp nhất mapping command → operation → method/URL → capability → bằng chứng. Mapping đối chiếu code tại commit `bc8a7ee3131093432de427e1954743ee34618f45`; bảng không bổ sung endpoint hoặc command mới. V1 vẫn mặc định, v2 opt-in qua `--api-version v2` hoặc binding session.
+Tài liệu này hợp nhất mapping command → operation → method/URL → capability → bằng chứng. Mapping ban đầu đối chiếu code tại commit `bc8a7ee3131093432de427e1954743ee34618f45`; các cập nhật Phase 6 được ghi bên dưới. CLI hiện mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md).
 
 ## Bổ sung Phase 6 đang review
 

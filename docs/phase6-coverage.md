@@ -1,6 +1,6 @@
 # Coverage Phase 6 — đang triển khai
 
-Nhóm đọc ban đầu tại `c829b7004ea2dbb7f99cf1dc3827070039bb9ea5`, bổ sung rating list v1 tại `4c29b81f0e61d11ccb6d047060680cbcf60ab121`, đang review trong [Draft PR #10](https://github.com/WindowScary321/myfap-api-cli/pull/10). V1 vẫn mặc định, v2 opt-in; **chưa tag/publish**. Đây là capability của code đang review, không phải tính năng đã có trên PyPI hoặc bằng chứng mọi endpoint hoạt động live.
+Nhóm đọc ban đầu tại `c829b7004ea2dbb7f99cf1dc3827070039bb9ea5`, bổ sung rating list v1 tại `4c29b81f0e61d11ccb6d047060680cbcf60ab121`, được ghi nhận trong [PR #10](https://github.com/WindowScary321/myfap-api-cli/pull/10). Các kết quả kiểm chứng bên dưới là lịch sử theo commit/version được nêu, không chứng minh mọi endpoint hoạt động live. Quy tắc chọn version hiện tại (mặc định v2 khi chưa có session) được mô tả tại [hướng dẫn chọn version](api-versions.md).
 
 ## Command và contract đã nối qua CLI
 

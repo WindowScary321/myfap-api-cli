@@ -6,7 +6,7 @@ Xem [release notes](../CHANGELOG.md), [checklist Phase 5](../tasks/phase5.md) v�
 
 ## 1. Quyết định phạm vi trước release
 
-`0.2.0` giữ v1 mặc định, v2 opt-in và không fallback im lặng. Trước tag, maintainer phải xác nhận:
+`0.2.0` mặc định v2 khi chưa có session; option `--api-version`, `MYFAP_API_VER` và binding session có thứ tự ưu tiên như [hướng dẫn chọn version](api-versions.md). CLI không fallback im lặng. Trước tag, maintainer phải xác nhận:
 
 - Chấp nhận phạm vi và known issues trong mục `0.2.0` của `CHANGELOG.md`.
 - Ba finding v1 vẫn được ghi đúng: news/notification HTTP 200/body 201, fee HTTP 404 trên APHL; nguyên nhân chưa biết. Không gọi chúng là đã sửa, empty hợp lệ hoặc unsupported trên mọi campus.

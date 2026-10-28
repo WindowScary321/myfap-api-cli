@@ -29,8 +29,13 @@ def _override_common_option(ctx, param, value):
 def _validate_common_options(callback):
     @wraps(callback)
     def invoke(*args, **kwargs):
+        state["api_version_source"] = "explicit" if state["api_version"] is not None else "default"
+        if state["api_version"] is None:
+            state["api_version"] = os.getenv("MYFAP_API_VER")
+            if state["api_version"] is not None:
+                state["api_version_source"] = "environment"
         if state["api_version"] not in (None, "v1", "v2"):
-            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version")
+            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version / MYFAP_API_VER")
         try:
             state["timeout"] = resolve_timeout(state["timeout"])
         except ValueError as error:
@@ -192,7 +197,7 @@ def main(
     campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; dùng session, APHL chỉ mặc định cho v1"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
     timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
-    api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn API v1 hoặc v2; mặc định dùng session rồi v1", metavar="[v1|v2]"),
+    api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn v1/v2; ưu tiên option, MYFAP_API_VER, session, rồi v2", metavar="[v1|v2]"),
 ):
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
@@ -220,6 +225,8 @@ def doctor(
     try:
         report = get_diagnostics(api_version=state["api_version"], campus=state["campus"],
                                  timeout=state["timeout"], online=online)
+        if state.get("api_version_source") == "environment":
+            report["api_version_source"] = "environment"
         save_output(report, "Doctor.json", output, stdout)
     except Exception as error:
         err_console.print(f"[red]Lỗi chẩn đoán: {error}[/red]")

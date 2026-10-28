@@ -1,6 +1,6 @@
 # Coverage Phase 4
 
-Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫn là mặc định. Bảng dưới đây phân biệt fixture, capture và kết quả smoke live v2 trên HN đã ghi ở phần cuối tài liệu. HTTP/body 200 không tự xác nhận payload có dữ liệu nghiệp vụ. Theo quyết định của người dùng ngày 19/10/2026, positive fee/survey được hoãn vào [TODO chờ dữ liệu phù hợp](../tasks/todo.md#kiểm-chứng-hoãn-chờ-dữ-liệu-phù-hợp), không chặn chuyển sang Phase 5; schema live vẫn chưa kiểm chứng. Trạng thái operation đã triển khai nằm trong [ma trận route v2](v2-contracts.md#ma-trận-route-v2).
+Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI; tại thời điểm đó v1 là mặc định. Quy tắc hiện tại được mô tả tại [hướng dẫn chọn version](api-versions.md). Bảng dưới đây phân biệt fixture, capture và kết quả smoke live v2 trên HN đã ghi ở phần cuối tài liệu. HTTP/body 200 không tự xác nhận payload có dữ liệu nghiệp vụ. Theo quyết định của người dùng ngày 19/10/2026, positive fee/survey được hoãn vào [TODO chờ dữ liệu phù hợp](../tasks/todo.md#kiểm-chứng-hoãn-chờ-dữ-liệu-phù-hợp), không chặn chuyển sang Phase 5; schema live vẫn chưa kiểm chứng. Trạng thái operation đã triển khai nằm trong [ma trận route v2](v2-contracts.md#ma-trận-route-v2).
 
 | Nhóm command | Operation v1 | Operation v2 | Trạng thái sau Phase 4 |
 |---|---|---|---|
