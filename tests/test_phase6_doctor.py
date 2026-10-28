@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 import requests
 
 from myfap import diagnostics, v2
-from myfap.api import READ_OPERATIONS
 from myfap.errors import ApiError, ApiPayloadError
 
 
@@ -17,11 +16,11 @@ class DoctorTests(unittest.TestCase):
              patch("myfap.storage.SessionStore.lock", side_effect=AssertionError("no session lock")), \
              patch("requests.Session.request", side_effect=AssertionError("no network")):
             report = diagnostics.get_diagnostics()
-        self.assertEqual(report["api_version"], "v1")
+        self.assertEqual(report["api_version"], "v2")
         self.assertEqual(report["api_version_source"], "default")
         self.assertIsNone(report["campus"])
         self.assertEqual(report["session_validation"], "not_checked")
-        self.assertEqual(report["available_operations"], sorted(READ_OPERATIONS))
+        self.assertEqual(report["available_operations"], sorted(v2.SUPPORTED_OPERATIONS | {"GetRequiredSurvey"}))
         self.assertEqual(report["online_probe"], {"requested": False})
         self.assertIsInstance(report["package_version"], str)
         self.assertEqual(set(report), {"package_version", "api_version", "api_version_source", "campus", "available_operations", "session_validation", "online_probe"})
@@ -39,7 +38,7 @@ class DoctorTests(unittest.TestCase):
     def test_invalid_inputs_and_online_v1_fail_before_client_or_http(self):
         for kwargs in ({"api_version": "v3"}, {"api_version": ""}, {"api_version": False},
                        {"campus": ""}, {"campus": "  "}, {"campus": "TEST\nPRIVATE"},
-                       {"campus": 3}, {"online": True}, {"api_version": "v1", "online": True}):
+                       {"campus": 3}, {"api_version": "v1", "online": True}):
             with self.subTest(kwargs=kwargs), \
                  patch("myfap.api.MyFapEssential", side_effect=AssertionError("no client")), \
                  patch("requests.Session.request", side_effect=AssertionError("no network")):

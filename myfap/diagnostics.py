@@ -8,7 +8,7 @@ from .v2 import SUPPORTED_OPERATIONS
 
 
 def get_diagnostics(*, api_version=None, campus=None, timeout=None, online=False):
-    version = "v1" if api_version is None else api_version
+    version = "v2" if api_version is None else api_version
     if version not in ("v1", "v2"):
         raise ApiError("API version phải là v1 hoặc v2.")
     if campus is not None and (

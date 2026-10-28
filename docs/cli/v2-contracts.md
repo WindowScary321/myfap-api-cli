@@ -1,6 +1,6 @@
 # Hợp đồng transport API v2
 
-Tài liệu này ghi lại adapter v2 hiện có sau Phase 4 và phạm vi các route còn lại. V1 vẫn là mặc định. V2 chỉ được gọi khi lớp auth/API chọn rõ phiên bản; module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
+Tài liệu này ghi lại adapter v2 và phạm vi các route còn lại. CLI mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md) và quy tắc tương thích session cũ. Module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
 
 ## Transport và operation đã hỗ trợ
 
@@ -14,7 +14,7 @@ Tài liệu này ghi lại adapter v2 hiện có sau Phase 4 và phạm vi các 
 | `GetSemester` | v2/student/semesters | GET `/MyFAP/GetSemester` | `{}` | Không có | FAP key của binding v2 | Campus của binding | Đọc; refresh/retry tối đa một lần khi expiry rõ | `module_599.js:153-158,898-919` |
 | `GetActivityStudent` | v2/student/schedule | GET `/MyFAP/GetActivityStudent` | `CampusCode`, `rollNumber`, `Semester` | Không có | FAP key của binding v2 | Campus của binding, khớp query | Đọc; refresh/retry tối đa một lần khi expiry rõ | `module_599.js:294-300,898-919` |
 
-Bảng trên nêu các contract nền tảng của bootstrap, handshake và lịch học. Ma trận bên dưới là nguồn trạng thái đầy đủ của operation trong adapter hiện tại; kết quả live theo từng nhóm command nằm trong [coverage Phase 4](phase4-coverage.md).
+Bảng trên nêu các contract nền tảng của bootstrap, handshake và lịch học. Ma trận bên dưới là nguồn trạng thái đầy đủ của operation trong adapter hiện tại; kết quả live theo từng nhóm command nằm trong [coverage Phase 4](../discovery/phase4-coverage.md).
 
 Mọi request v2 dùng `ClientCode: MyFAP`, `CampusCode`, `Authorization` và `Checksum: <base64-signature>:<unix-second>`. Các header client theo bản ghi app gồm `User-Agent: okhttp/4.9.2`, `Accept: application/json, text/plain, */*` và `Accept-Encoding: gzip`, áp dụng cho cả GET lẫn POST. GET không có body và không thêm `Content-Type`; POST gửi JSON có `Content-Type: application/json`.
 
@@ -30,7 +30,7 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 
 ## Ma trận route v2
 
-`supported` nghĩa là operation nằm trong `SUPPORTED_OPERATIONS` của adapter v2 hiện tại; `unsupported` nghĩa là chưa có capability trong adapter. `stub` là hàm trong APK không có implementation nghiệp vụ đủ để dựng thành capability. Adapter không giả lập route bằng cách trả danh sách rỗng. Trạng thái triển khai không thay thế bằng chứng live hoặc positive case; xem [coverage Phase 4](phase4-coverage.md).
+`supported` nghĩa là operation nằm trong `SUPPORTED_OPERATIONS` của adapter v2 hiện tại; `unsupported` nghĩa là chưa có capability trong adapter. `stub` là hàm trong APK không có implementation nghiệp vụ đủ để dựng thành capability. Adapter không giả lập route bằng cách trả danh sách rỗng. Trạng thái triển khai không thay thế bằng chứng live hoặc positive case; xem [coverage Phase 4](../discovery/phase4-coverage.md).
 
 | Operation | Method | Trạng thái adapter | Ghi chú contract |
 |---|---:|---|---|
@@ -78,7 +78,7 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetConnect` | Không có | stub | APK chỉ nối lại một đối tượng kết nối đã có |
 | `GetLoginDonor` | Không có | stub | APK trả trạng thái tạm, chưa có contract login donor |
 
-Sau nhóm đọc Phase 6 và đợt mở rộng endpoint 24/10/2026, ma trận có 31 operation được hỗ trợ trong code: 27 operation đọc, 3 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` rồi `GetVersion` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
+Sau nhóm đọc Phase 6 và đợt mở rộng endpoint 24/10/2026, ma trận có 31 operation được hỗ trợ trong code: 27 operation đọc, 3 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` rồi `GetVersion` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](../discovery/phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
 Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai năm route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack`, `GetNotificationByRoll` và `GetSemesterMark`; `AddRate`/`GetNotificationByDonor` vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
 

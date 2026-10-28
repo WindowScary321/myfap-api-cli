@@ -1,6 +1,6 @@
 # Coverage Phase 4
 
-Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫn là mặc định. Bảng dưới đây phân biệt fixture, capture và kết quả smoke live v2 trên HN đã ghi ở phần cuối tài liệu. HTTP/body 200 không tự xác nhận payload có dữ liệu nghiệp vụ. Theo quyết định của người dùng ngày 19/10/2026, positive fee/survey được hoãn vào [TODO chờ dữ liệu phù hợp](../tasks/todo.md#kiểm-chứng-hoãn-chờ-dữ-liệu-phù-hợp), không chặn chuyển sang Phase 5; schema live vẫn chưa kiểm chứng. Trạng thái operation đã triển khai nằm trong [ma trận route v2](v2-contracts.md#ma-trận-route-v2).
+Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI; tại thời điểm đó v1 là mặc định. Quy tắc hiện tại được mô tả tại [hướng dẫn chọn version](../cli/api-versions.md). Bảng dưới đây phân biệt fixture, capture và kết quả smoke live v2 trên HN đã ghi ở phần cuối tài liệu. HTTP/body 200 không tự xác nhận payload có dữ liệu nghiệp vụ. Theo quyết định của người dùng ngày 19/10/2026, positive fee/survey được hoãn vào [TODO chờ dữ liệu phù hợp](todo.md#kiểm-chứng-hoãn-chờ-dữ-liệu-phù-hợp), không chặn chuyển sang Phase 5; schema live vẫn chưa kiểm chứng. Trạng thái operation đã triển khai nằm trong [ma trận route v2](../cli/v2-contracts.md#ma-trận-route-v2).
 
 | Nhóm command | Operation v1 | Operation v2 | Trạng thái sau Phase 4 |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Phase 4 bổ sung adapter v2 cho các command đọc đã có trong CLI. V1 vẫ
 
 ## Bảng command, endpoint và URL hợp nhất
 
-Xem [command → method → endpoint → URL → capability](command-endpoints.md) cho cả v1/v2, helper không có command riêng và các route còn thuộc Phase 6. Bảng kèm kết quả live mới ngày 23/10/2026 trên commit `bc8a7ee`: 22 lần chạy command exit 0, 28 request FAP/survey thuộc 19 operation. Điểm chi tiết và điểm danh chi tiết bị skip vì chưa lấy được tham số phù hợp; không ghi live pass cho hai nhóm đó. Fee có data không rỗng nhưng chưa đối chiếu schema nghiệp vụ; survey vẫn not-found. Các kết quả lịch sử bên dưới giữ nguyên, không bị diễn giải thành mọi route đã đạt.
+Xem [command → method → endpoint → URL → capability](../cli/command-endpoints.md) cho cả v1/v2, helper không có command riêng và các route còn thuộc Phase 6. Bảng kèm kết quả live mới ngày 23/10/2026 trên commit `bc8a7ee`: 22 lần chạy command exit 0, 28 request FAP/survey thuộc 19 operation. Điểm chi tiết và điểm danh chi tiết bị skip vì chưa lấy được tham số phù hợp; không ghi live pass cho hai nhóm đó. Fee có data không rỗng nhưng chưa đối chiếu schema nghiệp vụ; survey vẫn not-found. Các kết quả lịch sử bên dưới giữ nguyên, không bị diễn giải thành mọi route đã đạt.
 
 ## Quy tắc transport
 
@@ -86,4 +86,4 @@ CLI tiếp tục báo lỗi operation cho body 201 không có message `Token inv
 
 Để dùng các lệnh này trên tài khoản Hà Nội đã kiểm chứng, có thể chọn `--api-version v2 --campus HN` và đăng nhập bằng `--config` trỏ tới session v2 riêng. V2/HN đã trả HTTP/body 200 trong lượt live trước đó; đây là cách chọn adapter rõ ràng, không phải bản sửa backend v1. Positive fee/survey vẫn chưa được kiểm chứng.
 
-Session và lock tạm đã xóa sau `logout`. Chỉ ghi metadata trong bảng, không lưu response, query có giá trị, credential hoặc dữ liệu tài khoản vào Git. Việc chạy lại live đã hoàn tất; các lỗi response v1 vẫn nằm trong [TODO](../tasks/todo.md#kiểm-chứng-live-còn-mở-trước-khi-phát-hành).
+Session và lock tạm đã xóa sau `logout`. Chỉ ghi metadata trong bảng, không lưu response, query có giá trị, credential hoặc dữ liệu tài khoản vào Git. Việc chạy lại live đã hoàn tất; các lỗi response v1 vẫn nằm trong [TODO](todo.md#kiểm-chứng-live-còn-mở-trước-khi-phát-hành).

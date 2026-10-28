@@ -1,6 +1,6 @@
 # Coverage Phase 6 — đang triển khai
 
-Nhóm đọc ban đầu tại `c829b7004ea2dbb7f99cf1dc3827070039bb9ea5`, bổ sung rating list v1 tại `4c29b81f0e61d11ccb6d047060680cbcf60ab121`, đang review trong [Draft PR #10](https://github.com/WindowScary321/myfap-api-cli/pull/10). V1 vẫn mặc định, v2 opt-in; **chưa tag/publish**. Đây là capability của code đang review, không phải tính năng đã có trên PyPI hoặc bằng chứng mọi endpoint hoạt động live.
+Nhóm đọc ban đầu tại `c829b7004ea2dbb7f99cf1dc3827070039bb9ea5`, bổ sung rating list v1 tại `4c29b81f0e61d11ccb6d047060680cbcf60ab121`, được ghi nhận trong [PR #10](https://github.com/WindowScary321/myfap-api-cli/pull/10). Các kết quả kiểm chứng bên dưới là lịch sử theo commit/version được nêu, không chứng minh mọi endpoint hoạt động live. Quy tắc chọn version hiện tại (mặc định v2 khi chưa có session) được mô tả tại [hướng dẫn chọn version](../cli/api-versions.md).
 
 ## Command và contract đã nối qua CLI
 
@@ -33,7 +33,7 @@ Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus 
 - Với transcript/training/summary, caller của APK (module_599.js) gọi wrapper GET **không truyền credential header**: wrapper (dòng 898–906) mặc định credential chuỗi rỗng khi thiếu tham số thứ tư, `_buildHeaders` (747–781) khi đó tạo header không `Authorization` và `_makeChecksum` (726–746) ký bằng bootstrap token. Chỉ `GetSemesterMark` (218–224) đặt FAP key trong query `Authen`; `AcademicTranscript` (266–272) và `GetDiemphongtrao` (280–286) chỉ có query campus/roll/semester. CLI giữ **policy authenticated read dùng FAP key của binding hiện tại** cho cả ba — không sao chép credential rỗng của app, không thử unauth rồi fallback, không nới reader chung. Thí nghiệm transport có kiểm soát (bảng cuối file) cho thấy proxy hiện tại **từ chối** mọi biến thể lệch khỏi policy này; vậy nhánh credential rỗng trong bytecode không được server chấp nhận — hoặc app thật bơm token ở tầng khác (Axios wrapper `module_1(Axios2)` chưa phục dựng) hoặc proxy đã đổi hành vi so với APK build 31. CLI không thay đổi.
 - Reader tổng kết chỉ dành cho `GetSemesterMark`: raw JSON array, envelope có data list, hoặc JSON string chứa trọn array. Giới hạn xử lý cục bộ 1 MiB. Không cắt tùy tiện chuỗi giữa dấu ngoặc; XML/HTML wrapper chưa xác minh bị từ chối bằng lỗi payload an toàn. Reader chung của operation khác không được nới lỏng.
 - Photo JSON không đồng nghĩa đã hỗ trợ xuất ảnh binary. Không tự fetch URL bất kỳ hoặc chuyển credential sang host ảnh.
-- Rating list v1 có code/fixture; URL là `https://api.fpt.edu.vn/fap/api/MyFAP/GetStudentRate`. Rating list v2 là stub và bị chặn. Rating submit/push/feedback đầy đủ chưa được mở bởi các thay đổi này. Những gate tại [tasks/phase6.md](../tasks/phase6.md) vẫn còn pending, Phase 6 **chưa hoàn tất**.
+- Rating list v1 có code/fixture; URL là `https://api.fpt.edu.vn/fap/api/MyFAP/GetStudentRate`. Rating list v2 là stub và bị chặn. Rating submit/push/feedback đầy đủ chưa được mở bởi các thay đổi này. Những gate tại [docs/discovery/phase6.md](phase6.md) vẫn còn pending, Phase 6 **chưa hoàn tất**.
 - `GetVersion` đã mở cho `doctor --online` ngày 24/10/2026 sau khi chốt contract bằng probe: caller APK dùng GET nhưng proxy trả 405; POST body `{}` bootstrap đạt 200 với data chuỗi ngắn (chấp nhận bootstrap lẫn FAP key Bearer); route v1 trả 404. `myfap version` tiếp tục chỉ đọc package version.
 
 ## Kiểm chứng
@@ -96,7 +96,7 @@ Người dùng xác nhận mở browser/context mới, session tạm riêng trê
 
 Khảo sát caller bổ sung: training dùng **semesterName** tại `module_1303.js:114–117,288–302` và `module_1300.js:108–110,222–229`; không có căn cứ đổi thành termID. Với courses, chỉ thấy facade forward (`549_AlertMaintain.js:262–265`), chưa có UI caller chứng minh semesterName hay termID ở v1. Search UI (`module_1291.js:251–263,345–358`) còn có trim/lower và bước XML entity encoding với receiver phục dựng chưa rõ; CLI hiện truyền search text qua params. Input live tổng quát đã trim/lower, chưa xác nhận đây là nguyên nhân 201 hoặc có căn cứ sửa contract từ decompile. Không dùng các bất định này để tự thử ID/alias khác hay double URL-encode.
 
-Regression tổng hợp `V1ObservedFailureTests` giữ bốn trạng thái 404/201 là lỗi CLI với stdout rỗng, một request, không refresh/fallback và không đổi session. Đây là test policy bằng mã/shape đã lọc, không phải bằng chứng sửa backend hoặc dữ liệu thật làm fixture. Theo dõi nguyên nhân tại [TODO](../tasks/todo.md). Rating submit/push/feedback ghi vẫn chưa mở; Phase 6 chưa hoàn tất.
+Regression tổng hợp `V1ObservedFailureTests` giữ bốn trạng thái 404/201 là lỗi CLI với stdout rỗng, một request, không refresh/fallback và không đổi session. Đây là test policy bằng mã/shape đã lọc, không phải bằng chứng sửa backend hoặc dữ liệu thật làm fixture. Theo dõi nguyên nhân tại [TODO](todo.md). Rating submit/push/feedback ghi vẫn chưa mở; Phase 6 chưa hoàn tất.
 
 ## Live nghiệm thu mục 2 (24/10/2026, v2/HN)
 
@@ -109,7 +109,7 @@ Chạy trên máy cá nhân bằng session thật của người dùng ở code 
 | `other training` (tự chọn kỳ mới nhất) | 200 / 200 | List rỗng; không phải positive nghiệp vụ |
 | `marks --summary` | 200 / 200 | Envelope data list 32 phần tử; mỗi phần tử đúng 5 khóa `SubjectCode`, `ClassName`, `AverageMark`, `Status`, `GradeStatus` — positive schema thật đầu tiên cho GetSemesterMark |
 
-Lượt này cùng bằng chứng bytecode ở phần Policy khép hộp credential v2 của transcript/training/summary trong [phase6.md](../tasks/phase6.md) mục 2. Schema nghiệp vụ transcript (HTML) và training vẫn giữ nhãn chưa kiểm chứng; positive schema summary là xác nhận dạng dữ liệu trên một tài khoản, chưa phải nghiệm thu backend mọi campus.
+Lượt này cùng bằng chứng bytecode ở phần Policy khép hộp credential v2 của transcript/training/summary trong [phase6.md](phase6.md) mục 2. Schema nghiệp vụ transcript (HTML) và training vẫn giữ nhãn chưa kiểm chứng; positive schema summary là xác nhận dạng dữ liệu trên một tài khoản, chưa phải nghiệm thu backend mọi campus.
 
 ### Thí nghiệm transport có kiểm soát (24/10/2026)
 

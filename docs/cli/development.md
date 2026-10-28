@@ -34,7 +34,7 @@ Dùng `uv add <tên-package>` hoặc `uv remove <tên-package>` để cập nh�
 
 - **Cảnh báo: AI SLOP, đọc như đấm vào mồm**
 
-Với PR hoặc push `main` chỉ sửa `docs/` hoặc `tasks/`, CI bỏ qua luôn. Nếu có thay đổi ở code hoặc file khác, CI vẫn chạy. `README.md` và `LICENSE` ở root vẫn thuộc phạm vi kiểm tra vì cần cho metadata package
+Với PR hoặc push `main` chỉ sửa `docs/`, CI bỏ qua luôn; quy tắc cũng giữ hỗ trợ đường dẫn `tasks/` cũ. Nếu có thay đổi ở code hoặc file khác, CI vẫn chạy. `README.md` và `LICENSE` ở root vẫn thuộc phạm vi kiểm tra vì cần cho metadata package
 
 Khi chạy đầy đủ, CI kiểm tra source trên Ubuntu và Windows, mỗi hệ điều hành dùng Python 3.9 và 3.11. Job build tạo một bộ wheel/sdist trên Ubuntu, kiểm metadata bằng Twine rồi tạo `SHA256SUMS`. Sau đó, cả bốn môi trường cài wheel và sdist bằng pip vào hai venv, chạy `pip check`, `myfap version` và `myfap --help`. Các bước này không đăng nhập FEID, gọi API FAP hoặc cài trình duyệt Playwright (nặng vl, mấy ô muốn đợi à)
 
@@ -55,7 +55,7 @@ Smoke test dùng pip để resolve dependency từ metadata package, không áp 
 
 ### Phạm vi package và kết quả CI
 
-**Quy tắc đóng gói:** Thư mục `docs/` và `tasks/` chỉ lưu ở repo, được `MANIFEST.in` loại khỏi sdist (kể cả khi build local). CI không đọc hai thư mục này khi build/test; artifact validator sẽ báo lỗi nếu chúng xuất hiện trong wheel hoặc sdist
+**Quy tắc đóng gói:** Thư mục `docs/` chỉ lưu ở repo và được `MANIFEST.in` loại khỏi sdist (kể cả khi build local); quy tắc cũng loại `tasks/` cũ. CI không đọc các thư mục này khi build/test; artifact validator sẽ báo lỗi nếu chúng xuất hiện trong wheel hoặc sdist
 
 **Reusable workflow (`workflow_call`):** Nhận input `ref`. Job `ready` sẽ fail nếu bước `scope`, source, build hoặc smoke test thất bại. Khi toàn bộ kiểm tra thành công, workflow xuất ra `artifact_name`, `package_version` và `manifest_sha256`
 
@@ -77,10 +77,10 @@ Bộ test và fixture chỉ nằm trong repo, không đóng gói vào wheel/sdis
 
 **Môi trường & Timezone:** File ICS sử dụng timezone Việt Nam từ `pytz`, không phụ thuộc vào timezone database của hệ điều hành trên Windows
 
-Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](../tasks/phase1.md)
+Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase1.md)
 
 ## Chuẩn bị phát hành Phase 5
 
-Quy trình tag → reusable CI → Trusted Publishing → post-publish smoke → GitHub Release nằm trong [runbook phát hành](releasing.md). Theo dõi kết quả và các gate chưa kiểm chứng tại [tasks/phase5.md](../tasks/phase5.md); release notes và known issues nằm trong [CHANGELOG.md](../CHANGELOG.md).
+Quy trình tag → reusable CI → Trusted Publishing → post-publish smoke → GitHub Release nằm trong [runbook phát hành](releasing.md). Theo dõi kết quả và các gate chưa kiểm chứng tại [docs/discovery/phase5.md](../discovery/phase5.md); release notes và known issues nằm trong [CHANGELOG.md](../../CHANGELOG.md).
 
 Chỉ maintainer tạo/push tag sau khi PR chuẩn bị release đã merge và phạm vi hỗ trợ đã được duyệt. Test offline hoặc cài artifact thành công không xác nhận Trusted Publisher, publish thật hay nghiệm thu backend.

@@ -19,6 +19,72 @@ class CLIVersionTests(unittest.TestCase):
     def setUp(self):
         self.runner = CliRunner(**RUNNER_OPTIONS)
 
+    def test_environment_version_selects_cli_backend(self):
+        with TemporaryDirectory() as temporary, patch("myfap.cli.MyFapEssential") as essential:
+            essential.return_value.get_campuses.return_value = []
+            result = self.runner.invoke(app, ["--config", str(Path(temporary) / "missing.json"), "campuses"], env={"MYFAP_API_VER": "v2"})
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(essential.call_args.kwargs["api_version"], "v2")
+
+    def test_default_and_precedence_for_campuses(self):
+        with TemporaryDirectory() as temporary:
+            path = Path(temporary) / "session.json"
+            cases = [
+                (None, {}, [], "v2"),
+                ({}, {}, [], "v1"),
+                ({"api_version": "v1"}, {"MYFAP_API_VER": "v2"}, [], "v2"),
+                ({"api_version": "v2"}, {"MYFAP_API_VER": "v2"}, ["--api-version", "v1"], "v1"),
+                (None, {"MYFAP_API_VER": "invalid"}, ["--api-version", "v2"], "v2"),
+            ]
+            for stored, env, flags, expected in cases:
+                with self.subTest(stored=stored, env=env, flags=flags), patch("myfap.cli.MyFapEssential") as essential:
+                    if path.exists():
+                        path.unlink()
+                    if stored is not None:
+                        path.write_text(json.dumps(stored), encoding="utf-8")
+                    essential.return_value.get_campuses.return_value = []
+                    result = self.runner.invoke(app, ["--config", str(path), *flags, "campuses"], env={"MYFAP_API_VER": None, **env})
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertEqual(essential.call_args.kwargs["api_version"], expected)
+
+    def test_invalid_environment_rejected_before_auth(self):
+        with patch("myfap.cli.get_auth") as auth:
+            result = self.runner.invoke(app, ["campuses"], env={"MYFAP_API_VER": "invalid"})
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("MYFAP_API_VER", Text.from_ansi(result.stderr).plain)
+        auth.assert_not_called()
+
+    def test_environment_precedence_for_nested_options_and_invocations(self):
+        cases = (
+            ({"MYFAP_API_VER": "v1"}, ["other", "--api-version", "v2", "feedbacks", "--stdout"], "v2"),
+            ({"MYFAP_API_VER": "v2"}, ["--api-version", "v1", "other", "feedbacks", "--stdout"], "v1"),
+            ({"MYFAP_API_VER": "bad"}, ["other", "feedbacks", "--api-version", "v2", "--stdout"], "v2"),
+        )
+        for env, command, expected in cases:
+            with self.subTest(env=env, command=command), patch("myfap.cli.MyFapAuth") as auth, patch("myfap.cli.MyFapOther") as other:
+                auth.return_value.resolve_api_version.return_value = expected
+                auth.return_value.load_session.return_value = True
+                other.return_value.get_feedbacks.return_value = {"code": "200", "data": []}
+                result = self.runner.invoke(app, command, env=env)
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(auth.call_args.kwargs["api_version"], expected)
+
+    def test_fresh_default_login_requires_explicit_campus_before_network(self):
+        with TemporaryDirectory() as temporary, patch("requests.Session.request") as request, patch.object(MyFapAuth, "_authorize") as browser:
+            result = self.runner.invoke(app, ["--config", str(Path(temporary) / "new.json"), "login", "--force"], env={"MYFAP_API_VER": None})
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("--campus", Text.from_ansi(result.stderr).plain)
+        request.assert_not_called()
+        browser.assert_not_called()
+
+    def test_doctor_reports_environment_source_without_reading_session(self):
+        with patch("myfap.auth.MyFapAuth", side_effect=AssertionError("no auth")), patch("requests.Session.request", side_effect=AssertionError("no network")):
+            result = self.runner.invoke(app, ["doctor", "--stdout"], env={"MYFAP_API_VER": "v1"})
+        self.assertEqual(result.exit_code, 0, result.output)
+        report = json.loads(result.stdout)
+        self.assertEqual((report["api_version"], report["api_version_source"]), ("v1", "environment"))
+        self.assertEqual(report["session_validation"], "not_checked")
+
     def test_global_version_reaches_login_and_nested_commands(self):
         for args in (["login", "--force"], ["info", "student", "--stdout"], ["other", "survey", "--stdout"]):
             with self.subTest(command=args), patch("myfap.cli.MyFapAuth") as factory, patch("myfap.cli.MyFapClient") as client, patch("myfap.cli.MyFapOther") as other:

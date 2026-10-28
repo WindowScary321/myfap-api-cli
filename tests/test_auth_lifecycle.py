@@ -250,11 +250,13 @@ class AuthLifecycleTests(unittest.TestCase):
             with self.subTest(content=content):
                 self.path.write_text(content, encoding="utf-8")
                 before = self.path.read_bytes()
-                auth = module.MyFapAuth(session_file=self.path)
+                # File hỏng không đọc được binding nên rơi vào mặc định v2: cần campus tường minh.
+                campus = "HN" if content in ('{"PRIVATE_SENTINEL":', '[]') else None
+                auth = module.MyFapAuth(campus=campus, session_file=self.path)
                 self._prepare_login(auth, before)
                 self.assertEqual(auth.login(), ("new-fake-key", "TEST000"))
                 auth._authorize.assert_called_once()
-                self.assertEqual(auth.campus, "SAVED" if '"campus":"SAVED"' in content else "APHL")
+                self.assertEqual(auth.campus, "SAVED" if '"campus":"SAVED"' in content else (campus or "APHL"))
                 self.assertEqual(self.load_file()["oidc_subject"], "new-fake-subject")
 
     def test_fresh_login_inherits_campus_and_version_but_resets_unsupported_account(self):
@@ -271,6 +273,17 @@ class AuthLifecycleTests(unittest.TestCase):
                 self.assertEqual((auth.campus, auth.api_version, auth.account_type), ("SAVED", expected_version, "student"))
                 stored = self.load_file()
                 self.assertEqual((stored["campus"], stored["api_version"], stored["account_type"]), ("SAVED", expected_version, "student"))
+
+    def test_login_rejects_invalid_stored_version_before_browser(self):
+        self.path.write_text(json.dumps({"campus": "TEST", "api_version": "invalid"}), encoding="utf-8")
+        before = self.path.read_bytes()
+        auth = module.MyFapAuth(session_file=self.path)
+        auth._authorize = Mock()
+        with self.assertRaises(module.AuthError):
+            auth.login()
+        auth._authorize.assert_not_called()
+        self.oidc.begin_login.assert_not_called()
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_fresh_login_honors_explicit_parameters_without_fallback(self):
         self.path.write_text(json.dumps({"campus": "SAVED", "api_version": "v2", "account_type": "donor"}), encoding="utf-8")
@@ -330,13 +343,28 @@ class AuthLifecycleTests(unittest.TestCase):
             with self.subTest(content=content):
                 self.path.write_text(content, encoding="utf-8")
                 before = self.path.read_bytes()
-                auth = module.MyFapAuth(session_file=self.path)
+                campus = "HN" if content == '{"PRIVATE_SENTINEL":' else None
+                auth = module.MyFapAuth(campus=campus, session_file=self.path)
                 auth._authorize = Mock(side_effect=module.AuthError("Đã hủy đăng nhập."))
                 self.oidc.begin_login.return_value = {"nonce": "fake-nonce"}
                 with self.assertRaises(module.AuthError):
                     auth.login()
                 auth._authorize.assert_called_once()
                 self.assertEqual(self.path.read_bytes(), before)
+
+    def test_login_without_campus_on_broken_file_defaults_v2_and_requires_campus(self):
+        # Chính sách mặc định v2: file hỏng coi như chưa có session, guard campus chặn trước browser.
+        self.path.write_text('{"PRIVATE_SENTINEL":', encoding="utf-8")
+        before = self.path.read_bytes()
+        auth = module.MyFapAuth(session_file=self.path)
+        auth._authorize = Mock()
+        self.oidc.begin_login = Mock()
+        with self.assertRaises(module.SessionBindingError) as caught:
+            auth.login()
+        self.assertIn("--campus", str(caught.exception))
+        auth._authorize.assert_not_called()
+        self.oidc.begin_login.assert_not_called()
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_login_does_not_ignore_session_path_or_permission_errors(self):
         with patch.object(self.auth.store, "read", side_effect=module.SessionStoreError("PRIVATE_SENTINEL")):
