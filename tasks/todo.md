@@ -14,7 +14,7 @@ Kết quả GitHub Actions và bình luận kiểm tra được theo dõi trực
 - [ ] Xác định nguyên nhân body 201 của `other notification` v1. Request khớp path/query/checksum của app; session đối chứng vẫn đọc được, chưa xác nhận lỗi thuộc backend hay điều kiện tài khoản.
 - [ ] Xác nhận `GeFeeByRoll` v1 có response thành công hoặc có bằng chứng từ đơn vị vận hành về phạm vi hỗ trợ. HTTP 404 trên APHL chưa đủ để kết luận route đã ngừng hỗ trợ trên mọi campus hoặc suy ra schema.
 
-Mỗi mục cần session tạm, kết quả ghi rõ API version/campus và metadata đã lọc trước khi đóng. Không đưa credential, thông tin cá nhân hoặc raw response lên Git. CI xanh, fixture hoặc kết quả API v2 không thay thế kiểm chứng live v1. Xem [checklist Phase 4](../history.md#tasks-phase4) và [báo cáo coverage](../docs/phase4-coverage.md).
+Mỗi mục cần session tạm, kết quả ghi rõ API version/campus và metadata đã lọc trước khi đóng. Không đưa credential, thông tin cá nhân hoặc raw response lên Git. CI xanh, fixture hoặc kết quả API v2 không thay thế kiểm chứng live v1. Xem [checklist Phase 4](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase4.md) và [báo cáo coverage](../docs/phase4-coverage.md).
 
 ## Kiểm chứng hoãn chờ dữ liệu phù hợp
 

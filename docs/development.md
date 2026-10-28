@@ -77,7 +77,7 @@ Bộ test và fixture chỉ nằm trong repo, không đóng gói vào wheel/sdis
 
 **Môi trường & Timezone:** File ICS sử dụng timezone Việt Nam từ `pytz`, không phụ thuộc vào timezone database của hệ điều hành trên Windows
 
-Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](../history.md#tasks-phase1)
+Chi tiết trạng thái và giới hạn kiểm chứng xem tại [tasks/phase1.md](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase1.md)
 
 ## Chuẩn bị phát hành Phase 5
 

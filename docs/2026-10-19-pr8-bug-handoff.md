@@ -201,6 +201,6 @@ Các command đọc trong phạm vi Phase 4 chưa có thiếu sót tích hợp n
 - Phase 5: pipeline tag → validate → reusable CI → publish → kiểm tra sau publish → GitHub Release.
 - Phase 6: transcript, điểm tổng kết/phong trào, môn/khóa học theo kỳ, balance, ảnh, tìm news, server `GetVersion`, feedback list/form/submit, rating, push và donor/employee.
 
-Nguồn phạm vi: [`tasks/phase4.md`](../history.md#tasks-phase4), `tasks/todo.md`, `docs/v2-contracts.md` và `../PLAN-PHASES.md`. Không đóng các mục live bằng fixture hoặc CI xanh; không coi backlog Phase 5/6 là regression của PR #8.
+Nguồn phạm vi: [`tasks/phase4.md`](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/tasks/phase4.md), `tasks/todo.md`, `docs/v2-contracts.md` và `../PLAN-PHASES.md`. Không đóng các mục live bằng fixture hoặc CI xanh; không coi backlog Phase 5/6 là regression của PR #8.
 
 Tài liệu này bàn giao kết quả kiểm chứng để sửa code. Chưa có xác nhận live trên tài khoản thật hoặc thử nhập ICS vào ứng dụng lịch.

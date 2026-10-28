@@ -59,4 +59,4 @@ V2 phân biệt HTTP/body 401, lỗi operation và App Check. Request đọc ch�
 
 Timeout vẫn theo `--timeout`, `MYFAP_TIMEOUT`, rồi mặc định hiện có. Mọi request mới giữ cấu hình đó và không follow redirect. Chữ ký v2 ở header, không đưa FEID token hay FAP Bearer token vào URL của các operation Phase 3.
 
-Xem [kết quả kiểm chứng](../history.md#docs-phase3-verification) để biết phần nào đã chạy live và phần nào chỉ có fixture. Không đưa session hoặc dữ liệu xuất ra Git; file session vẫn chứa credential dạng JSON trên máy.
+Xem [kết quả kiểm chứng](https://github.com/WindowScary321/myfap-api-cli/blob/467df1edb2220261dcd21392fbe3eaf008d6c662/docs/phase3-verification.md) để biết phần nào đã chạy live và phần nào chỉ có fixture. Không đưa session hoặc dữ liệu xuất ra Git; file session vẫn chứa credential dạng JSON trên máy.
