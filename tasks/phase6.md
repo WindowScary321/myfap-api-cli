@@ -6,7 +6,7 @@ Nhóm command đọc đã có implementation và fixture CLI/HTTP; xem [coverage
 
 ## Quy tắc xuyên suốt
 
-- Tái sử dụng wrapper, common options, resolver kỳ và output JSON hiện có; không refactor auth/CI ngoài phạm vi. Không thay `tasks/plan.md` vì đó là lịch sử migration.
+- Tái sử dụng wrapper, common options, resolver kỳ và output JSON hiện có; không refactor auth/CI ngoài phạm vi. Không thay [`tasks/plan.md`](../history.md#tasks-plan) vì đó là lịch sử migration.
 - Kiểm capability và option/input trước HTTP; giữ binding campus/API version/student và bảo toàn token đã rotate. Không fallback version, không trả dữ liệu rỗng giả cho stub/lỗi.
 - Retry đọc tối đa một lần chỉ khi expiry rõ. Thao tác ghi không replay dù endpoint dùng GET; timeout hoặc kết quả không rõ không được báo thành công hoặc tự gửi lại.
 - JSON/ICS stdout giữ UTF-8; log/lỗi stderr. `save_output` không phải binary writer.
