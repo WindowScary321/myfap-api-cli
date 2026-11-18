@@ -4,6 +4,8 @@
 
 ### API và dữ liệu
 
+- Đồng bộ năm GET proxy v2 theo myFAP Android 2.0.7/build 32: profile, marks summary, applications, kiểm tra feedback và notification bỏ query `Authen`, giữ credential trong Bearer/Checksum và rebind header sau refresh. V1 và output giữ nguyên; CLI v2/HN đã nghiệm thu đủ năm command với HTTP/body 200. Bằng chứng app, CLI và giới hạn được ghi tại [báo cáo build 32](docs/discovery/build32-verification.md).
+
 - Thêm tùy chọn `--ics` và `--full` cho `myfap exams`: xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ Việt Nam, UID/DTSTAMP UTC, CRLF); mặc định xuất ICS đưa đầy đủ các thông tin quan trọng (Môn, Phòng thi `roomNo`, Ngày công bố `dateofPublication`), chỉ ẩn mã slot UUID, ghi chú phụ và điểm danh; cờ `--full` kèm toàn bộ thông tin phụ vào sự kiện lịch; xuất JSON mặc định tiếp tục bảo toàn đầy đủ 100% dữ liệu gốc.
 - Thêm `myfap other feedbacks` đọc danh sách feedback student qua `GetStudentFeedbacks`, chỉ có trên proxy API v2; envelope đã kiểm chứng live nhưng item schema chưa có positive (danh sách rỗng trên tài khoản kiểm chứng).
 - `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc: mỗi bảng giữ header riêng (bảng chính 10 cột `No`…`Status`, bảng phụ 7 cột) và hàng dữ liệu keyed theo header, chuẩn hoá `&nbsp;`; không dùng `--pretty` vẫn giữ chuỗi HTML nguyên bản theo contract.

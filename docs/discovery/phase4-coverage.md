@@ -27,12 +27,14 @@ Xem [command → method → endpoint → URL → capability](../cli/command-endp
 
 ## Quy tắc transport
 
+Các kết quả Phase 4 trong bảng trên là lịch sử build 31. Hợp đồng query hiện tại đã theo [build 32](build32-verification.md); lịch sử HTTP/body 200 không được dùng để xác nhận CLI sau bản sửa mới.
+
 - V2 chỉ gửi các operation có trong allowlist đọc. Route ghi, stub hoặc chưa có capability vẫn bị chặn trước HTTP.
 - GET và POST dùng header theo capture app: `Accept`, `Accept-Encoding`, `User-Agent`, `ClientCode`, `CampusCode`, `Authorization` và `Checksum`. Chỉ POST có JSON body mới thêm `Content-Type: application/json`.
 - Các command đọc cần session qua proxy, gồm nhóm `info` và `other`, kiểm tra capability trước khi nạp session. Version được chọn theo option rồi metadata session; lệnh thiếu capability không handshake, refresh hoặc gọi API dữ liệu.
 - Survey giữ host và chữ ký riêng. Khi dùng session v2, CLI nhắc trên stderr rằng request đi tới `survey.fpt.edu.vn`; stdout vẫn chỉ chứa JSON khi có `--stdout`.
 - `GetSemester` không có query; `GetWeekByDate` chỉ có `date`; các route còn lại dùng đúng case query trong APK.
-- Bốn route `CheckOpenFeedBack`, `CheckUpdateProfile`, `GetApplication` và `GetNotificationByRoll` vẫn có `Authen` trong query. Giá trị này lấy từ credential binding hiện tại, không giữ bản cũ sau refresh.
+- Theo build 32, `CheckOpenFeedBack`, `CheckUpdateProfile`, `GetApplication`, `GetNotificationByRoll` và `GetSemesterMark` không có query `Authen`. Credential mới sau refresh chỉ được đưa vào Bearer/Checksum; query campus/roll giữ nguyên.
 - Retry đọc tối đa một lần khi server báo hết phiên rõ ràng. Timeout, 403, 5xx, App Check và lỗi operation không fallback sang v1.
 - `termID` được giữ opaque; CLI chọn kỳ theo `startDate` và giữ thứ tự server khi ngày trùng nhau.
 

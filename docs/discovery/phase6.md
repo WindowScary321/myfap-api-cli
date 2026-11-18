@@ -1,5 +1,7 @@
 # Phase 6: mở rộng command và endpoint trước phát hành
 
+**Quyết định hiện hành ngày 18/11/2026:** giữ v2 mặc định cho session mới và version đã lưu cho session cũ. Nội dung v1 mặc định trong mốc 23/10 bên dưới là lịch sử; xem [quy tắc chọn version](../cli/api-versions.md) và [cập nhật build 32](build32-verification.md).
+
 Nhánh triển khai `feat/phase6-command-expansion` bắt đầu từ `main` tại `75fc7b4aa33a13b9b39eab898f61e2e693f4baf9`, sau khi [PR #9](https://github.com/WindowScary321/myfap-api-cli/pull/9) được merge. Theo quyết định ngày **23/10/2026**, Phase 5 chỉ chuẩn bị pipeline; **hoãn tag/publish đến sau khi hoàn thiện và nghiệm thu phạm vi Phase 6**. Giữ baseline `0.2.0`, Python >=3.9, v1 mặc định và v2 opt-in.
 
 Nhóm command đọc đã có implementation và fixture CLI/HTTP; xem [coverage Phase 6](phase6-coverage.md). Dấu đã kiểm bên dưới chỉ áp dụng cho code/fixture được nêu, không thay thế live hoặc nghiệm thu backend. Phần thiếu contract/schema vẫn giữ gate rõ; không đánh dấu toàn Phase 6 hoàn tất khi các yêu cầu bắt buộc còn mở.
@@ -31,13 +33,13 @@ Mỗi mục cần đi trọn CLI → wrapper → transport v1/v2 → fixture/tes
 
 - [x] **`transcript` → `AcademicTranscript`:** hỗ trợ theo contract cả v1/v2, không lookup kỳ; chưa thêm formatter nghiệp vụ khi schema data chưa được xác minh.
 - [x] **`other training --semester` → `GetDiemphongtrao`:** query `semester` chữ thường, dùng resolver khi thiếu kỳ; giữ bound credential phù hợp.
-- [x] **`marks --summary` → `GetSemesterMark`:** không lookup kỳ hoặc thêm query semester. V1 dùng đúng `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 giữ query `Authen` mới sau refresh.
+- [x] **`marks --summary` → `GetSemesterMark`:** không lookup kỳ hoặc thêm query semester. V1 dùng đúng `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 build 32 bỏ query `Authen`, giữ Bearer/Checksum theo key hiện tại. Xem [giới hạn live build 32](build32-verification.md).
 - [x] Từ chối tổ hợp summary với `--courseid`/`--pretty`; nếu `--semester` không áp dụng thì báo lỗi, không âm thầm bỏ qua.
 - [x] Reader riêng cho summary kiểm HTTP/App Check/expiry trước khi đọc raw array/envelope/text. Chỉ parse dạng đã có bằng chứng, có giới hạn; malformed/unknown phải báo payload error, không cắt tùy tiện giữa dấu ngoặc rồi trả success.
 - [x] Chốt khác biệt credential v2 ở các caller decompile của transcript/training/summary bằng bytecode/contract và kiểm đọc. Không mặc định sao chép credential rỗng, thử unauth rồi fallback hoặc nới reader chung cho mọi endpoint.
 
 **Nghiệm thu nhóm:**
-- [x] Test exact casing, no-semester/no-checksum, signing identity và dựng Authen mới sau refresh; giữ nguyên command marks cũ.
+- [x] Test exact casing, no-semester/no-query-checksum và signing identity sau refresh: v1 dựng Authen mới, v2 không có query Authen; giữ nguyên command marks cũ.
 - [x] Fixture được ghi rõ synthetic; các schema hoặc credential chưa live xác nhận tiếp tục có nhãn unverified.
 
 ## 3. Photo và doctor

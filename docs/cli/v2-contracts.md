@@ -2,6 +2,8 @@
 
 Tài liệu này ghi lại adapter v2 và phạm vi các route còn lại. CLI mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md) và quy tắc tương thích session cũ. Module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
 
+Hợp đồng GET hiện theo APK **2.0.7/build 32**; xem [bằng chứng và giới hạn nghiệm thu](../discovery/build32-verification.md). Các nguồn `module_599.js` bên dưới thuộc build 31; phần query thay đổi được cập nhật rõ trong ma trận.
+
 ## Transport và operation đã hỗ trợ
 
 `myfap.v2.request()` trả về `requests.Response` nguyên bản. Lớp gọi phía trên chịu trách nhiệm chạy `read_response`, phân loại `401` và quyết định retry. Transport chỉ dựng request, kiểm tra tham số và che lỗi mạng khỏi thông tin credential.
@@ -39,13 +41,13 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `AuthenticationByFeIdCode` | `POST` | unsupported | Nhánh code exchange của app đang tắt |
 | `GetStudentById` | `GET` | supported | Query `CampusCode`, `rollNumber` |
 | `RetriveImage` | `GET` | supported | Phase 6: photo JSON opaque; không fetch/decode ảnh |
-| `CheckUpdateProfile` | `GET` | supported | Vẫn giữ query `Authen` theo app |
+| `CheckUpdateProfile` | `GET` | supported | Build 32: query `CampusCode`, `rollNumber`, không `Authen` |
 | `GetSemester` | `GET` | supported | Query rỗng |
 | `GetSubjets` | `GET` | supported | Query `CampusCode` |
 | `GetSubjectBySemester` | `GET` | supported | Phase 6: query `CampusCode`, `Semester`; không rollNumber |
 | `GetCourseOfSemester` | `GET` | supported | Phase 6: query `CampusCode`, `semester`, `rollNumber` |
 | `GetStudentMark` | `GET` | supported | Query `CampusCode`, `rollNumber`, `Semester` |
-| `GetSemesterMark` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`, `Authen`; không query kỳ, reader riêng |
+| `GetSemesterMark` | `GET` | supported | Build 32: query `CampusCode`, `rollNumber`, không `Authen`/kỳ; reader riêng; CLI v2/HN đã live 200/200 |
 | `GetMarkByCourse` | `GET` | supported | Query `CampusCode`, `CourseId`, `rollNumber` |
 | `AcademicTranscript` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`; policy bound key, live chưa xác minh |
 | `GetDiemphongtrao` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`, `semester`; policy bound key |
@@ -59,13 +61,13 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 | `GetBalance` | `GET` | supported | Phase 6: query `CampusCode`, `rollNumber`; giữ payload, không diễn giải nợ |
 | `GetTop10News` | `GET` | supported | Query `CampusCode`, `type` |
 | `SearchNews` | `GET` | supported | Phase 6: query `CampusCode`, `type`, `keysearch` |
-| `GetApplication` | `GET` | supported | Vẫn giữ query `Authen` theo app |
-| `CheckOpenFeedBack` | `GET` | supported | Vẫn giữ query `Authen` theo app |
+| `GetApplication` | `GET` | supported | Build 32: query `CampusCode`, `rollNumber`, không `Authen` |
+| `CheckOpenFeedBack` | `GET` | supported | Build 32: query `CampusCode`, `rollNumber`, không `Authen` |
 | `AddRate` | `POST` | unsupported | Vẫn giữ query `Authen` theo app |
 | `UpdateTokedevices` | `GET` | unsupported | Query `CampusCode`, `Email`, `tokendevice` |
-| `GetNotificationByRoll` | `GET` | supported | Vẫn giữ query `Authen` theo app |
+| `GetNotificationByRoll` | `GET` | supported | Build 32: query `CampusCode`, `rollNumber`, không `Authen` |
 | `UpdateTokenDonor` | `GET` | unsupported | Donor flow |
-| `GetNotificationByDonor` | `GET` | unsupported | Vẫn giữ query `Authen` theo app |
+| `GetNotificationByDonor` | `GET` | unsupported | Build 32 bỏ query `Authen`; chưa mở donor capability |
 | `GetTokenWithEmp` | `GET` | unsupported | Employee flow |
 | `GetAllActiveCampus` | `POST` | supported | Body `{}` |
 | `GetCampusInfo` | `GET` | supported | Query `CampusCode`, `rollNumber` |
@@ -80,7 +82,7 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 
 Sau nhóm đọc Phase 6 và đợt mở rộng endpoint 24/10/2026, ma trận có 31 operation được hỗ trợ trong code: 27 operation đọc, 3 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` rồi `GetVersion` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](../discovery/phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
-Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile` (`module_599.js:136`), `GetSemesterMark` (`223`), `GetApplication` (`429`), `CheckOpenFeedBack` (`443`), `AddRate` (`467`), `GetNotificationByRoll` (`491`) và `GetNotificationByDonor` (`532`). Trong số này, CLI đã triển khai năm route `CheckUpdateProfile`, `GetApplication`, `CheckOpenFeedBack`, `GetNotificationByRoll` và `GetSemesterMark`; `AddRate`/`GetNotificationByDonor` vẫn chưa được hỗ trợ. Route điểm danh chi tiết đổi từ `getCourseAttendance` của v1 sang `GetCourseAttendance` ở v2 (`module_599.js:363-364`); wrapper v1 không đủ để ghi nhận capability v2.
+Ở build 31, bảy route giữ `Authen` trong query là `CheckUpdateProfile`, `GetSemesterMark`, `GetApplication`, `CheckOpenFeedBack`, `AddRate`, `GetNotificationByRoll` và `GetNotificationByDonor` (`module_599.js:136,223,429,443,467,491,532`). Build 32 (`module_604.js`, fn#7514/7538/7594/7598/7614/7622) bỏ trường này ở cả sáu GET, còn POST `AddRate` giữ nguyên. CLI áp dụng query mới cho năm GET đã hỗ trợ và tiếp tục ký/Bearer bằng FAP key của binding hiện tại; `AddRate`/donor vẫn unsupported. Route điểm danh chi tiết tiếp tục dùng alias v2 `GetCourseAttendance`; không thay contract v1.
 
 ## Giới hạn hiện tại
 
