@@ -379,6 +379,16 @@ class AuthLifecycleTests(unittest.TestCase):
                 self.auth.session.post.return_value = response({"code": "200", "data": rows})
                 self.assertFalse(self.refresh())
 
+    def test_init_rejects_empty_session_file_and_control_characters_in_campus(self):
+        for bad_session in ("", "   ", "bad\npath"):
+            with self.subTest(session_file=bad_session):
+                with self.assertRaises(module.AuthError):
+                    module.MyFapAuth(session_file=bad_session)
+        for bad_campus in ("HN\nEvil", "HN\x7f"):
+            with self.subTest(campus=bad_campus):
+                with self.assertRaises(module.AuthError):
+                    module.MyFapAuth(campus=bad_campus)
+
 
 if __name__ == "__main__":
     unittest.main()

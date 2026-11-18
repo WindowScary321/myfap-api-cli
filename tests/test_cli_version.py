@@ -56,15 +56,15 @@ class CLIVersionTests(unittest.TestCase):
 
     def test_environment_precedence_for_nested_options_and_invocations(self):
         cases = (
-            ({"MYFAP_API_VER": "v1"}, ["other", "--api-version", "v2", "feedbacks", "--stdout"], "v2"),
-            ({"MYFAP_API_VER": "v2"}, ["--api-version", "v1", "other", "feedbacks", "--stdout"], "v1"),
-            ({"MYFAP_API_VER": "bad"}, ["other", "feedbacks", "--api-version", "v2", "--stdout"], "v2"),
+            ({"MYFAP_API_VER": "v1"}, ["other", "--api-version", "v2", "balance", "--stdout"], "v2"),
+            ({"MYFAP_API_VER": "v2"}, ["--api-version", "v1", "other", "balance", "--stdout"], "v1"),
+            ({"MYFAP_API_VER": "bad"}, ["other", "balance", "--api-version", "v2", "--stdout"], "v2"),
         )
         for env, command, expected in cases:
             with self.subTest(env=env, command=command), patch("myfap.cli.MyFapAuth") as auth, patch("myfap.cli.MyFapOther") as other:
                 auth.return_value.resolve_api_version.return_value = expected
                 auth.return_value.load_session.return_value = True
-                other.return_value.get_feedbacks.return_value = {"code": "200", "data": []}
+                other.return_value.get_balance.return_value = {"code": "200", "data": []}
                 result = self.runner.invoke(app, command, env=env)
                 self.assertEqual(result.exit_code, 0, result.output)
                 self.assertEqual(auth.call_args.kwargs["api_version"], expected)

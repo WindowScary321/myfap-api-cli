@@ -131,3 +131,37 @@ class CommonOptionTests(unittest.TestCase):
         result = self.runner.invoke(app, ["login", "-f"])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(self.MyFapAuth.call_args.kwargs, {"campus": None, "session_file": None, "api_version": None, "timeout": None})
+
+    def test_empty_or_conflicting_command_options_fail_before_auth(self):
+        cases = (
+            ["--config", "", "login"],
+            ["--campus", "", "campuses", "--api-version", "v2"],
+            ["login", "--campus", ""],
+            ["--campus", "HN", "login", "--campus", ""],
+            ["schedule", "--semester", "", "--stdout"],
+            ["schedule", "--semester", "   ", "--stdout"],
+            ["schedule", "--output", ""],
+            ["marks", "--courseid", "", "--stdout"],
+            ["marks", "-cid", "123", "-s", "Fall2026", "--stdout"],
+            ["attendance", "-sc", "", "-cn", "", "--stdout"],
+            ["week-timetable", "--date", "", "--stdout"],
+            ["week-timetable", "--week", "0", "--stdout"],
+            ["week-timetable", "--year", "0", "--stdout"],
+        )
+        for command in cases:
+            with self.subTest(command=command):
+                self.MyFapAuth.reset_mock()
+                self.MyFapEssential.reset_mock()
+                self.MyFapClient.reset_mock()
+                result = self.runner.invoke(app, command)
+                self.assertNotEqual(result.exit_code, 0, result.output)
+                self.assertEqual(result.stdout, "")
+                self.assertNotIn("Traceback", result.stderr)
+                self.MyFapAuth.assert_not_called()
+                self.MyFapEssential.assert_not_called()
+                self.MyFapClient.assert_not_called()
+
+    def test_child_login_campus_overrides_invalid_parent_campus(self):
+        result = self.runner.invoke(app, ["--campus", "", "login", "--campus", "HN", "-f"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.MyFapAuth.call_args.kwargs["campus"], "HN")

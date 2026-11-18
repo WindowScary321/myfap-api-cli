@@ -86,7 +86,7 @@ Bảy route giữ `Authen` trong query của adapter app là `CheckUpdateProfile
 
 - Chưa tích hợp auto-detect/fallback; `GetApiActive` chỉ là request chẩn đoán.
 - Chưa xác nhận live schema của proxy cho các route unsupported.
-- Chưa thêm v2 vào command mặc định hoặc đổi phiên bản session đã lưu khi handshake thất bại.
+- Không tự động đổi phiên bản session đã lưu khi handshake thất bại.
 - Không dùng response rỗng để che route stub, HTTP 404 hoặc capability chưa biết.
 
 Inventory được đối chiếu với các caller `MyFAP/*` trong `module_599.js`; các hàm stub nằm tại `21-31` và `458-460`. Service survey tiếp tục dùng host, checksum và contract riêng, không đi qua transport proxy này.

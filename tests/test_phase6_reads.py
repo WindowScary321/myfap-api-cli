@@ -433,12 +433,24 @@ class FeedbackListTests(unittest.TestCase):
 
     def test_feedbacks_v1_is_rejected_before_http(self):
         self.save_session("v1")
-        with patch("requests.Session.request") as request:
+        with patch("myfap.auth.MyFapAuth.load_session") as load, patch("requests.Session.request") as request:
             result = self.runner.invoke(app, ["--config", str(self.path), "other", "feedbacks", "--stdout"])
         self.assertEqual(result.exit_code, 1)
         self.assertEqual(result.stdout, "")
         self.assertIn("GetStudentFeedbacks", Text.from_ansi(result.stderr).plain)
+        load.assert_not_called()
         request.assert_not_called()
+
+    def test_feedbacks_v1_on_v2_session_preserves_session_without_handshake(self):
+        self.save_session("v2")
+        before = self.path.read_bytes()
+        with patch("requests.Session.request") as request:
+            result = self.runner.invoke(app, ["--config", str(self.path), "--api-version", "v1", "other", "feedbacks", "--stdout"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("GetStudentFeedbacks", Text.from_ansi(result.stderr).plain)
+        request.assert_not_called()
+        self.assertEqual(self.path.read_bytes(), before)
 
 
 class ExamsIcsCommandTests(unittest.TestCase):

@@ -47,7 +47,11 @@ def create_survey_checksum(username: str) -> str:
 
 
 def _text(value):
-    return isinstance(value, str) and bool(value.strip())
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
 
 
 class MyFapAuth:
@@ -58,12 +62,14 @@ class MyFapAuth:
             raise AuthError("API version không hợp lệ.")
         if account_type is not None and not _text(account_type):
             raise AuthError("Loại tài khoản không hợp lệ.")
+        if session_file is not None and (not isinstance(session_file, (str, Path)) or not _text(str(session_file))):
+            raise AuthError("Đường dẫn file session không hợp lệ. Hãy kiểm tra --config.")
         self._requested = (campus, api_version, account_type)
         self.campus = campus or "APHL"
         self.api_version = api_version or "v1"
         self.account_type = account_type or "student"
         self.timeout = resolve_timeout(timeout)
-        self.session_file = Path(session_file) if session_file else SESSION_FILE
+        self.session_file = Path(session_file) if session_file is not None else SESSION_FILE
         self.store = SessionStore(self.session_file)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "okhttp/4.9.2"})

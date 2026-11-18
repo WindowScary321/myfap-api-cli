@@ -113,8 +113,8 @@ def parse_transcript_html(html_str: str):
 def convert_exams_to_ics(data: dict, full: bool = False) -> str:
     """Chuyển dữ liệu lịch thi JSON thành chuỗi ICS.
 
-    Mặc định (full=False) chỉ đưa thông tin quan trọng (Môn, Ngày công bố);
-    ẩn mã slot UUID, phòng thi, ghi chú và các trường phụ.
+    Mặc định (full=False) chỉ đưa thông tin quan trọng (Môn, Phòng thi, Ngày công bố);
+    ẩn mã slot UUID, ghi chú và các trường phụ.
     Khi full=True đưa toàn bộ thông tin phụ vào sự kiện lịch.
     """
     if not isinstance(data, dict) or not isinstance(data.get("data"), list):
@@ -239,15 +239,24 @@ def convert_schedule_to_ics(data: dict) -> str:
         e.begin = start_dt
         e.end = end_dt
         
+        room_no = session.get("roomNo")
+        room_str = room_no if isinstance(room_no, str) else ("" if room_no is None else str(room_no))
+        group_name = session.get("groupName")
+        group_str = group_name if isinstance(group_name, str) else ("" if group_name is None else str(group_name))
+        session_no = session.get("sessionNo")
+        session_str = "" if session_no is None else str(session_no)
+        lecturer = session.get("lecturer")
+        lecturer_str = lecturer if isinstance(lecturer, str) and lecturer else ("N/A" if lecturer is None or lecturer == "" else str(lecturer))
+
         # Location
-        e.location = session.get("roomNo", "")
-        
+        e.location = room_str
+
         # Description
         desc = []
-        desc.append(f"Group: {session.get('groupName', '')}")
-        desc.append(f"Session: {session.get('sessionNo', '')}")
-        desc.append(f"Lecturer: {session.get('lecturer', 'N/A')}")
-        desc.append(f"Room: {session.get('roomNo', '')}")
+        desc.append(f"Group: {group_str}")
+        desc.append(f"Session: {session_str}")
+        desc.append(f"Lecturer: {lecturer_str}")
+        desc.append(f"Room: {room_str}")
         if session.get("meetURL"):
             desc.append(f"Meet URL: {session.get('meetURL')}")
             
