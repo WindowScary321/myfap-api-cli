@@ -200,9 +200,11 @@ jobs:
           sparse-checkout: /scripts/
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
+          version: "0.13.0"
           python-version: ${{ matrix.python-version }}
+          enable-cache: false
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.ci.outputs.artifact_name }}
@@ -213,5 +215,6 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
           MANIFEST_SHA256: ${{ needs.ci.outputs.manifest_sha256 }}
         run: >-
+          uv run --no-project --python "${{ matrix.python-version }}"
           python -I scripts/smoke_index.py --expected-version "$VERSION"
-          --artifact-dir dist --manifest-sha256 "$MANIFEST_SHA256" --test-pypi --attempts 6 --delay 10
+          --artifact-dir dist --manifest-sha256 "$MANIFEST_SHA256" --test-pypi --attempts 6 --delay 20
