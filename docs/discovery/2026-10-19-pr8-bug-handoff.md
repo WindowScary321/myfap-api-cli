@@ -21,8 +21,8 @@ Kiểm tra đối chứng: refresh timeout trên v1/v2 không đổi file sessio
 
 Đã chạy 25 tiến trình CLI độc lập và toàn bộ suite tại commit mới: **313 test, 309 đạt, 4 skip**. GitHub CI của commit này đạt 11/11 job: <https://github.com/WindowScary321/myfap-api-cli/actions/runs/39211433376>. Chưa thấy regression mới có đủ bằng chứng trong phần code sửa.
 
-- [Lệnh, exit code, trạng thái session và kết quả ICS sau sửa](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-recheck-_8hm6jvn/results.json).
-- [ICS 250 sự kiện sau sửa](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-recheck-_8hm6jvn/schedule-250.ics).
+- [Lệnh, exit code, trạng thái session và kết quả ICS sau sửa](../../../work/pr8-cli-recheck-_8hm6jvn/results.json).
+- [ICS 250 sự kiện sau sửa](../../../work/pr8-cli-recheck-_8hm6jvn/schedule-250.ics).
 
 Các ca CLI độc lập vẫn chỉ dùng session/HTTP tổng hợp và sentinel chặn browser như mô tả ở dưới. Lượt này không gọi server thật hoặc thử nhập ICS vào ứng dụng lịch. Theo báo cáo mới của agent chính trong `docs/discovery/phase4-coverage.md`, ba lệnh v1 đã được chạy lại nhưng news/notification vẫn trả body 201 và fee vẫn HTTP 404; positive fee/survey còn mở. Đây là các giới hạn riêng, không bị đóng theo kết quả sửa bốn finding.
 
@@ -60,9 +60,9 @@ Hạ tầng có thể tái sử dụng: `.github/workflows/ci.yml` đã có `wor
 
 Riêng `MyFapAuth._authorize` được thay bằng một hàm báo `REVIEW_BROWSER_REQUESTED` để xác nhận chương trình đã đi tới bước yêu cầu mở browser. Exit 1 có sentinel này là điểm dừng chủ động của phép thử, **không phải một lỗi đăng nhập mới**.
 
-- [Toàn bộ lệnh, exit code và HTTP trace đã lọc](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-verification-efcl8s7o/results.json).
-- [File ICS do CLI xuất từ fixture tổng hợp](C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-verification-efcl8s7o/schedule.ics).
-- Thư mục chứa stdout/stderr riêng cho từng ca: `C:/Users/tubeo/Downloads/com.fuct-2.0.6-build31-analysis/work/pr8-cli-verification-efcl8s7o/`.
+- [Toàn bộ lệnh, exit code và HTTP trace đã lọc](../../../work/pr8-cli-verification-efcl8s7o/results.json).
+- [File ICS do CLI xuất từ fixture tổng hợp](../../../work/pr8-cli-verification-efcl8s7o/schedule.ics).
+- Thư mục chứa stdout/stderr riêng cho từng ca: `../../../work/pr8-cli-verification-efcl8s7o/`.
 
 Các lệnh có `--config` trong phần dưới được chạy với đường dẫn session tạm riêng. Để tái hiện lỗi cần server phản hồi, phải dựng đúng HTTP fixture đã mô tả; chỉ chạy lệnh bằng tài khoản thật không bảo đảm gặp điều kiện đó.
 

@@ -136,8 +136,3 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 - [Typer](https://typer.tiangolo.com/) & [Rich](https://rich.readthedocs.io/): nền tảng giao diện cli của repo này
 - [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/): bóc tách và xử lý dữ liệu html
 - [ics.py](https://icspy.readthedocs.io/): tạo và chuẩn hóa định dạng iCalendar giúp dễ dàng import vào các ứng dụng lịch
-
-## Các model đã sử dụng
-- [Gemini 3 Pro Preview](https://openrouter.ai/google/gemini-3-pro-preview): Hoàn thành phiên bản myFAP đầu tiên (trước v0.2.0), tích hợp API v1
-- [GPT-6.1 Sol](https://openrouter.ai/openai/gpt-6.1-sol): Agent chính lên kế hoạch cho việc tích hợp API v2, viết testcase dành cho unittesting và viết script CI/CD 
-- [Gemini 3.8 Flash](https://openrouter.ai/google/gemini-3.8-flash), [DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash), [GLM 5.3 Flash](https://openrouter.ai/z-ai/glm-5.3-flash): Các subagent thực hiện code và test
