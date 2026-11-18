@@ -149,3 +149,7 @@ Nếu khai báo cùng option ở nhiều cấp, giá trị ở lệnh con đư�
 - [Typer](https://typer.tiangolo.com/) & [Rich](https://rich.readthedocs.io/): nền tảng giao diện CLI của repo này
 - [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/): bóc tách và xử lý dữ liệu HTML
 - [ics.py](https://icspy.readthedocs.io/): tạo và chuẩn hóa định dạng iCalendar giúp dễ dàng import vào các ứng dụng lịch
+
+## Giấy phép
+
+Dự án này được phát hành theo giấy phép MIT. Xem chi tiết tại file [LICENSE](./LICENSE).

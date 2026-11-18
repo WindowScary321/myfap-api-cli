@@ -151,3 +151,7 @@ If the same option is passed at multiple command levels, the subcommand value ta
 - [Typer](https://typer.tiangolo.com/) & [Rich](https://rich.readthedocs.io/): CLI framework and terminal UI
 - [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/): HTML parsing and extraction
 - [ics.py](https://icspy.readthedocs.io/): generating and normalizing iCalendar files for calendar imports
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
