@@ -1,3 +1,7 @@
+include LICENSE
+include README.md
+exclude README.vi.md
 prune docs
 prune tasks
 prune tests
+global-exclude *.py[cod] __pycache__
