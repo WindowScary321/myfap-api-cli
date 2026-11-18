@@ -23,9 +23,8 @@ class Phase4TransportTests(unittest.TestCase):
             ("GetSubjets", {}, {"CampusCode": "TEST"}),
             ("GetWeekByDate", {"date": "2026-10-17"}, {"date": "2026-10-17"}),
             *((name, self.query, {"CampusCode": "TEST", **self.query}) for name in (
-                "GeFeeByRoll", "GetStudentById", "GetCampusInfo")),
-            *((name, self.query, {"CampusCode": "TEST", **self.query, "Authen": "fake-key"}) for name in (
-                "CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll")),
+                "GeFeeByRoll", "GetStudentById", "GetCampusInfo", "CheckOpenFeedBack",
+                "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll", "GetSemesterMark")),
             *((name, self.term_query, {"CampusCode": "TEST", **self.term_query}) for name in (
                 "GetActivityStudent", "GetStudentMark", "GetScheduleExam", "GetStudentAttendances")),
             ("GetMarkByCourse", {**self.query, "CourseId": 42}, {"CampusCode": "TEST", **self.query, "CourseId": 42}),
@@ -52,15 +51,17 @@ class Phase4TransportTests(unittest.TestCase):
                 self.assertNotIn("json", call.kwargs)
                 signer.assert_called_once_with("fake-key")
 
-    def test_query_authen_is_rebuilt_from_each_current_credential(self):
-        for operation in ("CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll"):
+    def test_build32_query_stays_credential_free_when_headers_change(self):
+        for operation in ("CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll", "GetSemesterMark"):
             with self.subTest(operation=operation):
                 self.send(operation, self.query, credential="fake-old")
                 self.send(operation, self.query, credential="fake-new")
                 first, second = self.session.request.call_args_list[-2:]
-                self.assertEqual(first.kwargs["params"]["Authen"], "fake-old")
-                self.assertEqual(second.kwargs["params"]["Authen"], "fake-new")
+                self.assertEqual(first.kwargs["params"], {"CampusCode": "TEST", **self.query})
+                self.assertEqual(second.kwargs["params"], first.kwargs["params"])
+                self.assertEqual(first.kwargs["headers"]["Authorization"], "Bearer fake-old")
                 self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer fake-new")
+                self.assertNotEqual(first.kwargs["headers"]["Checksum"], second.kwargs["headers"]["Checksum"])
                 self.assertNotIn("Authen", self.query)
 
     def test_prepared_get_and_post_requests_use_app_headers(self):

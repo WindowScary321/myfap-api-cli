@@ -93,6 +93,33 @@ class V2TransportTests(unittest.TestCase):
                 self.assertEqual(prepared.headers["Checksum"], "fake%3d:123")
                 self.assertFalse(call.kwargs["allow_redirects"])
 
+    def test_build32_reads_keep_credentials_out_of_prepared_urls(self):
+        operations = ("CheckUpdateProfile", "GetSemesterMark", "GetApplication", "CheckOpenFeedBack", "GetNotificationByRoll")
+        with requests.Session() as session, patch.object(session, "send", return_value=Mock()) as send, \
+             patch.object(v2, "create_checksum", return_value="fake%3d:123") as signer:
+            for operation in operations:
+                with self.subTest(operation=operation):
+                    query = {"rollNumber": "FAKE+ROLL"}
+                    v2.request(session, operation, credential="FAKE_PRIVATE_KEY", campus="TEST", params=query)
+                    prepared = send.call_args.args[0]
+                    self.assertEqual(parse_qs(urlsplit(prepared.url).query), {"CampusCode": ["TEST"], "rollNumber": ["FAKE+ROLL"]})
+                    self.assertNotIn("FAKE_PRIVATE_KEY", prepared.url)
+                    self.assertEqual(prepared.headers["Authorization"], "Bearer FAKE_PRIVATE_KEY")
+                    self.assertEqual(prepared.headers["Checksum"], "fake%3d:123")
+                    self.assertIsNone(prepared.body)
+                    self.assertNotIn("Content-Type", prepared.headers)
+                    self.assertEqual(query, {"rollNumber": "FAKE+ROLL"})
+            self.assertEqual(signer.call_count, len(operations))
+            signer.assert_called_with("FAKE_PRIVATE_KEY")
+
+    def test_build32_reads_reject_explicit_authen_before_http(self):
+        for operation in ("CheckUpdateProfile", "GetSemesterMark", "GetApplication", "CheckOpenFeedBack", "GetNotificationByRoll"):
+            with self.subTest(operation=operation), self.assertRaises(ApiError) as caught:
+                v2.request(self.session, operation, credential="fake", campus="TEST",
+                           params={"rollNumber": "FAKE", "Authen": "PRIVATE_VALUE"})
+            self.assertNotIn("PRIVATE_VALUE", str(caught.exception))
+        self.session.request.assert_not_called()
+
     def test_response_is_returned_without_classification_or_retry(self):
         self.response.status_code = 401
         self.assertIs(v2.request(self.session, "GetSemester", credential="fake", campus="TEST"), self.response)

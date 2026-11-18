@@ -81,8 +81,10 @@ class SemesterSummaryCommandTests(unittest.TestCase):
                 self.assertEqual(json.loads(result.stdout), {"code": 200, "data": [{"synthetic": True}]})
                 request.assert_called_once()
                 self.assertTrue(request.call_args.args[1].endswith("/GetSemesterMark"))
-                self.assertEqual(request.call_args.kwargs["params"], {
-                    "CampusCode": "TEST", "rollNumber": "TEST000", "Authen": "FAKE_KEY"})
+                query = {"CampusCode": "TEST", "rollNumber": "TEST000"}
+                if version == "v1":
+                    query["Authen"] = "FAKE_KEY"
+                self.assertEqual(request.call_args.kwargs["params"], query)
                 if version == "v2":
                     self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "Bearer FAKE_KEY")
 
@@ -97,7 +99,7 @@ class SemesterSummaryCommandTests(unittest.TestCase):
             self.assertIn("--summary", Text.from_ansi(result.stderr).plain)
             auth.assert_not_called()
 
-    def test_summary_rebuilds_authen_after_single_refresh(self):
+    def test_summary_refreshes_once_with_version_specific_credentials(self):
         from pathlib import Path
         from tempfile import TemporaryDirectory
         from unittest.mock import patch
@@ -118,7 +120,16 @@ class SemesterSummaryCommandTests(unittest.TestCase):
                 self.assertEqual(result.exit_code, 0, result.output)
                 self.assertEqual(request.call_count, 2)
                 rotation.assert_called_once()
-                self.assertEqual(request.call_args.kwargs["params"]["Authen"], "FAKE_NEW")
+                first, second = request.call_args_list
+                if version == "v1":
+                    self.assertEqual(first.kwargs["params"]["Authen"], "FAKE_OLD")
+                    self.assertEqual(second.kwargs["params"]["Authen"], "FAKE_NEW")
+                else:
+                    self.assertEqual(first.kwargs["params"], {"CampusCode": "TEST", "rollNumber": "TEST000"})
+                    self.assertEqual(second.kwargs["params"], first.kwargs["params"])
+                    self.assertEqual(first.kwargs["headers"]["Authorization"], "Bearer FAKE_OLD")
+                    self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer FAKE_NEW")
+                    self.assertNotEqual(first.kwargs["headers"]["Checksum"], second.kwargs["headers"]["Checksum"])
                 self.assertNotIn("checksum", request.call_args.kwargs["params"])
 
 
