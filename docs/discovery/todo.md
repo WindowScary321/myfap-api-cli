@@ -9,7 +9,7 @@ Kết quả GitHub Actions và bình luận kiểm tra được theo dõi trực
 
 ## Kiểm chứng live còn mở trước khi phát hành
 
-- [x] **CLI theo build 32:** ngày 18/11/2026 đã nghiệm thu năm GET sau sửa query bằng session FEID tạm mới trên v2/HN: cả năm command exit 0, HTTP/body 200, stdout JSON hợp lệ, không query Authen; gồm đúng `marks --summary` (`GetSemesterMark`). Session tạm đã dọn. Bằng chứng app và CLI được tách tại [báo cáo build 32](build32-verification.md); chưa mở rộng kết luận sang campus khác hoặc live expiry.
+- [x] **CLI theo build 32:** ngày 18/11/2026 đã nghiệm thu năm GET sau sửa query trên v2/HN bằng phiên FEID mới và session tạm. Cả năm command exit 0, HTTP/body 200, stdout là JSON hợp lệ, query không có Authen; lượt chạy bao gồm `marks --summary` (`GetSemesterMark`). Session tạm đã được dọn. [Báo cáo build 32](build32-verification.md) ghi riêng bằng chứng từ app và CLI; kết quả chưa được xác nhận trên campus khác hoặc tình huống hết phiên thật.
 
 - [x] Chạy lại `news`, `other notification` và `other fee` trên v1/APHL bằng session tạm ngày 19/10/2026. News/notification nhận HTTP 200/body 201; fee nhận HTTP 404. Lệnh đối chứng `info student` đạt 200/200 trước và sau; session/lock tạm đã xóa. Xem [báo cáo live v1](phase4-coverage.md#chạy-lại-ba-lệnh-v1-ngày-19102026).
 - [ ] Xác minh ý nghĩa body 201 của `news` v1 và đối chiếu trường hợp có dữ liệu. Lượt live mới vẫn có `data: null`, message null hoặc không có. Không gộp mọi code 201 vào hết phiên hoặc coi đó là danh sách rỗng hợp lệ.

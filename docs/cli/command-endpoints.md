@@ -4,7 +4,7 @@ Tài liệu này hợp nhất mapping command → operation → method/URL → c
 
 ## Bổ sung Phase 6 đang review
 
-**Cập nhật build 32 (18/11/2026):** `other profile`, `marks --summary`, `applications`, `other feedback`, `other notification` dùng query v2 `CampusCode`, `rollNumber`, không có `Authen`; v1 giữ nguyên. `marks --summary` gọi `GetSemesterMark`, khác `marks` (`GetStudentMark`) và điểm chi tiết (`GetMarkByCourse`). CLI v2/HN đã nghiệm thu đủ năm command với HTTP/body 200; bằng chứng tĩnh, Fiddler app và CLI được tách tại [báo cáo build 32](../discovery/build32-verification.md).
+**Cập nhật build 32 (18/11/2026):** năm lệnh `other profile`, `marks --summary`, `applications`, `other feedback`, `other notification` chỉ gửi `CampusCode`, `rollNumber` trong query v2, bỏ `Authen`. V1 giữ nguyên. `marks --summary` gọi `GetSemesterMark`; hai luồng xem điểm còn lại dùng `marks` (`GetStudentMark`) và điểm chi tiết (`GetMarkByCourse`). Cả năm command đã được nghiệm thu trên CLI v2/HN với HTTP/body 200. [Báo cáo build 32](../discovery/build32-verification.md) ghi riêng bằng chứng tĩnh, traffic app qua Fiddler và kết quả chạy CLI.
 
 Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](../discovery/phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](../discovery/endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
 

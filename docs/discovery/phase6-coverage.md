@@ -4,7 +4,7 @@ Nhóm đọc ban đầu tại `c829b7004ea2dbb7f99cf1dc3827070039bb9ea5`, bổ s
 
 ## Command và contract đã nối qua CLI
 
-Query hiện tại đã đồng bộ [build 32](build32-verification.md); ngày 18/11 CLI v2/HN đã đọc đủ năm GET thay đổi với HTTP/body 200, gồm đúng `GetSemesterMark`. Kết quả ngày 24/10 bên dưới giữ nguyên dưới mốc build 31.
+Query hiện đã đồng bộ [build 32](build32-verification.md). Ngày 18/11, CLI v2/HN đã gọi đủ năm GET thay đổi, bao gồm `GetSemesterMark`, và đều nhận HTTP/body 200. Kết quả ngày 24/10 bên dưới vẫn thuộc build 31.
 
 URL dữ liệu v1 là `https://api.fpt.edu.vn/fap/api/MyFAP/<operation>`; v2 là `https://fap-proxy.fpt.edu.vn/MyFAP/<operation>`. Tất cả operation dữ liệu trong bảng dùng GET. Không ghi query có giá trị, token, checksum hoặc thông tin tài khoản vào tài liệu.
 
@@ -14,7 +14,7 @@ URL dữ liệu v1 là `https://api.fpt.edu.vn/fap/api/MyFAP/<operation>`; v2 l�
 | `courses --semester` | `GetCourseOfSemester` | Có / Có | Query `semester` chữ thường; thiếu option dùng resolver `startDate` | Fixture explicit/latest; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
 | `other subjects --semester` | `GetSubjectBySemester` | Có / Có | Query `Semester` chữ hoa; signer v1 là semester; không có option vẫn `GetSubjets`, không lookup kỳ | Fixture hai version; live v2/HN 200/200, v1: xem kết quả APHL bên dưới |
 | `news --search --type` | `SearchNews` | Có / Có | `type`, `keysearch`; signer v1 là type; search rỗng bị chặn | Fixture Unicode/reserved characters; live v2/HN 200/200 |
-| `transcript`, `transcript --pretty` | `AcademicTranscript` | Có / Có | Không lookup kỳ; `--pretty` phân tích HTML thành JSON keyed theo header từng bảng (chuẩn hoá `&nbsp;`), mặc định giữ chuỗi gốc | Fixture parser/CLI; live v2/HN 200/200 — `--pretty` cho 2 bảng 49+2 dòng, header khớp dữ liệu thật |
+| `transcript`, `transcript --pretty` | `AcademicTranscript` | Có / Có | Không lookup kỳ; `--pretty` phân tích HTML thành JSON keyed theo header từng bảng (chuẩn hóa `&nbsp;`), mặc định giữ chuỗi gốc | Fixture parser/CLI; live v2/HN 200/200 — `--pretty` cho 2 bảng 49+2 dòng, header khớp dữ liệu thật |
 | `other training --semester` | `GetDiemphongtrao` | Có / Có | Query `semester`; thiếu option dùng resolver | Fixture; live v2/HN 200/200 với bound key, list rỗng |
 | `marks --summary` | `GetSemesterMark` | Có / Có | Không có query kỳ; v1 giữ `CampusCode`, `rollNumber`, `Authen`, **không checksum**; v2 build 32 chỉ `CampusCode`, `rollNumber`, credential qua header | Fixture parser/refresh; CLI v2/HN live 200/200 cả lịch sử build 31 và nghiệm thu build 32 ngày 18/11 |
 | `info photo` | `RetriveImage` | Có / Có | Chỉ JSON, bảo toàn chuỗi opaque kể cả HTML entity; không tải URL hoặc decode ảnh | Live v2/HN 200/200, data string; định dạng ảnh chưa xác minh |
@@ -31,7 +31,7 @@ Cột v1/v2 là capability trong code, không bảo đảm backend mọi campus 
 
 ## Policy và phần chưa xác minh
 
-Mô tả caller `module_599.js` và thí nghiệm credential dưới đây thuộc build 31. Build 32 đã bỏ query `Authen` của summary; policy Bearer/Checksum của CLI giữ nguyên, xem [báo cáo cập nhật](build32-verification.md).
+Phần mô tả caller `module_599.js` và thí nghiệm credential dưới đây ghi nhận hành vi ở build 31. Sang build 32, summary bỏ query `Authen`; CLI vẫn giữ chính sách Bearer/Checksum. Xem [báo cáo cập nhật](build32-verification.md).
 
 - Các read mới kế thừa binding và tối đa một refresh/retry khi server báo expiry rõ. Không tự refresh/logout từ 201 không rõ nghĩa, 403, timeout, 5xx hoặc App Check. Capability đọc không mở đường ghi.
 - Với transcript/training/summary, caller của APK (module_599.js) gọi wrapper GET **không truyền credential header**: wrapper (dòng 898–906) mặc định credential chuỗi rỗng khi thiếu tham số thứ tư, `_buildHeaders` (747–781) khi đó tạo header không `Authorization` và `_makeChecksum` (726–746) ký bằng bootstrap token. Chỉ `GetSemesterMark` (218–224) đặt FAP key trong query `Authen`; `AcademicTranscript` (266–272) và `GetDiemphongtrao` (280–286) chỉ có query campus/roll/semester. CLI giữ **policy authenticated read dùng FAP key của binding hiện tại** cho cả ba — không sao chép credential rỗng của app, không thử unauth rồi fallback, không nới reader chung. Thí nghiệm transport có kiểm soát (bảng cuối file) cho thấy proxy hiện tại **từ chối** mọi biến thể lệch khỏi policy này; vậy nhánh credential rỗng trong bytecode không được server chấp nhận — hoặc app thật bơm token ở tầng khác (Axios wrapper `module_1(Axios2)` chưa phục dựng) hoặc proxy đã đổi hành vi so với APK build 31. CLI không thay đổi.

@@ -2,7 +2,7 @@
 
 Tài liệu này ghi lại adapter v2 và phạm vi các route còn lại. CLI mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md) và quy tắc tương thích session cũ. Module transport không tự dò phiên bản, refresh session hoặc diễn giải JSON response.
 
-Hợp đồng GET hiện theo APK **2.0.7/build 32**; xem [bằng chứng và giới hạn nghiệm thu](../discovery/build32-verification.md). Các nguồn `module_599.js` bên dưới thuộc build 31; phần query thay đổi được cập nhật rõ trong ma trận.
+Hợp đồng GET đã được cập nhật theo APK **2.0.7/build 32**; xem [bằng chứng và giới hạn nghiệm thu](../discovery/build32-verification.md). Nguồn `module_599.js` bên dưới thuộc build 31. Ma trận route ghi rõ những query đã đổi.
 
 ## Transport và operation đã hỗ trợ
 
@@ -82,7 +82,9 @@ Các route trên cùng dùng base URL `https://fap-proxy.fpt.edu.vn/MyFAP/`. Hea
 
 Sau nhóm đọc Phase 6 và đợt mở rộng endpoint 24/10/2026, ma trận có 31 operation được hỗ trợ trong code: 27 operation đọc, 3 bootstrap và 1 handshake. `doctor --api-version v2 --online` gọi `GetApiActive` rồi `GetVersion` bằng bootstrap, không xác nhận session hoặc campus tài khoản. Capability mới chưa đồng nghĩa đã nghiệm thu live; xem [coverage Phase 6](../discovery/phase6-coverage.md). Xem thêm [bảng hợp nhất command/method/URL v1 và v2](command-endpoints.md) để phân biệt capability trong adapter, command thực sự tồn tại và kết quả live.
 
-Ở build 31, bảy route giữ `Authen` trong query là `CheckUpdateProfile`, `GetSemesterMark`, `GetApplication`, `CheckOpenFeedBack`, `AddRate`, `GetNotificationByRoll` và `GetNotificationByDonor` (`module_599.js:136,223,429,443,467,491,532`). Build 32 (`module_604.js`, fn#7514/7538/7594/7598/7614/7622) bỏ trường này ở cả sáu GET, còn POST `AddRate` giữ nguyên. CLI áp dụng query mới cho năm GET đã hỗ trợ và tiếp tục ký/Bearer bằng FAP key của binding hiện tại; `AddRate`/donor vẫn unsupported. Route điểm danh chi tiết tiếp tục dùng alias v2 `GetCourseAttendance`; không thay contract v1.
+Ở build 31, bảy route có query `Authen` là `CheckUpdateProfile`, `GetSemesterMark`, `GetApplication`, `CheckOpenFeedBack`, `AddRate`, `GetNotificationByRoll` và `GetNotificationByDonor` (`module_599.js:136,223,429,443,467,491,532`). Build 32 (`module_604.js`, fn#7514/7538/7594/7598/7614/7622) bỏ trường này ở cả sáu GET; POST `AddRate` giữ nguyên.
+
+CLI áp dụng query mới cho năm GET đã hỗ trợ. FAP key của binding hiện tại vẫn dùng cho Bearer và Checksum; CLI chưa hỗ trợ `AddRate` hoặc donor. Route điểm danh chi tiết tiếp tục dùng alias v2 `GetCourseAttendance`; contract v1 giữ nguyên.
 
 ## Giới hạn hiện tại
 
