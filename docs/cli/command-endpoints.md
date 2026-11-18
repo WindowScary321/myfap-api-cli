@@ -1,15 +1,15 @@
 # Command, endpoint và URL của CLI hiện tại
 
-Tài liệu này hợp nhất mapping command → operation → method/URL → capability → bằng chứng. Mapping đối chiếu code tại commit `bc8a7ee3131093432de427e1954743ee34618f45`; bảng không bổ sung endpoint hoặc command mới. V1 vẫn mặc định, v2 opt-in qua `--api-version v2` hoặc binding session.
+Tài liệu này hợp nhất mapping command → operation → method/URL → capability → bằng chứng. Mapping ban đầu đối chiếu code tại commit `bc8a7ee3131093432de427e1954743ee34618f45`; các cập nhật Phase 6 được ghi bên dưới. CLI hiện mặc định v2 khi chưa có session; xem [thứ tự chọn version](api-versions.md).
 
 ## Bổ sung Phase 6 đang review
 
-Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
+Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](../discovery/phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](../discovery/endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
 
 ## Phạm vi theo kế hoạch
 
-- **Phase 4:** phủ command đọc hiện có, lập coverage và kiểm chứng live. Xem [coverage Phase 4](phase4-coverage.md).
-- **Phase 5:** chuẩn bị và nghiệm thu pipeline phát hành. Có code và CI xanh chưa đồng nghĩa đã publish `0.2.0`; xem [checklist Phase 5](../tasks/phase5.md).
+- **Phase 4:** phủ command đọc hiện có, lập coverage và kiểm chứng live. Xem [coverage Phase 4](../discovery/phase4-coverage.md).
+- **Phase 5:** chuẩn bị và nghiệm thu pipeline phát hành. Có code và CI xanh chưa đồng nghĩa đã publish `0.2.0`; xem [checklist Phase 5](../discovery/phase5.md).
 - **Phase 6:** thêm các chức năng/API mới, nghiệm thu trước khi tạo tag/publish theo quyết định ngày 23/10/2026. Không tự mở route chỉ vì có tên trong APK; cần contract, capability, fixture và kiểm chứng riêng.
 
 Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md` của workspace phân tích. Hai file kế hoạch nằm ngoài repository CLI; không cần đóng gói chúng vào artifact.
@@ -71,7 +71,7 @@ Chạy trên commit `bc8a7ee3131093432de427e1954743ee34618f45`, **v2/HN**, brows
 - Refresh FEID và handshake thành công; `info student` sau refresh vẫn HTTP/body 200. Không chạy thao tác ghi nghiệp vụ, không gây lỗi session có chủ ý.
 - Session/lock và thư mục tạm đã dọn. Chỉ metadata allowlist được giữ; không lưu raw response, nội dung học vụ, thông tin tài khoản, credential, query có giá trị hoặc ảnh màn hình vào repository/GitHub.
 
-Không chạy lại v1 trong lượt này. Kết quả v2 không đóng ba finding v1 trong [TODO](../tasks/todo.md).
+Không chạy lại v1 trong lượt này. Kết quả v2 không đóng ba finding v1 trong [TODO](../discovery/todo.md).
 
 ## Các endpoint còn lại không thuộc triển khai Phase 5
 
@@ -91,8 +91,8 @@ Inventory và method từng route proxy nằm trong [ma trận v2](v2-contracts.
 
 ## Nguồn kiểm tra
 
-- [Command và resolver](../myfap/cli.py).
-- [Wrapper nghiệp vụ v1/v2 và survey](../myfap/api.py).
-- [Allowlist, alias, method và query v2](../myfap/v2.py).
-- [Auth/handshake](../myfap/auth.py), [discovery/OIDC](../myfap/oidc.py).
-- Regression: [v1 API](../tests/test_api.py), [v2 API](../tests/test_api_v2.py), [transport Phase 4](../tests/test_phase4_transport.py), [CLI capability](../tests/test_cli_v2_capabilities.py).
+- [Command và resolver](../../myfap/cli.py).
+- [Wrapper nghiệp vụ v1/v2 và survey](../../myfap/api.py).
+- [Allowlist, alias, method và query v2](../../myfap/v2.py).
+- [Auth/handshake](../../myfap/auth.py), [discovery/OIDC](../../myfap/oidc.py).
+- Regression: [v1 API](../../tests/test_api.py), [v2 API](../../tests/test_api_v2.py), [transport Phase 4](../../tests/test_phase4_transport.py), [CLI capability](../../tests/test_cli_v2_capabilities.py).

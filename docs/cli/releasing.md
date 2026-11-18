@@ -2,11 +2,11 @@
 
 Tài liệu này là runbook Phase 5 cho distribution `myfap`. Pipeline được chuẩn bị trong mã nguồn không đồng nghĩa đã được nghiệm thu trên GitHub Actions hoặc đã publish. Chỉ maintainer tạo/push tag sau khi PR chuẩn bị release đã merge và phạm vi hỗ trợ đã được duyệt. Không tự phát hành theo push `main`.
 
-Xem [release notes](../CHANGELOG.md), [checklist Phase 5](../tasks/phase5.md) và [coverage API](phase4-coverage.md).
+Xem [release notes](../../CHANGELOG.md), [checklist Phase 5](../discovery/phase5.md) và [coverage API](../discovery/phase4-coverage.md).
 
 ## 1. Quyết định phạm vi trước release
 
-`0.2.0` giữ v1 mặc định, v2 opt-in và không fallback im lặng. Trước tag, maintainer phải xác nhận:
+`0.2.0` mặc định v2 khi chưa có session; option `--api-version`, `MYFAP_API_VER` và binding session có thứ tự ưu tiên như [hướng dẫn chọn version](api-versions.md). CLI không fallback im lặng. Trước tag, maintainer phải xác nhận:
 
 - Chấp nhận phạm vi và known issues trong mục `0.2.0` của `CHANGELOG.md`.
 - Ba finding v1 vẫn được ghi đúng: news/notification HTTP 200/body 201, fee HTTP 404 trên APHL; nguyên nhân chưa biết. Không gọi chúng là đã sửa, empty hợp lệ hoặc unsupported trên mọi campus.
@@ -140,7 +140,7 @@ TestPyPI upload cũng là hành động ra dịch vụ ngoài; chỉ chạy sau 
 
 ## 7. Ghi nhận nghiệm thu
 
-Ghi kết quả tại [tasks/phase5.md](../tasks/phase5.md): commit, lệnh, exit code, matrix đã chạy và phần bị skip/chưa kiểm chứng. Phân biệt rõ:
+Ghi kết quả tại [docs/discovery/phase5.md](../discovery/phase5.md): commit, lệnh, exit code, matrix đã chạy và phần bị skip/chưa kiểm chứng. Phân biệt rõ:
 
 - **Offline:** fixture tổng hợp và kiểm cấu hình; không gọi FEID/FAP.
 - **Local live:** CLI thật với session tạm được phép, payload chỉ xử lý cục bộ; chỉ metadata đã lọc được ghi vào báo cáo.

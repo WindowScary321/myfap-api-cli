@@ -233,6 +233,18 @@ class ScheduleParserTests(unittest.TestCase):
         self.assertEqual(event.end.datetime, datetime(2026, 10, 15, 17, 50, tzinfo=timezone.utc))
         self.assertEqual((event.end.datetime - event.begin.datetime).total_seconds(), 80 * 60)
 
+    def test_null_optional_fields_do_not_render_literal_none(self):
+        data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
+        data["data"][0].update({"roomNo": None, "groupName": None, "sessionNo": None, "lecturer": None, "meetURL": None})
+
+        content = convert_schedule_to_ics(data)
+        event = next(iter(Calendar(content).events))
+
+        self.assertIsNone(event.location)
+        self.assertNotIn("LOCATION:", content)
+        self.assertNotIn("None", event.description)
+        self.assertIn("Lecturer: N/A", event.description)
+
     def test_slot_without_separator_raises_clear_message(self):
         data = json.loads((FIXTURES / "schedule_valid.json").read_text(encoding="utf-8"))
         data["data"][0]["slotTime"] = "7:30"
@@ -343,6 +355,29 @@ class SaveOutputSanitizationTests(unittest.TestCase):
             self.assertEqual(files, ["BangDiem_x_.._.._evil.json"])
             content = json.loads((Path(temporary) / files[0]).read_text(encoding="utf-8"))
         self.assertEqual(content, {"code": 200, "data": []})
+
+    def test_windows_forbidden_filename_characters_are_sanitized(self):
+        with TemporaryDirectory() as temporary, redirect_stderr(io.StringIO()):
+            save_output({"code": 200, "data": []}, "BangDiem_Fall:2026*?.json", temporary, False)
+            files = sorted(path.name for path in Path(temporary).iterdir())
+            self.assertEqual(files, ["BangDiem_Fall_2026__.json"])
+
+    def test_marks_pretty_parses_uppercase_table_tag(self):
+        from unittest.mock import Mock, patch
+        from typer.testing import CliRunner
+        from myfap.cli import app
+
+        with TemporaryDirectory() as temporary:
+            cfg = Path(temporary) / "session.json"
+            cfg.write_text(json.dumps({
+                "campus": "HN", "api_version": "v2", "account_type": "student",
+                "authen_key": "FAKE_V2_KEY", "mssv": "TEST000", "email": "sample@example.invalid",
+            }), encoding="utf-8")
+            html_upper = "<TABLE><tr><th>Item</th><th>Weight</th><th>Value</th></tr><tr><td>Q1</td><td>10%</td><td>9</td></tr></TABLE>"
+            with patch("requests.Session.request", return_value=Mock(status_code=200, json=Mock(return_value={"code": 200, "data": html_upper}))):
+                result = CliRunner().invoke(app, ["--config", str(cfg), "marks", "-cid", "123", "-p", "--stdout"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(json.loads(result.stdout)["data"], [{"category": "", "item": "Q1", "weight": "10%", "value": "9"}])
 
     def test_empty_schedule_returns_valid_empty_calendar(self):
         data = json.loads((FIXTURES / "schedule_empty.json").read_text(encoding="utf-8"))

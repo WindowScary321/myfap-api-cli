@@ -104,8 +104,12 @@ class CommandRequestTests(unittest.TestCase):
                     with patch.object(self.auth, "_oidc"):
                         result = self.runner.invoke(app, ["login"])
                 self.assertEqual(result.exit_code, 1, result.output)
-                browser.assert_called_once()
-                self.assertIn("Đã hủy đăng nhập", result.stderr)
+                if stored.get("api_version") == "v3":
+                    browser.assert_not_called()
+                    self.assertIn("API version không hợp lệ", result.stderr)
+                else:
+                    browser.assert_called_once()
+                    self.assertIn("Đã hủy đăng nhập", result.stderr)
                 self.assertEqual(self.path.read_bytes(), before)
                 self.auth.session.get.assert_not_called()
 

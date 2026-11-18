@@ -26,11 +26,26 @@ def _override_common_option(ctx, param, value):
     return value
 
 
+def _check_non_empty_option(value: Optional[str], hint: str, message: str):
+    if value is not None and (not isinstance(value, str) or not value.strip() or any(ord(c) < 32 or ord(c) == 127 for c in value)):
+        raise typer.BadParameter(message, param_hint=hint)
+
+
 def _validate_common_options(callback):
     @wraps(callback)
     def invoke(*args, **kwargs):
+        state["api_version_source"] = "explicit" if state["api_version"] is not None else "default"
+        if state["api_version"] is None:
+            state["api_version"] = os.getenv("MYFAP_API_VER")
+            if state["api_version"] is not None:
+                state["api_version_source"] = "environment"
         if state["api_version"] not in (None, "v1", "v2"):
-            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version")
+            raise typer.BadParameter("Chỉ hỗ trợ v1 hoặc v2.", param_hint="--api-version / MYFAP_API_VER")
+        effective_campus = kwargs.get("campus") if kwargs.get("campus") is not None else state["campus"]
+        _check_non_empty_option(effective_campus, "--campus", "Mã cơ sở không hợp lệ.")
+        _check_non_empty_option(state["config"], "--config", "Đường dẫn file session không hợp lệ.")
+        if "output" in kwargs:
+            _check_non_empty_option(kwargs.get("output"), "--output", "Thư mục xuất không được rỗng.")
         try:
             state["timeout"] = resolve_timeout(state["timeout"])
         except ValueError as error:
@@ -104,7 +119,7 @@ console = Console()
 err_console = Console(stderr=True)
 
 def get_auth(campus=None):
-    c = campus if campus else state["campus"]
+    c = campus if campus is not None else state["campus"]
     return MyFapAuth(campus=c, session_file=state.get("config"), timeout=state.get("timeout"), api_version=state.get("api_version"))
 
 def require_auth(operation=None):
@@ -124,7 +139,14 @@ def require_auth(operation=None):
     return auth
 
 def require_operation(auth, operation):
-    if auth.resolve_api_version() != "v2":
+    version = auth.resolve_api_version()
+    if version == "v1":
+        from .api import READ_OPERATIONS
+        if operation not in READ_OPERATIONS:
+            err_console.print(f"[red]Lỗi: {operation} chỉ có trên proxy API v2; v1 không có route tương ứng.[/red]")
+            raise typer.Exit(code=1)
+        return
+    if version != "v2":
         return
     from .v2 import OPERATION_ALIASES, SUPPORTED_OPERATIONS
     operation = OPERATION_ALIASES.get(operation, operation)
@@ -133,7 +155,7 @@ def require_operation(auth, operation):
         raise typer.Exit(code=1)
 
 def resolve_semester(auth, semester_flag):
-    if semester_flag:
+    if semester_flag is not None:
         return semester_flag
     essential = MyFapEssential(auth)
     try:
@@ -162,10 +184,14 @@ def save_output(data, default_filename: str, output_dir: Optional[str], stdout: 
             stream.flush()
         return
 
-    out_path = Path(output_dir) if output_dir else Path.cwd()
+    _check_non_empty_option(output_dir, "--output", "Thư mục xuất không được rỗng.")
+    out_path = Path(output_dir) if output_dir is not None else Path.cwd()
     out_path.mkdir(parents=True, exist_ok=True)
-    # Tên file có thể nhúng dữ liệu server (tên kỳ); thay ký tự đường dẫn để không thoát thư mục xuất.
-    safe_filename = default_filename.replace("\\", "_").replace("/", "_").replace("\x00", "_")
+    # Tên file có thể nhúng dữ liệu server (tên kỳ); thay ký tự đường dẫn/cấm trên Windows để không thoát thư mục xuất.
+    safe_filename = "".join(
+        "_" if (ord(ch) < 32 or ord(ch) == 127 or ch in '\\/:*?"<>|') else ch
+        for ch in default_filename
+    )
     file_path = out_path / safe_filename
 
     try:
@@ -192,7 +218,7 @@ def main(
     campus: Optional[str] = typer.Option(None, "--campus", "-c", help="Mã cơ sở; dùng session, APHL chỉ mặc định cho v1"),
     config: Optional[str] = typer.Option(None, "--config", help="Đường dẫn file session tùy chỉnh"),
     timeout: Optional[float] = typer.Option(None, "--timeout", help="Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT", metavar="SECONDS"),
-    api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn API v1 hoặc v2; mặc định dùng session rồi v1", metavar="[v1|v2]"),
+    api_version: Optional[str] = typer.Option(None, "--api-version", help="Chọn v1/v2; ưu tiên option, MYFAP_API_VER, session, rồi v2", metavar="[v1|v2]"),
 ):
     """Công cụ quản lý thông tin sinh viên FPT qua dòng lệnh."""
     state["campus"] = campus
@@ -220,6 +246,8 @@ def doctor(
     try:
         report = get_diagnostics(api_version=state["api_version"], campus=state["campus"],
                                  timeout=state["timeout"], online=online)
+        if state.get("api_version_source") == "environment":
+            report["api_version_source"] = "environment"
         save_output(report, "Doctor.json", output, stdout)
     except Exception as error:
         err_console.print(f"[red]Lỗi chẩn đoán: {error}[/red]")
@@ -232,7 +260,7 @@ def login(
     force: bool = typer.Option(False, "--force", "-f", help="Bắt buộc đăng nhập lại từ đầu (mở trình duyệt)")
 ):
     """Đăng nhập vào hệ thống FEID"""
-    target_campus = campus if campus else state["campus"]
+    target_campus = campus if campus is not None else state["campus"]
     auth = get_auth(target_campus)
 
     try:
@@ -329,6 +357,7 @@ def schedule(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch học"""
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     auth = require_auth("GetActivityStudent")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
@@ -376,8 +405,7 @@ def training(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Lấy điểm phong trào theo kỳ."""
-    if semester is not None and not semester.strip():
-        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     auth = require_auth("GetDiemphongtrao")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
@@ -396,8 +424,7 @@ def courses(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Lấy danh sách khóa học theo kỳ."""
-    if semester is not None and not semester.strip():
-        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     auth = require_auth("GetCourseOfSemester")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
@@ -419,6 +446,8 @@ def marks(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem bảng điểm theo kỳ, chi tiết môn hoặc tổng kết."""
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
+    _check_non_empty_option(courseid, "--courseid", "Mã môn học không được rỗng.")
     if summary:
         if semester is not None or courseid is not None or pretty:
             raise typer.BadParameter("--summary không dùng cùng --semester, --courseid hoặc --pretty.")
@@ -430,20 +459,22 @@ def marks(
             err_console.print(f"[red]Lỗi lấy tổng kết: {error}[/red]")
             raise typer.Exit(code=1)
         return
-    if pretty and not courseid:
+    if courseid is not None and semester is not None:
+        raise typer.BadParameter("--courseid không dùng cùng --semester.")
+    if pretty and courseid is None:
         err_console.print("[red]Lỗi: --pretty (-p) chỉ được sử dụng khi truyền mã môn --courseid (-cid)[/red]")
         raise typer.Exit(code=1)
         
-    auth = require_auth("GetMarkByCourse" if courseid else "GetStudentMark")
+    auth = require_auth("GetMarkByCourse" if courseid is not None else "GetStudentMark")
     client = MyFapClient(auth)
 
-    if courseid:
+    if courseid is not None:
         try:
             with err_console.status(f"[bold green]Đang tải điểm chi tiết môn {courseid}..."):
                 data = client.get_mark_by_course(courseid)
             
             filename = f"BangDiem_{courseid}.json"
-            if pretty and isinstance(data, dict) and 'data' in data and data['data'] and '<table' in data['data']:
+            if pretty and isinstance(data, dict) and isinstance(data.get("data"), str) and "<table" in data["data"].lower():
                 data['data'] = parse_marks_html(data['data'])
                 filename = f"BangDiem_{courseid}_prettier.json"
                 
@@ -468,11 +499,12 @@ def marks(
 def exams(
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
     ics: bool = typer.Option(False, "--ics", help="Xuất lịch thi ra định dạng iCalendar (.ics)"),
-    full: bool = typer.Option(False, "--full", help="Kèm toàn bộ thông tin phụ khi xuất ICS (phòng thi, ghi chú, mã slot/UUID, điểm danh...)"),
+    full: bool = typer.Option(False, "--full", help="Kèm toàn bộ thông tin phụ khi xuất ICS (mã slot/UUID, ghi chú, điểm danh...)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch thi"""
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     auth = require_auth("GetScheduleExam")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
@@ -493,17 +525,18 @@ def exams(
 
 @app.command(name="week-timetable")
 def week_timetable(
-    week: Optional[int] = typer.Option(None, "--week", "-w", help="Số thứ tự của tuần (VD: 20)"),
+    week: Optional[int] = typer.Option(None, "--week", "-w", min=1, help="Số thứ tự của tuần (VD: 20)"),
     date: Optional[str] = typer.Option(None, "--date", "-d", help="Ngày cụ thể để tra cứu tuần (VD: 2026-05-17)"),
     semester: Optional[str] = typer.Option(None, "--semester", "-s", help="Tên kỳ học (VD: Summer2026)"),
-    year: Optional[int] = typer.Option(None, "--year", "-y", help="Năm học (VD: 2026)"),
+    year: Optional[int] = typer.Option(None, "--year", "-y", min=1, help="Năm học (VD: 2026)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Thư mục xuất file"),
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem lịch học theo tuần"""
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     now = datetime.now()
     requested_date = None
-    if date:
+    if date is not None:
         try:
             requested_date = datetime.strptime(date, "%Y-%m-%d")
         except ValueError:
@@ -522,7 +555,7 @@ def week_timetable(
             
         try:
             target_week = essential.get_week(date_str)
-            if date:
+            if date is not None:
                 err_console.print(f"Ngày {date_str} tương ứng với: Tuần {target_week}")
             else:
                 err_console.print(f"Chưa chỉ định tuần, tự động lấy tuần hiện tại (Tuần {target_week})")
@@ -550,14 +583,17 @@ def attendance(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Xem thông tin điểm danh"""
-    if bool(subject_code) != bool(class_name):
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
+    _check_non_empty_option(subject_code, "--subjectcode", "Mã môn học không được rỗng.")
+    _check_non_empty_option(class_name, "--classname", "Tên lớp học không được rỗng.")
+    if (subject_code is not None) != (class_name is not None):
         err_console.print("[red]Lỗi: Cần cả --subjectcode (-sc) và --classname (-cn) để xem chi tiết điểm danh.[/red]")
         raise typer.Exit(code=1)
-    auth = require_auth("getCourseAttendance" if subject_code else "GetStudentAttendances")
+    auth = require_auth("getCourseAttendance" if subject_code is not None else "GetStudentAttendances")
     client = MyFapClient(auth)
     sem = resolve_semester(auth, semester)
 
-    if subject_code or class_name:
+    if subject_code is not None or class_name is not None:
         try:
             with err_console.status(f"[bold green]Đang tải điểm danh môn {subject_code}..."):
                 data = client.get_course_attendance(sem, subject_code, class_name)
@@ -802,8 +838,7 @@ def other_subjects(
     stdout: bool = typer.Option(False, "--stdout", help="In kết quả ra màn hình thay vì lưu file")
 ):
     """Lấy tất cả môn học hoặc các môn của một kỳ chỉ định."""
-    if semester is not None and not semester.strip():
-        raise typer.BadParameter("Kỳ học không được rỗng.", param_hint="--semester")
+    _check_non_empty_option(semester, "--semester", "Kỳ học không được rỗng.")
     auth = require_auth("GetSubjets" if semester is None else "GetSubjectBySemester")
     other_client = MyFapOther(auth)
     try:

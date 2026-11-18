@@ -24,14 +24,16 @@ class VersionSelectionTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.path = Path(temporary.name) / "session.json"
 
-    def test_public_version_uses_parameter_then_session_then_v1(self):
+    def test_public_version_uses_parameter_then_session_then_default(self):
         auth = module.MyFapAuth(session_file=self.path)
-        self.assertEqual(auth.resolve_api_version(), "v1")
+        # Chưa có session: CLI mặc định v2.
+        self.assertEqual(auth.resolve_api_version(), "v2")
         self.path.write_text(json.dumps({"api_version": "v2"}), encoding="utf-8")
         self.assertEqual(auth.resolve_api_version(), "v2")
         explicit = module.MyFapAuth(api_version="v1", session_file=self.path)
         with patch.object(explicit.store, "read", side_effect=AssertionError("must not read")):
             self.assertEqual(explicit.resolve_api_version(), "v1")
+        # Session tồn tại nhưng thiếu trường version là session v1 cũ: giữ v1.
         self.path.write_text("{}", encoding="utf-8")
         self.assertEqual(auth.resolve_api_version(), "v1")
 

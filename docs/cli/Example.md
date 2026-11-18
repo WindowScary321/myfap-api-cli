@@ -14,26 +14,29 @@
     CLI Tool dựa trên MyFAP dành cho Sinh Viên FPTU
 
   Options:
-    -c, --campus TEXT  Mã cơ sở; dùng session, APHL chỉ mặc định cho v1
-    --config TEXT      Đường dẫn file session tùy chỉnh (thay vì mặc định
-                      ~/.myfap-api-cli/session.json)
-    --timeout SECONDS  Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
-    --help             Show this message and exit.
+    -c, --campus <str>       Mã cơ sở; dùng session, APHL chỉ mặc định cho v1
+    --config <str>           Đường dẫn file session tùy chỉnh
+    --timeout SECONDS        Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
+    --api-version [v1|v2]    Chọn v1/v2; ưu tiên option, MYFAP_API_VER, session, rồi v2
+    --help                   Show this message and exit.
 
   Commands:
     version         Hiển thị phiên bản MyFap API CLI
+    doctor          Chẩn đoán cấu hình explicit/default; không đọc hoặc làm mới session.
     login           Đăng nhập vào hệ thống FEID
     logout          Đăng xuất (Xóa session)
     refresh         Làm mới token (Refresh Token)
     campuses        Xem danh sách các cơ sở (Campus)
     semesters       Xem danh sách kỳ học
     schedule        Xem lịch học
-    marks           Xem bảng điểm
+    transcript      Lấy bảng điểm toàn khóa theo contract API đã chọn.
+    courses         Lấy danh sách khóa học theo kỳ.
+    marks           Xem bảng điểm theo kỳ, chi tiết môn hoặc tổng kết.
     exams           Xem lịch thi
     week-timetable  Xem lịch học theo tuần
     attendance      Xem thông tin điểm danh
     applications    Xem danh sách đơn từ đã gửi cho trường
-    news            Xem 10 thông báo gần nhất
+    news            Xem tin gần nhất hoặc tìm kiếm thông báo.
     info            Xem thông tin chung (sinh viên, campus)
     other           Các chức năng phụ trợ khác (survey, feedback, fee...)
   ```
@@ -137,15 +140,23 @@ Trước đây biến môi trường chỉ áp dụng cho request dữ liệu; n
   Các chức năng phụ trợ khác (survey, feedback, fee...)
 
   Options:
-    --help  Show this message and exit.
+    -c, --campus <str>       Mã cơ sở; dùng session, APHL chỉ mặc định cho v1
+    --config <str>           Đường dẫn file session tùy chỉnh
+    --timeout SECONDS        Timeout HTTP theo giây; ưu tiên hơn MYFAP_TIMEOUT
+    --api-version [v1|v2]    Chọn v1/v2; ưu tiên option, MYFAP_API_VER, session, rồi v2
+    --help                   Show this message and exit.
 
   Commands:
+    training      Lấy điểm phong trào theo kỳ.
     survey        Kiểm tra các survey chưa thực hiện
     feedback      Kiểm tra Feedback
+    feedbacks     Lấy danh sách feedback student (chỉ API v2); item schema chưa kiểm chứng positive.
     profile       Kiểm tra Update Profile
     notification  Xem thông báo qua MSSV
     fee           Lấy danh sách học phí và trạng thái thanh toán từng khoản
-    subjects      Lấy danh sách tất cả môn học
+    balance       Lấy số dư tài khoản; không diễn giải thành trạng thái nợ học phí.
+    subjects      Lấy tất cả môn học hoặc các môn của một kỳ chỉ định.
+    rating        Đánh giá dịch vụ; list hiện chỉ hỗ trợ API v1
   ```
 ### Refresh thủ công ``authen_key`` trong trường hợp cli bị lỗi
   ```

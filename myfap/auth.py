@@ -47,7 +47,11 @@ def create_survey_checksum(username: str) -> str:
 
 
 def _text(value):
-    return isinstance(value, str) and bool(value.strip())
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
 
 
 class MyFapAuth:
@@ -58,12 +62,14 @@ class MyFapAuth:
             raise AuthError("API version không hợp lệ.")
         if account_type is not None and not _text(account_type):
             raise AuthError("Loại tài khoản không hợp lệ.")
+        if session_file is not None and (not isinstance(session_file, (str, Path)) or not _text(str(session_file))):
+            raise AuthError("Đường dẫn file session không hợp lệ. Hãy kiểm tra --config.")
         self._requested = (campus, api_version, account_type)
         self.campus = campus or "APHL"
         self.api_version = api_version or "v1"
         self.account_type = account_type or "student"
         self.timeout = resolve_timeout(timeout)
-        self.session_file = Path(session_file) if session_file else SESSION_FILE
+        self.session_file = Path(session_file) if session_file is not None else SESSION_FILE
         self.store = SessionStore(self.session_file)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "okhttp/4.9.2"})
@@ -127,7 +133,7 @@ class MyFapAuth:
                 data = self.store.read()
         except SessionStoreError:
             raise AuthError("Không đọc được API version trong session an toàn. Hãy kiểm tra --config.") from None
-        version = data.get("api_version", "v1") if data is not None else "v1"
+        version = data.get("api_version", "v1") if data is not None else "v2"
         if version not in ("v1", "v2"):
             raise AuthError("Session có API version không hợp lệ. Hãy đăng nhập lại hoặc chỉ định --api-version.")
         return version
@@ -375,9 +381,11 @@ class MyFapAuth:
                 except SessionFormatError:
                     existing = None
                 stored_campus = existing.get("campus") if existing is not None else None
-                stored_version = existing.get("api_version", "v1") if existing is not None else "v1"
+                stored_version = existing.get("api_version", "v1") if existing is not None else "v2"
                 self.campus = self._requested[0] or (stored_campus if _text(stored_campus) else "APHL")
-                self.api_version = self._requested[1] or (stored_version if stored_version in ("v1", "v2") else "v1")
+                self.api_version = self._requested[1] or stored_version
+                if self.api_version not in ("v1", "v2"):
+                    raise AuthError("Session có API version không hợp lệ. Hãy chỉ định --api-version khi đăng nhập.")
                 self.account_type = self._requested[2] or "student"
             self._check_supported()
             oidc = self._oidc()

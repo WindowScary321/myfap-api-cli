@@ -123,9 +123,13 @@ def _authenticated_get(session, auth, operation, identifier, *, timeout, campus=
                 auth=auth, operation=operation, params_factory=build_params, preserve_data=preserve_data)
 
 
+def _validate_text(value, message):
+    if not isinstance(value, str) or not value.strip() or any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ApiError(message)
+
+
 def _validate_semester(semester):
-    if not isinstance(semester, str) or not semester.strip() or any(ord(character) < 32 for character in semester):
-        raise ApiError("Kỳ học phải là chuỗi không rỗng, không chứa ký tự điều khiển.")
+    _validate_text(semester, "Kỳ học phải là chuỗi không rỗng, không chứa ký tự điều khiển.")
 
 
 def _semester_start(semester):
@@ -292,6 +296,7 @@ class MyFapClient:
 
     def get_schedule(self, semester: str):
         """Lấy lịch học theo kỳ."""
+        _validate_semester(semester)
         return _authenticated_get(self.session, self.auth, "GetActivityStudent", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
 
@@ -303,6 +308,7 @@ class MyFapClient:
 
     def get_marks(self, semester: str):
         """Lấy bảng điểm theo kỳ."""
+        _validate_semester(semester)
         return _authenticated_get(self.session, self.auth, "GetStudentMark", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
 
@@ -327,26 +333,34 @@ class MyFapClient:
 
     def get_mark_by_course(self, course_id: str):
         """Lấy điểm chi tiết của môn học, gồm dữ liệu HTML."""
+        if not (isinstance(course_id, int) and not isinstance(course_id, bool) and course_id > 0):
+            _validate_text(course_id, "Mã môn học không hợp lệ.")
         return _authenticated_get(self.session, self.auth, "GetMarkByCourse", self.auth.mssv,
                                   student=True, params={"CourseId": course_id}, timeout=self.timeout, api_version=self.api_version)
 
     def get_exams(self, semester: str):
         """Lấy lịch thi theo kỳ."""
+        _validate_semester(semester)
         return _authenticated_get(self.session, self.auth, "GetScheduleExam", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
 
     def get_schedule_by_week(self, week: int, semester: str, year: int):
         """Lấy lịch học theo tuần."""
+        _validate_semester(semester)
         return _authenticated_get(self.session, self.auth, "GetActivityStudentByWeek", self.auth.mssv,
                                   student=True, params={"week": week, "Semester": semester, "year": year}, timeout=self.timeout, api_version=self.api_version)
 
     def get_attendances(self, semester: str):
         """Lấy trạng thái điểm danh tổng quát theo kỳ."""
+        _validate_semester(semester)
         return _authenticated_get(self.session, self.auth, "GetStudentAttendances", self.auth.mssv,
                                   student=True, params={"Semester": semester}, timeout=self.timeout, api_version=self.api_version)
 
     def get_course_attendance(self, semester: str, subject_code: str, class_name: str):
         """Lấy chi tiết điểm danh một môn học."""
+        _validate_semester(semester)
+        _validate_text(subject_code, "Mã môn học và tên lớp không hợp lệ.")
+        _validate_text(class_name, "Mã môn học và tên lớp không hợp lệ.")
         return _authenticated_get(self.session, self.auth, "getCourseAttendance", self.auth.mssv,
                                   student=True, params={"Semester": semester, "SubjectCode": subject_code, "ClassName": class_name}, timeout=self.timeout, api_version=self.api_version)
 

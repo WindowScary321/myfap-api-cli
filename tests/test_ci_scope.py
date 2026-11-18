@@ -14,6 +14,7 @@ from scripts import ci_scope
 class ScopePolicyTests(unittest.TestCase):
     def test_repository_only_changes_skip_checks(self):
         for paths in ([], ["docs/Example.md"], ["tasks/phase0.md"],
+                      ["docs/cli/Example.md", "docs/discovery/todo.md"],
                       ["docs/old.md", "docs/new.md", "tasks/todo.md"]):
             with self.subTest(paths=paths):
                 self.assertFalse(ci_scope.paths_require_checks(paths))
