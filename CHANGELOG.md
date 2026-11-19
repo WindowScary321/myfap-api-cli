@@ -1,10 +1,14 @@
 # Lịch sử thay đổi
 
-## [0.2.0] - Chưa phát hành
+## [0.2.1] - Chưa phát hành
 
 ### API và dữ liệu
 
 - Đã cập nhật năm GET proxy v2 theo myFAP Android 2.0.7/build 32: profile, marks summary, applications, kiểm tra feedback và notification bỏ query `Authen`. Credential vẫn nằm trong Bearer/Checksum; header dùng key mới sau refresh. V1 và output giữ nguyên. Cả năm command đã được nghiệm thu trên CLI v2/HN với HTTP/body 200; xem bằng chứng từ app, CLI và các giới hạn tại [báo cáo build 32](docs/discovery/build32-verification.md).
+
+## [0.2.0] - 18/11/2026
+
+### API và dữ liệu
 
 - Thêm tùy chọn `--ics` và `--full` cho `myfap exams`: xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ Việt Nam, UID/DTSTAMP UTC, CRLF); mặc định xuất ICS đưa đầy đủ các thông tin quan trọng (Môn, Phòng thi `roomNo`, Ngày công bố `dateofPublication`), chỉ ẩn mã slot UUID, ghi chú phụ và điểm danh; cờ `--full` kèm toàn bộ thông tin phụ vào sự kiện lịch; xuất JSON mặc định tiếp tục bảo toàn đầy đủ 100% dữ liệu gốc.
 - Thêm `myfap other feedbacks` đọc danh sách feedback student qua `GetStudentFeedbacks`, chỉ có trên proxy API v2; envelope đã kiểm chứng live nhưng item schema chưa có positive (danh sách rỗng trên tài khoản kiểm chứng).

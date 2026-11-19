@@ -72,8 +72,9 @@ Kiểm thử local: 44 test liên quan đều đạt; toàn bộ suite có 437 t
 exit 0. Hai test mới kiểm tra URL của request và việc từ chối query Authen do caller đưa vào.
 Regression URL thất bại ở cả năm operation trước sửa và đạt sau sửa.
 Các bước build wheel/sdist, Twine strict, kiểm tra artifact và cài thử bằng pip đều
-exit 0, dùng artifact mới trong thư mục tạm ngoài repo. Phiên bản package
-vẫn là `0.2.0`; dependency và pipeline publish giữ nguyên.
+exit 0, dùng artifact mới trong thư mục tạm ngoài repo. Lượt kiểm tra trên dùng
+package `0.2.0`; dependency và pipeline publish giữ nguyên. Bản cập nhật build 32
+được chuẩn bị phát hành dưới version `0.2.1`.
 
 Rating, push và feedback form/submit tiếp tục tạm hoãn, giữ các điều kiện về schema/ack.
 Các finding v1 và TODO positive fee/survey vẫn mở. Báo cáo chỉ ghi metadata,

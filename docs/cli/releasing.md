@@ -6,9 +6,9 @@ Xem [release notes](../../CHANGELOG.md), [checklist Phase 5](../discovery/phase5
 
 ## 1. Quyết định phạm vi trước release
 
-`0.2.0` mặc định v2 khi chưa có session; option `--api-version`, `MYFAP_API_VER` và binding session có thứ tự ưu tiên như [hướng dẫn chọn version](api-versions.md). CLI không fallback im lặng. Trước tag, maintainer phải xác nhận:
+Phiên bản chuẩn bị phát hành là `0.2.1`, mặc định v2 khi chưa có session; option `--api-version`, `MYFAP_API_VER` và binding session có thứ tự ưu tiên như [hướng dẫn chọn version](api-versions.md). CLI không fallback im lặng. Trước tag, maintainer phải xác nhận:
 
-- Chấp nhận phạm vi và known issues trong mục `0.2.0` của `CHANGELOG.md`.
+- Chấp nhận phạm vi và known issues trong mục `0.2.1` của `CHANGELOG.md`, cùng các giới hạn còn áp dụng từ `0.2.0`.
 - Ba finding v1 vẫn được ghi đúng: news/notification HTTP 200/body 201, fee HTTP 404 trên APHL; nguyên nhân chưa biết. Không gọi chúng là đã sửa, empty hợp lệ hoặc unsupported trên mọi campus.
 - Positive fee/survey được hoãn theo quyết định ngày 19/10/2026; schema live có dữ liệu vẫn chưa kiểm chứng. Việc hoãn không chặn chuyển Phase 5 nhưng không phải bằng chứng backend đạt.
 - Reader độc lập đã kiểm ICS (lịch học `schedule --ics` và lịch thi `exams --ics`); import vào ứng dụng lịch thật đã kiểm chứng. Theo quyết định ngày 23/10/2026, phát hành `v0.2.0` sau khi hoàn thiện và nghiệm thu phạm vi Phase 6 (toàn bộ read student v1+v2, doctor, transcript --pretty, exams --ics; các thao tác ghi mục 4–5 giữ gate do thiếu dữ liệu tài khoản).
@@ -38,7 +38,7 @@ Cấu hình sau cần được maintainer kiểm tra trực tiếp; file workflo
 ## 3. Chuẩn bị commit và tag
 
 1. Kiểm working tree sạch, PR chuẩn bị release đã merge và lấy `main`/tag mới nhất.
-2. Đối chiếu `[project].version`, root package trong `uv.lock`, CLI và artifact. Baseline đã là `0.2.0`; không bump lại từ `0.1.8`. Chỉ chạy `uv lock` khi metadata thực sự đổi, không sửa tay lockfile hoặc dùng `--upgrade` cho release thông thường.
+2. Đối chiếu `[project].version`, root package trong `uv.lock`, CLI và artifact; tất cả phải là `0.2.1`. Bản `0.2.0` đã có release, không dùng lại tag hoặc version đó cho bản cập nhật này. Chỉ chạy `uv lock` khi metadata thực sự đổi, không sửa tay lockfile hoặc dùng `--upgrade` cho release thông thường.
 3. Kiểm PyPI để biết version mục tiêu đã tồn tại hay chưa. Nếu version đã phát hành trước đó mà không phải đang phục hồi cùng release/artifact, dừng và để maintainer chọn version mới.
 4. Chạy regression, build, Twine, validator và cài artifact theo [hướng dẫn phát triển](development.md#kiểm-tra-trên-máy-local). Ghi commit, lệnh, exit code và các phần chưa kiểm chứng.
 5. Duyệt mục version trong `CHANGELOG.md`, coverage và quyết định phạm vi ở mục 1. Tag phải trỏ tới commit thuộc `origin/main`.
@@ -51,8 +51,8 @@ git switch main
 git pull --ff-only origin main
 git status --short --branch
 # Xác nhận version, notes, CI và phạm vi trước hai lệnh tiếp theo.
-git tag -a v0.2.0 -m "Phát hành myfap 0.2.0"
-git push origin v0.2.0
+git tag -a v0.2.1 -m "Phát hành myfap 0.2.1"
+git push origin v0.2.1
 ```
 
 Không dùng `--force`, không di chuyển/xóa tag để sửa một release đã upload. Stable pipeline chỉ nhận tag chuẩn `vX.Y.Z`, không nhận prerelease hoặc thành phần số có zero đứng đầu.
