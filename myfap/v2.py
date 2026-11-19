@@ -1,4 +1,4 @@
-"""HTTP contracts for the opt-in FAP proxy adapter."""
+"""HTTP contracts for the FAP proxy adapter."""
 
 import base64
 import hashlib
@@ -46,7 +46,6 @@ _READ_QUERY_FIELDS = {
     "GetCampusInfo": ("rollNumber",),
     "GetWeekByDate": ("date",),
 }
-_AUTHEN_QUERY_OPERATIONS = frozenset({"CheckOpenFeedBack", "CheckUpdateProfile", "GetApplication", "GetNotificationByRoll", "GetSemesterMark"})
 READ_OPERATIONS = frozenset(_READ_QUERY_FIELDS)
 SUPPORTED_OPERATIONS = BOOTSTRAP_OPERATIONS | READ_OPERATIONS | {"AuthenticationByFeId"}
 
@@ -62,7 +61,7 @@ def _positive_int(value):
     )
 
 
-def _read_params(operation, params, campus, credential):
+def _read_params(operation, params, campus):
     query = {}
     if operation not in {"GetSemester", "GetWeekByDate"}:
         if params.pop("CampusCode", campus) != campus:
@@ -82,9 +81,6 @@ def _read_params(operation, params, campus, credential):
         if not valid:
             raise ApiError("Giá trị trong query API v2 không hợp lệ.")
     query.update(params)
-    if operation in _AUTHEN_QUERY_OPERATIONS:
-        # The query and signature must use the same freshly bound key after refresh.
-        query["Authen"] = credential
     return query
 
 
@@ -124,7 +120,7 @@ def request(session, operation, *, credential=None, campus=None, params=None, bo
         else:
             if body is not None:
                 raise ApiError("Operation đọc API v2 không nhận JSON body.")
-            params = _read_params(operation, params, campus, credential)
+            params = _read_params(operation, params, campus)
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Accept-Encoding": "gzip",

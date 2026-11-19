@@ -4,12 +4,14 @@ Tài liệu này hợp nhất mapping command → operation → method/URL → c
 
 ## Bổ sung Phase 6 đang review
 
+**Cập nhật build 32 (18/11/2026):** năm lệnh `other profile`, `marks --summary`, `applications`, `other feedback`, `other notification` chỉ gửi `CampusCode`, `rollNumber` trong query v2, bỏ `Authen`. V1 giữ nguyên. `marks --summary` gọi `GetSemesterMark`; hai luồng xem điểm còn lại dùng `marks` (`GetStudentMark`) và điểm chi tiết (`GetMarkByCourse`). Cả năm command đã được nghiệm thu trên CLI v2/HN với HTTP/body 200. [Báo cáo build 32](../discovery/build32-verification.md) ghi riêng bằng chứng tĩnh, traffic app qua Fiddler và kết quả chạy CLI.
+
 Mapping theo mốc Phase 5 trong tài liệu này được giữ làm lịch sử. Capability đọc mới, query ngoại lệ, doctor và giới hạn hiện tại nằm tại [coverage Phase 6](../discovery/phase6-coverage.md); đối chiếu toàn bộ 82 route của APK với CLI nằm tại [phân tích khoảng trống endpoint](../discovery/endpoint-gap-analysis.md). Các dòng “chưa tích hợp” ở phần inventory Phase 5 bên dưới cần đọc theo mốc commit ban đầu, không phải trạng thái code Phase 6 mới nhất. Chưa publish Phase 6 hoặc đánh dấu các luồng ghi đã đạt.
 
 ## Phạm vi theo kế hoạch
 
 - **Phase 4:** phủ command đọc hiện có, lập coverage và kiểm chứng live. Xem [coverage Phase 4](../discovery/phase4-coverage.md).
-- **Phase 5:** chuẩn bị và nghiệm thu pipeline phát hành. Có code và CI xanh chưa đồng nghĩa đã publish `0.2.0`; xem [checklist Phase 5](../discovery/phase5.md).
+- **Phase 5:** chuẩn bị và nghiệm thu pipeline phát hành. Có code và CI xanh chưa đồng nghĩa đã publish `0.2.1`; xem [checklist Phase 5](../discovery/phase5.md).
 - **Phase 6:** thêm các chức năng/API mới, nghiệm thu trước khi tạo tag/publish theo quyết định ngày 23/10/2026. Không tự mở route chỉ vì có tên trong APK; cần contract, capability, fixture và kiểm chứng riêng.
 
 Ba giai đoạn trên theo mục Phase 4–6 trong `PLAN.md` và `PLAN-PHASES.md` của workspace phân tích. Hai file kế hoạch nằm ngoài repository CLI; không cần đóng gói chúng vào artifact.

@@ -1,12 +1,18 @@
 # Lịch sử thay đổi
 
-## [0.2.0] - Chưa phát hành
+## [0.2.1] - Chưa phát hành
+
+### API và dữ liệu
+
+- Đã cập nhật năm GET proxy v2 theo myFAP Android 2.0.7/build 32: profile, marks summary, applications, kiểm tra feedback và notification bỏ query `Authen`. Credential vẫn nằm trong Bearer/Checksum; header dùng key mới sau refresh. V1 và output giữ nguyên. Cả năm command đã được nghiệm thu trên CLI v2/HN với HTTP/body 200; xem bằng chứng từ app, CLI và các giới hạn tại [báo cáo build 32](docs/discovery/build32-verification.md).
+
+## [0.2.0] - 18/11/2026
 
 ### API và dữ liệu
 
 - Thêm tùy chọn `--ics` và `--full` cho `myfap exams`: xuất lịch thi ra định dạng iCalendar chuẩn RFC 5545 (giờ Việt Nam, UID/DTSTAMP UTC, CRLF); mặc định xuất ICS đưa đầy đủ các thông tin quan trọng (Môn, Phòng thi `roomNo`, Ngày công bố `dateofPublication`), chỉ ẩn mã slot UUID, ghi chú phụ và điểm danh; cờ `--full` kèm toàn bộ thông tin phụ vào sự kiện lịch; xuất JSON mặc định tiếp tục bảo toàn đầy đủ 100% dữ liệu gốc.
 - Thêm `myfap other feedbacks` đọc danh sách feedback student qua `GetStudentFeedbacks`, chỉ có trên proxy API v2; envelope đã kiểm chứng live nhưng item schema chưa có positive (danh sách rỗng trên tài khoản kiểm chứng).
-- `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc: mỗi bảng giữ header riêng (bảng chính 10 cột `No`…`Status`, bảng phụ 7 cột) và hàng dữ liệu keyed theo header, chuẩn hoá `&nbsp;`; không dùng `--pretty` vẫn giữ chuỗi HTML nguyên bản theo contract.
+- `transcript --pretty` phân tích HTML bảng điểm toàn khóa thành JSON cấu trúc: mỗi bảng giữ header riêng (bảng chính 10 cột `No`…`Status`, bảng phụ 7 cột) và hàng dữ liệu keyed theo header, chuẩn hóa `&nbsp;`; không dùng `--pretty` vẫn giữ chuỗi HTML nguyên bản theo contract.
 - `doctor --api-version v2 --online` báo thêm `backend_version` qua `GetVersion` POST bootstrap; GET bị proxy từ chối 405 và route v1 đã 404. `myfap version` vẫn chỉ đọc package version offline.
 - Thêm [phân tích khoảng trống endpoint](docs/discovery/endpoint-gap-analysis.md) đối chiếu 82 route của APK với adapter: CLI phủ toàn bộ operation đọc student (ngoại trừ `GetStudentFeedbackForm` đang gate có chủ đích chờ `feedbackId` thực tế); donor/employee, login thay thế và OTA được ghi rõ out of scope.
 - Chuyển training và nhóm rating vào `other`: dùng `myfap other training` và `myfap other rating list`, không giữ command root cũ. Endpoint, policy retry và capability từng version không đổi.

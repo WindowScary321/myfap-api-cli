@@ -108,7 +108,6 @@ class VersionedApiTests(unittest.TestCase):
     def test_existing_read_wrappers_use_v2_contracts_and_preserve_output(self):
         student = {"CampusCode": "TEST", "rollNumber": "TEST+ROLL"}
         with_semester = {**student, "Semester": "Fall2026"}
-        with_authen = {**student, "Authen": "FAKE_OLD_KEY"}
         cases = (
             (api.MyFapEssential, "get_week", ("2026-10-17",), "GetWeekByDate", {"date": "2026-10-17"}, "42"),
             (api.MyFapEssential, "get_news", (), "GetTop10News", {"CampusCode": "TEST", "type": 1}, []),
@@ -118,12 +117,17 @@ class VersionedApiTests(unittest.TestCase):
             (api.MyFapClient, "get_schedule_by_week", (42, "Fall2026", 2026), "GetActivityStudentByWeek", {**with_semester, "week": 42, "year": 2026}, []),
             (api.MyFapClient, "get_attendances", ("Fall2026",), "GetStudentAttendances", with_semester, []),
             (api.MyFapClient, "get_course_attendance", ("Fall2026", "DEMO", "CLASS"), "GetCourseAttendance", {**with_semester, "SubjectCode": "DEMO", "ClassName": "CLASS"}, []),
-            (api.MyFapClient, "get_applications", (), "GetApplication", with_authen, []),
+            (api.MyFapClient, "get_applications", (), "GetApplication", student, []),
             (api.MyFapClient, "get_student_info", (), "GetStudentById", student, [{"fixture": "student"}]),
             (api.MyFapClient, "get_campus_info", (), "GetCampusInfo", student, [{"fixture": "campus"}]),
-            (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack", with_authen, True),
-            (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile", with_authen, False),
-            (api.MyFapOther, "get_notification", (), "GetNotificationByRoll", with_authen, []),
+            (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack", student, True),
+            (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile", student, False),
+            (api.MyFapOther, "get_notification", (), "GetNotificationByRoll", student, [{
+                "id": "FAKE-NOTICE", "title": "Synthetic notice", "contents": "Synthetic content",
+                "entryBy": "FAKE-SENDER", "entryDate": "2026-11-18", "rollnumbers": "TEST+ROLL",
+                "topic": "Synthetic topic", "campusCode": "TEST", "pType": True,
+                "uRL": "https://example.invalid/notice",
+            }]),
             (api.MyFapOther, "get_fee", (), "GeFeeByRoll", student, [
                 {"IsPaid": True, "invoice": "FAKE-PAID", "amount": 1000},
                 {"IsPaid": False, "invoice": "FAKE-UNPAID", "amount": "2000.50"},
@@ -144,7 +148,7 @@ class VersionedApiTests(unittest.TestCase):
         self.session.post.assert_not_called()
         self.auth.refresh_session.assert_not_called()
 
-    def test_query_authen_and_canonical_reads_are_rebuilt_after_refresh(self):
+    def test_v2_reads_keep_query_stable_and_rebind_headers_after_refresh(self):
         cases = (
             (api.MyFapOther, "check_open_feedback", (), "CheckOpenFeedBack"),
             (api.MyFapOther, "check_update_profile", (), "CheckUpdateProfile"),
@@ -173,9 +177,10 @@ class VersionedApiTests(unittest.TestCase):
                 self.assertTrue(second.args[0].endswith("/" + operation))
                 self.assertEqual(second.kwargs["headers"]["Authorization"], "Bearer FAKE_NEW_KEY")
                 self.assertNotEqual(first.kwargs["headers"]["Checksum"], second.kwargs["headers"]["Checksum"])
-                if operation in {"CheckOpenFeedBack", "CheckUpdateProfile", "GetNotificationByRoll", "GetApplication"}:
-                    self.assertEqual(first.kwargs["params"]["Authen"], "FAKE_OLD_KEY")
-                    self.assertEqual(second.kwargs["params"]["Authen"], "FAKE_NEW_KEY")
+                self.assertEqual(first.kwargs["headers"]["Authorization"], "Bearer FAKE_OLD_KEY")
+                self.assertEqual(first.kwargs["params"], second.kwargs["params"])
+                self.assertNotIn("Authen", first.kwargs["params"])
+                self.assertNotIn("Authen", second.kwargs["params"])
 
     def test_new_v2_reads_preserve_empty_errors_and_never_fall_back(self):
         cases = (

@@ -46,7 +46,7 @@ uv run --locked --group ci python -m unittest discover -s tests -v
 uv build --out-dir dist
 uv run --locked --group ci python -m twine check --strict dist/*.whl dist/*.tar.gz
 uv run --locked --group ci python scripts/check_artifacts.py --dist-dir dist
-uv run --locked --group ci python scripts/smoke_install.py --artifact-dir dist --expected-version 0.2.0
+uv run --locked --group ci python scripts/smoke_install.py --artifact-dir dist --expected-version 0.2.1
 ```
 
 Thư mục artifact phải chỉ chứa wheel/sdist của version hiện tại và manifest. Nếu còn file build cũ, copy ra ngoài trước khi chạy
